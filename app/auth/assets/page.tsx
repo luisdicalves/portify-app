@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { StepHeader } from '@/components/ui/StepHeader';
 
 const ASSET_TYPES = [
   { id: 'stocks', icon: 'candlestick_chart', label: 'Ações', desc: 'Apple, Tesla, Nvidia e outras cotadas.' },
@@ -24,21 +25,7 @@ export default function AssetsPage() {
 
   return (
     <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
-      {/* Header */}
-      <div style={{ padding: '20px 24px 0' }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)' }}>arrow_back_ios_new</span>
-        </button>
-        {/* Step indicator */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-          {[0,1,2].map(i => (
-            <div key={i} style={{ height: 4, flex: 1, borderRadius: 'var(--radius-full)', background: i === 0 ? 'var(--primary-strong)' : 'var(--outline-variant)' }} />
-          ))}
-        </div>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--primary)', marginBottom: 6 }}>Passo 1 de 3</div>
-        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2 }}>O que pretende gerir?</div>
-        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 6 }}>Escolha os tipos de ativo para o seu portfólio.</div>
-      </div>
+      <StepHeader step={1} total={6} back={() => router.back()} title="O que pretende gerir?" sub="Escolha os tipos de ativo para o seu portfólio." />
 
       {/* Asset types */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, padding: '24px 24px 0' }}>
@@ -71,7 +58,7 @@ export default function AssetsPage() {
         <button
           className="btn-primary"
           disabled={selected.size === 0}
-          onClick={() => router.push('/dashboard')}
+          onClick={() => router.push('/auth/experience')}
           style={{ opacity: selected.size === 0 ? 0.5 : 1 }}
         >
           Continuar
