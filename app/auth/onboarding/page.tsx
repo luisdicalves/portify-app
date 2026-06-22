@@ -23,8 +23,8 @@ export default function OnboardingPage() {
         }}>{t.skip}</button>
       </div>
 
-      {/* Illustration */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+      {/* Illustration — altura fixa para não variar com o texto */}
+      <div style={{ height: 280, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{
           width: 160, height: 160, borderRadius: 40,
           background: 'var(--primary-container)',
@@ -36,8 +36,8 @@ export default function OnboardingPage() {
         </div>
       </div>
 
-      {/* Text */}
-      <div style={{ padding: '0 32px', textAlign: 'center' }}>
+      {/* Text — altura fixa para os dots não saltarem */}
+      <div style={{ padding: '0 32px', textAlign: 'center', minHeight: 120 }}>
         <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.2, marginBottom: 12 }}>
           {steps[step].title}
         </div>
@@ -47,7 +47,7 @@ export default function OnboardingPage() {
       </div>
 
       {/* Dots */}
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 32 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 24 }}>
         {steps.map((_, i) => (
           <div key={i} style={{
             width: i === step ? 24 : 8,
