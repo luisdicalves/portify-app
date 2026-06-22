@@ -30,20 +30,22 @@ export default function SectorsPage() {
     <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
       <StepHeader step={5} total={6} back={() => router.back()} title="Setores de interesse" sub="Escolha as áreas que quer acompanhar." />
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px 0' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 0' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
           {SECTORS.map(s => {
             const on = selected.has(s.id);
             return (
               <button key={s.id} onClick={() => toggle(s.id)} style={{
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
-                padding: '16px 8px',
-                background: on ? 'var(--primary-container)' : 'var(--surface-lowest)',
-                border: `2px solid ${on ? 'var(--primary-strong)' : 'var(--card-border)'}`,
-                borderRadius: 'var(--radius-xl)', cursor: 'pointer', transition: 'all .15s',
+                display: 'inline-flex', alignItems: 'center', gap: 7,
+                padding: '9px 14px',
+                background: on ? 'var(--primary-strong)' : 'var(--surface-low)',
+                border: `1px solid ${on ? 'var(--primary-strong)' : 'var(--card-border)'}`,
+                borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all .15s',
+                fontSize: 14, fontWeight: 600,
+                color: on ? '#fff' : 'var(--on-surface)',
               }}>
-                <span className={`material-symbols-outlined${on ? ' icf' : ''}`} style={{ fontSize: 28, color: on ? 'var(--primary-strong)' : 'var(--on-surface-variant)' }}>{s.icon}</span>
-                <span style={{ fontSize: 12, fontWeight: 600, color: on ? 'var(--primary)' : 'var(--on-surface)', textAlign: 'center', lineHeight: 1.2 }}>{s.label}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: on ? '#fff' : 'var(--on-surface-variant)' }}>{s.icon}</span>
+                {s.label}
               </button>
             );
           })}

@@ -49,19 +49,24 @@ export default function PinSetPage() {
         </button>
       </div>
 
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, textAlign: 'center' }}>
+        {/* Icon */}
+        <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--primary)' }}>lock_reset</span>
+        </div>
+
+        <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
           {step === 'set' ? 'Defina o seu PIN' : 'Confirme o PIN'}
         </div>
-        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 6 }}>
+        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', maxWidth: 240 }}>
           {step === 'set' ? 'Crie um código de 6 dígitos para proteger a conta' : 'Introduza o PIN novamente para confirmar'}
         </div>
 
         {error && (
-          <div style={{ fontSize: 13, color: 'var(--loss)', marginTop: 12 }}>{error}</div>
+          <div style={{ fontSize: 13, color: 'var(--loss)' }}>{error}</div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 32 }}>
+        <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
           {[0,1,2,3,4,5].map(i => (
             <div key={i} className={`pin-dot${i < current.length ? ' filled' : ''}`} />
           ))}
