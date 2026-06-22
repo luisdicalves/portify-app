@@ -33,7 +33,7 @@ export default function RegisterPage() {
         options: { data: { first_name: form.firstName, last_name: form.lastName } },
       });
       if (error) throw error;
-      router.push('/auth/onboarding');
+      router.push('/auth/pin-set');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Erro ao criar conta.');
     } finally {
