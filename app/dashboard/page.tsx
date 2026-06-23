@@ -1,115 +1,96 @@
 'use client';
 
-import { useApp } from '@/lib/context';
-import { useDict } from '@/lib/dict';
+import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 
-const SECTORS = [
-  { label: 'tech', pct: 48, color: '#0052cc' },
-  { label: 'health', pct: 22, color: '#047a3d' },
-  { label: 'energy', pct: 18, color: '#f59e0b' },
-  { label: 'others', pct: 12, color: '#8d90a0' },
-];
-
-const HOLDINGS = [
-  { ticker: 'AAPL', name: 'Apple Inc.', value: '€ 24.342,80', change: '+2,14%', gain: true },
-  { ticker: 'MSFT', name: 'Microsoft Corp.', value: '€ 18.120,00', change: '+0,87%', gain: true },
-  { ticker: 'TSLA', name: 'Tesla Inc.', value: '€ 6.540,00', change: '-1,23%', gain: false },
-];
-
 export default function DashboardPage() {
-  const { lang, theme, toggleTheme } = useApp();
-  const t = useDict(lang);
+  const router = useRouter();
 
   return (
-    <div className="phone-shell">
-      {/* Top bar */}
-      <div className="top-bar">
-        <div>
-          <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', fontWeight: 500 }}>{new Date().toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-          <div style={{ fontSize: 18, fontWeight: 700 }}>{t.greeting}</div>
+    <div className="phone-shell" style={{ overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span className="material-symbols-outlined icf" style={{ fontSize: 30, color: 'var(--primary)' }}>account_circle</span>
+          <div style={{ lineHeight: 1.15 }}>
+            <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Bem-vindo de volta</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.01em' }}>Luís</div>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <button onClick={toggleTheme} style={{ background: 'var(--surface-high)', border: 'none', borderRadius: 'var(--radius-full)', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
-          </button>
-          <button style={{ background: 'var(--surface-high)', border: 'none', borderRadius: 'var(--radius-full)', width: 36, height: 36, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>notifications</span>
-            <div style={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, borderRadius: '50%', background: 'var(--loss)', border: '2px solid var(--bg)' }} />
-          </button>
-          <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 700, color: 'var(--primary-strong)' }}>R</div>
-        </div>
+        <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)' }}>notifications</span>
       </div>
 
-      <div className="screen-content">
-        {/* Portfolio value card */}
-        <div style={{ margin: '20px 20px 0', padding: 24, background: 'var(--primary-strong)', borderRadius: 'var(--radius-2xl)', color: '#fff', boxShadow: '0 8px 32px rgba(0,82,204,0.35)' }}>
-          <div style={{ fontSize: 13, fontWeight: 500, opacity: 0.75, marginBottom: 6 }}>{t.totalValue}</div>
-          <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1 }}>€ 52.840,60</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'rgba(255,255,255,0.18)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontSize: 13, fontWeight: 600 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_upward</span>+€ 624,30 · +1,20%
-            </span>
-            <span style={{ fontSize: 12, opacity: 0.6 }}>{t.dailyPerf}</span>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-            <div><div style={{ fontSize: 11, opacity: 0.65 }}>{t.assets}</div><div style={{ fontSize: 15, fontWeight: 700 }}>12</div></div>
-            <div><div style={{ fontSize: 11, opacity: 0.65 }}>{t.totalGain}</div><div style={{ fontSize: 15, fontWeight: 700 }}>+12,4%</div></div>
-            <div><div style={{ fontSize: 11, opacity: 0.65 }}>{lang === 'pt' ? 'Desde início' : 'Since start'}</div><div style={{ fontSize: 15, fontWeight: 700 }}>2018</div></div>
+      {/* Scroll content */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '16px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+        {/* Portfolio value */}
+        <div onClick={() => router.push('/dashboard/net-worth')} style={{ cursor: 'pointer' }}>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Valor total do portfólio</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+            <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>€ 142.580,42</span>
+            <span style={{ color: 'var(--gain)', fontSize: 13, fontWeight: 600 }}>+2,45%</span>
           </div>
         </div>
 
-        {/* Allocation */}
-        <div style={{ margin: '20px 20px 0', padding: 20, background: 'var(--surface-lowest)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--card-border)' }}>
-          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>{t.allocation}</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {SECTORS.map(s => (
-              <div key={s.label}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 500 }}>{t[s.label as keyof typeof t] as string}</span>
-                  <span style={{ fontWeight: 700, color: s.color }}>{s.pct}%</span>
-                </div>
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${s.pct}%`, background: s.color }} />
-                </div>
+        {/* Performance chart */}
+        <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+          <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
+            <defs>
+              <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path d="M0,76 Q40,70 70,72 T140,44 T210,54 T270,16 T320,28 L320,96 L0,96 Z" fill="url(#pHomeG)" />
+            <path d="M0,76 Q40,70 70,72 T140,44 T210,54 T270,16 T320,28" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" />
+          </svg>
+        </div>
+
+        {/* Stat cards row */}
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div onClick={() => router.push('/dashboard/net-worth')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>savings</span>
+            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Património líquido</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>131.4k €</div>
+          </div>
+          <div onClick={() => router.push('/dashboard/performance')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>trending_up</span>
+            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Retorno total</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+12,4%</div>
+          </div>
+        </div>
+
+        {/* Daily performance */}
+        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Destaques do dia</div>
+
+          <div onClick={() => router.push('/portfolio/NVDA')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--gain-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px', marginBottom: 9 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: 'var(--gain)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>arrow_upward</span>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Top holdings */}
-        <div style={{ margin: '20px 0 0' }}>
-          <div className="section-header">{lang === 'pt' ? 'Principais Posições' : 'Top Holdings'}</div>
-          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-xl)', margin: '0 20px', overflow: 'hidden' }}>
-            {HOLDINGS.map((h, i) => (
-              <div key={h.ticker} className="list-row" style={i === HOLDINGS.length - 1 ? { borderBottom: 'none' } : {}}>
-                <div className="asset-icon">{h.ticker.slice(0, 2)}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 15, fontWeight: 600 }}>{h.ticker}</div>
-                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 2 }}>{h.name}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 15, fontWeight: 700 }}>{h.value}</div>
-                  <div className={`stat-chip ${h.gain ? 'gain' : 'loss'}`} style={{ marginTop: 3, justifyContent: 'flex-end' }}>
-                    <span className="material-symbols-outlined" style={{ fontSize: 12 }}>{h.gain ? 'arrow_upward' : 'arrow_downward'}</span>
-                    {h.change}
-                  </div>
-                </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>NVDA</div>
+                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>NVIDIA Corp</div>
               </div>
-            ))}
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+4,28%</span>
+          </div>
+
+          <div onClick={() => router.push('/portfolio/TSLA')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: 'var(--loss)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>arrow_downward</span>
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 700 }}>TSLA</div>
+                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Tesla, Inc.</div>
+              </div>
+            </div>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>-1,92%</span>
           </div>
         </div>
 
-        {/* News card */}
-        <div style={{ margin: '20px 20px 0', padding: 20, background: 'var(--surface-lowest)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--card-border)' }}>
-          <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', color: 'var(--primary)', marginBottom: 8 }}>{t.markets}</div>
-          <div style={{ fontSize: 15, fontWeight: 600, lineHeight: 1.4, marginBottom: 8 }}>{t.newsTitle}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--primary)', fontWeight: 600 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>schedule</span>{t.readMore}
-          </div>
-        </div>
-
-        <div style={{ height: 20 }} />
       </div>
 
       <BottomNav />

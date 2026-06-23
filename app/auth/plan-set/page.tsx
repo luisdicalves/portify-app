@@ -3,97 +3,85 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-const GOALS = ['Independência financeira', 'Reforma', 'Habitação', 'Educação', 'Outro'];
-const FREQUENCIES = ['Semanal', 'Mensal', 'Trimestral', 'Anual'];
-const HORIZONS = [1, 2, 3, 5, 10, 15, 20, 30];
-const AMOUNTS = [50, 100, 200, 300, 500, 750, 1000, 1500, 2000];
+const AMOUNTS  = ['100 €','250 €','300 €','500 €','1.000 €'];
+const PERIODS  = ['Semanal','Mensal','Trimestral','Anual'];
+const HORIZONS = ['< 2 anos','2 – 5 anos','5 – 10 anos','> 10 anos'];
+
+function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <div onClick={onClick} style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      padding: '10px 16px', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+      fontSize: 14, fontWeight: 600, transition: 'all .15s', border: '1px solid',
+      background: on ? 'var(--primary-container)' : 'var(--surface-low)',
+      color: on ? 'var(--on-primary-container)' : 'var(--on-surface)',
+      borderColor: on ? 'var(--primary-strong)' : 'var(--card-border)',
+    }}>
+      {label}
+    </div>
+  );
+}
+
+const label11 = { fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' as const, color: 'var(--on-surface-variant)', marginBottom: 9 };
 
 export default function PlanSetPage() {
   const router = useRouter();
-  const [goal, setGoal] = useState(0);
-  const [freq, setFreq] = useState(1);
-  const [horizon, setHorizon] = useState(4);
-  const [amount, setAmount] = useState(3);
+  const [goal, setGoal] = useState('100000');
+  const [amt, setAmt] = useState(1);
+  const [period, setPeriod] = useState(1);
+  const [horizon, setHorizon] = useState(2);
 
   return (
-    <div className="phone-shell">
-      <div style={{ padding: '20px 24px 0' }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', marginBottom: 16 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)' }}>arrow_back_ios_new</span>
-        </button>
-        <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em' }}>Define o teu plano</div>
-        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 4 }}>Podes alterar estes valores em qualquer altura.</div>
+    <div className="phone-shell" style={{ overflow: 'hidden' }}>
+      <div style={{ padding: '14px 24px 8px' }}>
+        <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer', display: 'block', marginBottom: 8 }}>
+          arrow_back_ios_new
+        </span>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1 }}>Define o teu plano</div>
+        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 4, textWrap: 'pretty' as never }}>Podes alterar estes valores em qualquer altura.</div>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 24px 0', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-        {/* Goal */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+        {/* Goal amount */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--on-surface-variant)', marginBottom: 10 }}>Objetivo financeiro</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {GOALS.map((g, i) => (
-              <button key={i} onClick={() => setGoal(i)} style={{
-                padding: '8px 16px', borderRadius: 'var(--radius-full)', border: `1.5px solid ${i === goal ? 'var(--primary-strong)' : 'var(--outline-variant)'}`,
-                background: i === goal ? 'var(--primary-container)' : 'transparent',
-                color: i === goal ? 'var(--primary)' : 'var(--on-surface-variant)',
-                fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}>{g}</button>
-            ))}
+          <div style={label11}>Objetivo financeiro</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 16px' }}>
+            <span style={{ fontSize: 18, color: 'var(--outline)' }}>€</span>
+            <input value={goal} onChange={e => setGoal(e.target.value)}
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '15px 0', fontSize: 20, fontWeight: 700, color: 'var(--on-surface)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }} />
           </div>
         </div>
 
-        {/* Amount */}
+        {/* Amount per period */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--on-surface-variant)', marginBottom: 10 }}>
-            Investimento por período · <span style={{ color: 'var(--primary-strong)', fontSize: 16 }}>€ {AMOUNTS[amount]}</span>
-          </div>
-          <input type="range" min={0} max={AMOUNTS.length - 1} value={amount} onChange={e => setAmount(+e.target.value)}
-            style={{ width: '100%', accentColor: 'var(--primary-strong)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--outline)', marginTop: 4 }}>
-            <span>€ 50</span><span>€ 2.000</span>
+          <div style={label11}>Montante por período</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {AMOUNTS.map((a, i) => <Chip key={i} label={a} on={amt === i} onClick={() => setAmt(i)} />)}
           </div>
         </div>
 
         {/* Frequency */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--on-surface-variant)', marginBottom: 10 }}>Periodicidade</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {FREQUENCIES.map((f, i) => (
-              <button key={i} onClick={() => setFreq(i)} style={{
-                flex: 1, padding: '10px 0', borderRadius: 'var(--radius-md)',
-                border: `1.5px solid ${i === freq ? 'var(--primary-strong)' : 'var(--outline-variant)'}`,
-                background: i === freq ? 'var(--primary-container)' : 'transparent',
-                color: i === freq ? 'var(--primary)' : 'var(--on-surface-variant)',
-                fontSize: 12, fontWeight: 600, cursor: 'pointer',
-              }}>{f}</button>
-            ))}
+          <div style={label11}>Periodicidade</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {PERIODS.map((p, i) => <Chip key={i} label={p} on={period === i} onClick={() => setPeriod(i)} />)}
           </div>
         </div>
 
         {/* Horizon */}
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--on-surface-variant)', marginBottom: 10 }}>
-            Horizonte temporal · <span style={{ color: 'var(--primary-strong)', fontSize: 16 }}>{HORIZONS[horizon]} anos</span>
-          </div>
-          <input type="range" min={0} max={HORIZONS.length - 1} value={horizon} onChange={e => setHorizon(+e.target.value)}
-            style={{ width: '100%', accentColor: 'var(--primary-strong)' }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--outline)', marginTop: 4 }}>
-            <span>1 ano</span><span>30 anos</span>
+          <div style={label11}>Horizonte temporal</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+            {HORIZONS.map((h, i) => <Chip key={i} label={h} on={horizon === i} onClick={() => setHorizon(i)} />)}
           </div>
         </div>
 
-        {/* Projection */}
-        <div style={{ background: 'var(--primary-container)', borderRadius: 'var(--radius-xl)', padding: '16px 20px' }}>
-          <div style={{ fontSize: 12, color: 'var(--primary)', fontWeight: 700, marginBottom: 4 }}>PROJEÇÃO ESTIMADA</div>
-          <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--primary)' }}>
-            € {Math.round(AMOUNTS[amount] * 52 * HORIZONS[horizon] * 1.05 / 1000)}k – € {Math.round(AMOUNTS[amount] * 52 * HORIZONS[horizon] * 1.07 / 1000)}k
-          </div>
-          <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 4 }}>CAGR estimado entre 5% e 7%</div>
-        </div>
-      </div>
+        <div style={{ flex: 1, minHeight: 8 }} />
 
-      <div style={{ padding: '24px 24px 48px' }}>
-        <button className="btn-primary" onClick={() => router.push('/auth/summary')}>Ver resumo</button>
+        <button onClick={() => router.push('/auth/summary')}
+          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Ver resumo
+        </button>
       </div>
     </div>
   );

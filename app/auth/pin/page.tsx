@@ -23,58 +23,45 @@ export default function PinPage() {
   const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
 
   return (
-    <div className="phone-shell" style={{ justifyContent: 'space-between', padding: '0 24px' }}>
-      {/* Back */}
-      <div style={{ paddingTop: 20 }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)' }}>arrow_back_ios_new</span>
-        </button>
-      </div>
-
-      {/* Header */}
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{t.pinTitle}</div>
-        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.pinSub}</div>
+    <div className="phone-shell" style={{ padding: 24 }}>
+      {/* Centered content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+        <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--primary)' }}>lock</span>
+        </div>
+        <div style={{ fontSize: 22, fontWeight: 700 }}>{t.pinTitle}</div>
+        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', textAlign: 'center' }}>{t.pinSub}</div>
 
         {/* PIN dots */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 32 }}>
+        <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
           {[0,1,2,3,4,5].map(i => (
-            <div key={i} className={`pin-dot${i < pin.length ? ' filled' : ''}`} />
+            <span key={i} style={{ display: 'block', width: 14, height: 14, borderRadius: 'var(--radius-full)', border: '2px solid var(--primary)', background: 'transparent', position: 'relative', overflow: 'hidden' }}>
+              {i < pin.length && <span style={{ display: 'block', width: '100%', height: '100%', borderRadius: 'var(--radius-full)', background: 'var(--primary)' }} />}
+            </span>
           ))}
         </div>
       </div>
 
       {/* Keypad */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, paddingBottom: 48 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
         {keys.map((k, i) => (
-          <button
-            key={i}
-            onClick={() => k !== '' && press(k)}
-            style={{
-              height: 58,
-              borderRadius: 'var(--radius-lg)',
-              cursor: k === '' ? 'default' : 'pointer',
-              fontSize: 22,
-              fontWeight: 600,
-              border: 'none',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: k === '' ? 'transparent' : 'var(--surface-high)',
-              color: 'var(--on-surface)',
-              transition: 'opacity 0.1s',
-            }}
-          >
-            {k === 'del'
-              ? <span className="material-symbols-outlined" style={{ fontSize: 24 }}>backspace</span>
-              : k}
+          <button key={i} onClick={() => k !== '' && press(k)} style={{
+            height: 58, borderRadius: 'var(--radius-lg)',
+            cursor: k === '' ? 'default' : 'pointer',
+            fontSize: 22, fontWeight: 600, border: 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: k === '' ? 'transparent' : 'var(--surface-high)',
+            color: 'var(--on-surface)', fontFamily: 'inherit',
+          }}>
+            {k === 'del' ? <span className="material-symbols-outlined" style={{ fontSize: 24 }}>backspace</span> : k}
           </button>
         ))}
       </div>
 
-      <div style={{ textAlign: 'center', paddingBottom: 32 }}>
-        <span style={{ fontSize: 14, color: 'var(--primary)', fontWeight: 500, cursor: 'pointer' }}>{t.forgotPin}</span>
-      </div>
+      <button onClick={() => router.push('/auth/login')}
+        style={{ marginTop: 16, background: 'transparent', border: 'none', color: 'var(--primary)', fontFamily: 'inherit', fontSize: 14, fontWeight: 600, cursor: 'pointer', width: '100%' }}>
+        {t.forgotPin}
+      </button>
     </div>
   );
 }

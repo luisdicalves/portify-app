@@ -1,124 +1,126 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useApp } from '@/lib/context';
-import { useDict } from '@/lib/dict';
-import BottomNav from '@/components/ui/BottomNav';
 import { createClient } from '@/lib/supabase/client';
+import BottomNav from '@/components/ui/BottomNav';
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function SectionLabel({ label }: { label: string }) {
+  return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
+}
+
+function SettingsRow({ icon, label, value, onPress, border = true }: { icon: string; label: string; value?: string; onPress?: () => void; border?: boolean }) {
   return (
-    <div>
-      <div className="section-header">{title}</div>
-      <div style={{ background: 'var(--surface-lowest)', borderRadius: 'var(--radius-xl)', margin: '0 20px', border: '1px solid var(--card-border)', overflow: 'hidden' }}>
-        {children}
-      </div>
+    <div onClick={onPress} style={{ cursor: onPress ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: border ? '1px solid var(--hairline)' : 'none' }}>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
+        <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>{icon}</span>
+        {label}
+      </span>
+      {value !== undefined
+        ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, color: 'var(--on-surface-variant)' }}>{value}<span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span></span>
+        : onPress ? <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>chevron_right</span> : null
+      }
     </div>
   );
 }
 
-function Row({ icon, label, value, arrow = true, danger = false, onClick }: {
-  icon: string; label: string; value?: string; arrow?: boolean; danger?: boolean; onClick?: () => void;
-}) {
-  return (
-    <div onClick={onClick} className="list-row" style={{ cursor: onClick ? 'pointer' : 'default' }}>
-      <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: danger ? 'var(--loss-container)' : 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 20, color: danger ? 'var(--loss)' : 'var(--on-surface-variant)' }}>{icon}</span>
-      </div>
-      <span style={{ flex: 1, fontSize: 15, fontWeight: 500, color: danger ? 'var(--loss)' : 'var(--on-surface)' }}>{label}</span>
-      {value && <span style={{ fontSize: 14, color: 'var(--on-surface-variant)' }}>{value}</span>}
-      {arrow && <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline-variant)' }}>chevron_right</span>}
-    </div>
-  );
+function Card({ children }: { children: React.ReactNode }) {
+  return <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>{children}</div>;
 }
 
 export default function ProfilePage() {
-  const { lang, theme, toggleTheme, setLang } = useApp();
-  const t = useDict(lang);
   const router = useRouter();
 
-  async function handleSignOut() {
+  async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/auth/login');
+    router.push('/');
   }
 
   return (
-    <div className="phone-shell">
+    <div className="phone-shell" style={{ overflow: 'hidden' }}>
       {/* Header */}
-      <div className="top-bar">
-        <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--primary)' }}>
-          {lang === 'pt' ? 'Perfil' : 'Profile'}
-        </div>
+      <div style={{ display: 'flex', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
+        <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>Perfil</span>
       </div>
 
-      <div className="screen-content">
-        {/* Avatar + info */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 20px 8px' }}>
-          <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 32, fontWeight: 700, color: 'var(--primary-strong)', marginBottom: 12 }}>R</div>
-          <div style={{ fontSize: 20, fontWeight: 700 }}>Ricardo Ferreira</div>
-          <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 2 }}>@ricardoferreira</div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-            <span style={{ background: 'var(--primary-container)', color: 'var(--primary)', fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 'var(--radius-full)' }}>
-              {lang === 'pt' ? 'Conservador' : 'Conservative'}
-            </span>
-            <span style={{ background: 'var(--surface-high)', color: 'var(--on-surface-variant)', fontSize: 12, fontWeight: 600, padding: '4px 12px', borderRadius: 'var(--radius-full)' }}>
-              {t.investorSince}
-            </span>
+      <div style={{ flex: 1, overflow: 'auto', padding: '18px 16px 100px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+        {/* Identity */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{ width: 88, height: 88, borderRadius: 'var(--radius-full)', background: 'var(--primary-strong)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 700 }}>RF</div>
+            <div style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--bg)' }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>edit</span>
+            </div>
           </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Ricardo Ferreira</div>
+            <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>Membro desde 2024</div>
+          </div>
+        </div>
+
+        {/* Stat cards */}
+        <div style={{ display: 'flex', gap: 12 }}>
+          <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--primary)' }}>trending_up</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Risco</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>Moderado</span>
+          </div>
+          <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--gain)' }}>flag</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Objetivo</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>Longo prazo</span>
+          </div>
+        </div>
+
+        {/* Personal data */}
+        <Card>
+          <SettingsRow icon="manage_accounts" label="Dados pessoais" onPress={() => router.push('/profile/personal')} border={false} />
+        </Card>
+
+        {/* Investor profile */}
+        <div>
+          <SectionLabel label="Perfil de investidor" />
+          <Card>
+            <SettingsRow icon="local_fire_department" label="Perfil de risco" value="Moderado" onPress={() => router.push('/auth/risk')} />
+            <SettingsRow icon="schedule" label="Horizonte temporal" value="5–10 anos" onPress={() => router.push('/auth/objective')} />
+            <SettingsRow icon="target" label="Objetivo" value="Longo prazo" onPress={() => router.push('/auth/objective')} />
+            <SettingsRow icon="sell" label="Setores" value="Tech, Saúde" onPress={() => router.push('/auth/sectors')} border={false} />
+          </Card>
+        </div>
+
+        {/* Investment plan */}
+        <div>
+          <SectionLabel label="Plano de investimento" />
+          <Card>
+            <SettingsRow icon="account_balance_wallet" label="Plano ativo" value="250 €/Mensal" onPress={() => router.push('/auth/plan-set')} border={false} />
+          </Card>
+        </div>
+
+        {/* Import / Export */}
+        <div>
+          <SectionLabel label="Portfólio" />
+          <Card>
+            <SettingsRow icon="description" label="Importar CSV" value="Importar" onPress={() => {}} />
+            <SettingsRow icon="upload_file" label="Exportar dados" onPress={() => router.push('/profile/export')} />
+            <SettingsRow icon="link" label="Ligar corretora" border={false} />
+          </Card>
         </div>
 
         {/* Account */}
-        <Section title={lang === 'pt' ? 'Conta' : 'Account'}>
-          <Row icon="person" label={t.personalData} />
-          <Row icon="donut_small" label={lang === 'pt' ? 'Perfil de Investidor' : 'Investor Profile'} value={lang === 'pt' ? 'Conservador' : 'Conservative'} />
-          <Row icon="trending_up" label={t.investmentPlan} value="€ 100 · Semanal" />
-        </Section>
-
-        {/* Preferences */}
-        <Section title={t.preferences}>
-          <div className="list-row" style={{ cursor: 'pointer' }} onClick={toggleTheme}>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>{theme === 'dark' ? 'light_mode' : 'dark_mode'}</span>
-            </div>
-            <span style={{ flex: 1, fontSize: 15, fontWeight: 500 }}>{t.darkTheme}</span>
-            <div style={{ width: 48, height: 28, borderRadius: 'var(--radius-full)', background: theme === 'dark' ? 'var(--primary-strong)' : 'var(--surface-highest)', position: 'relative', transition: 'background 0.2s' }}>
-              <div style={{ position: 'absolute', top: 3, left: 3, width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,.3)', transform: theme === 'dark' ? 'translateX(20px)' : 'translateX(0)', transition: 'transform 0.2s' }} />
-            </div>
-          </div>
-          <div className="list-row" style={{ cursor: 'pointer' }} onClick={() => setLang(lang === 'pt' ? 'en' : 'pt')}>
-            <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-md)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>language</span>
-            </div>
-            <span style={{ flex: 1, fontSize: 15, fontWeight: 500 }}>{t.language}</span>
-            <span style={{ fontSize: 14, color: 'var(--on-surface-variant)' }}>{t.langValue}</span>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline-variant)' }}>chevron_right</span>
-          </div>
-          <Row icon="currency_exchange" label={t.currency} value="EUR €" />
-        </Section>
-
-        {/* Data */}
-        <Section title={t.dataManagement}>
-          <Row icon="upload_file" label={t.importPortfolio} value={lang === 'pt' ? 'CSV, XLSX' : 'CSV, XLSX'} />
-          <Row icon="download" label={t.exportReport} value={lang === 'pt' ? 'PDF anual' : 'Annual PDF'} />
-        </Section>
-
-        {/* Security */}
-        <Section title={lang === 'pt' ? 'Segurança' : 'Security'}>
-          <Row icon="pin" label={lang === 'pt' ? 'Alterar PIN' : 'Change PIN'} onClick={() => router.push('/auth/pin')} />
-          <Row icon="lock" label={lang === 'pt' ? 'Alterar palavra-passe' : 'Change password'} />
-          <Row icon="security" label={lang === 'pt' ? 'Autenticação 2 fatores' : '2-factor auth'} value={lang === 'pt' ? 'Ativo' : 'Active'} />
-        </Section>
-
-        {/* Sign out */}
-        <div style={{ margin: '16px 20px 0' }}>
-          <button onClick={handleSignOut} style={{ width: '100%', padding: '16px', background: 'var(--loss-container)', color: 'var(--loss)', border: 'none', borderRadius: 'var(--radius-lg)', fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20 }}>logout</span>
-            {t.signOut}
-          </button>
+        <div>
+          <SectionLabel label="Conta" />
+          <Card>
+            <SettingsRow icon="lock" label="Segurança" onPress={() => router.push('/profile/security')} />
+            <SettingsRow icon="settings" label="Definições" onPress={() => {}} border={false} />
+          </Card>
         </div>
 
-        <div style={{ height: 24 }} />
+        {/* Sign out */}
+        <button onClick={signOut} style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, color: 'var(--loss)', cursor: 'pointer', fontFamily: 'inherit' }}>
+          Terminar sessão
+        </button>
+
       </div>
 
       <BottomNav />

@@ -1,40 +1,37 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-import { useApp } from '@/lib/context';
-import { useDict } from '@/lib/dict';
 
-const tabs = [
-  { path: '/dashboard', icon: 'home', iconActive: 'home', labelKey: 'navDash' },
-  { path: '/portfolio', icon: 'pie_chart', iconActive: 'pie_chart', labelKey: 'navPort' },
-  { path: '/for-you', icon: 'auto_awesome', iconActive: 'auto_awesome', labelKey: 'navFor' },
-  { path: '/activity', icon: 'swap_horiz', iconActive: 'swap_horiz', labelKey: 'navTx' },
-  { path: '/profile', icon: 'person', iconActive: 'person', labelKey: 'navProfile' },
-] as const;
+const TABS = [
+  { path: '/dashboard', icon: 'dashboard',             label: 'Painel' },
+  { path: '/portfolio', icon: 'account_balance_wallet', label: 'Portfólio' },
+  { path: '/activity',  icon: 'payments',              label: 'Movimentos' },
+  { path: '/profile',   icon: 'person',                label: 'Perfil' },
+];
 
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
-  const { lang } = useApp();
-  const t = useDict(lang);
 
   return (
-    <nav className="bottom-nav">
-      {tabs.map(tab => {
-        const active = pathname.startsWith(tab.path);
+    <div style={{
+      position: 'absolute', left: 14, right: 14, bottom: 14,
+      display: 'flex', justifyContent: 'space-around', alignItems: 'center',
+      background: 'var(--nav-bg)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)',
+      border: '1px solid var(--card-border)', borderRadius: 'var(--radius-2xl)',
+      padding: '11px 8px', boxShadow: 'var(--shadow)', zIndex: 10,
+    }}>
+      {TABS.map(tab => {
+        const active = pathname === tab.path || pathname.startsWith(tab.path + '/');
+        const color = active ? 'var(--primary)' : 'var(--on-surface-variant)';
         return (
-          <button
-            key={tab.path}
-            className={`nav-item${active ? ' active' : ''}`}
-            onClick={() => router.push(tab.path)}
-          >
-            <span className={`material-symbols-outlined${active ? ' icf' : ''}`}>
-              {active ? tab.iconActive : tab.icon}
-            </span>
-            <span className="nav-label">{t[tab.labelKey]}</span>
-          </button>
+          <div key={tab.path} onClick={() => router.push(tab.path)}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, cursor: 'pointer', color }}>
+            <span className={`material-symbols-outlined${active ? ' icf' : ''}`} style={{ fontSize: 22 }}>{tab.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
+          </div>
         );
       })}
-    </nav>
+    </div>
   );
 }

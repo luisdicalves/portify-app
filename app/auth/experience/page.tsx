@@ -5,44 +5,47 @@ import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 
 const OPTIONS = [
-  { id: 'beginner', label: 'Iniciante', desc: 'Estou a começar a investir.', icon: 'school' },
-  { id: 'intermediate', label: 'Intermédio', desc: 'Já invisto há algum tempo.', icon: 'trending_up' },
-  { id: 'advanced', label: 'Avançado', desc: 'Negoceio com frequência e confiança.', icon: 'auto_graph' },
+  { id: 'beginner',     label: 'Iniciante',   desc: 'Estou a começar a investir.',            icon: 'school' },
+  { id: 'intermediate', label: 'Intermédio',  desc: 'Já invisto há algum tempo.',              icon: 'trending_up' },
+  { id: 'advanced',     label: 'Avançado',    desc: 'Negoceio com frequência e confiança.',    icon: 'workspace_premium' },
 ];
 
 export default function ExperiencePage() {
   const router = useRouter();
-  const [selected, setSelected] = useState('beginner');
+  const [selected, setSelected] = useState(0);
 
   return (
-    <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
-      <StepHeader step={2} total={6} back={() => router.back()} title="Experiência a investir" sub="Ajustamos o conteúdo ao seu nível." />
+    <div className="phone-shell" style={{ overflow: 'hidden' }}>
+      <StepHeader step={2} total={5} back={() => router.back()} title="Experiência a investir" sub="Ajustamos o conteúdo ao seu nível." />
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12, padding: '24px 24px 0' }}>
-        {OPTIONS.map(o => {
-          const on = selected === o.id;
+      <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {OPTIONS.map((o, i) => {
+          const on = selected === i;
           return (
-            <button key={o.id} onClick={() => setSelected(o.id)} style={{
-              display: 'flex', alignItems: 'center', gap: 16, padding: '18px 20px',
-              background: on ? 'var(--primary-container)' : 'var(--surface-lowest)',
+            <div key={o.id} onClick={() => setSelected(i)} style={{
+              display: 'flex', alignItems: 'center', gap: 14, padding: 15, cursor: 'pointer', transition: 'all .15s',
+              borderRadius: 'var(--radius-lg)',
+              background: on ? 'var(--primary-container)' : 'var(--surface-low)',
               border: `2px solid ${on ? 'var(--primary-strong)' : 'var(--card-border)'}`,
-              borderRadius: 'var(--radius-xl)', cursor: 'pointer', textAlign: 'left', transition: 'all .15s',
             }}>
-              <div style={{ width: 48, height: 48, borderRadius: 'var(--radius-md)', background: on ? 'var(--primary-strong)' : 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-                <span className={`material-symbols-outlined${on ? ' icf' : ''}`} style={{ fontSize: 24, color: on ? '#fff' : 'var(--on-surface-variant)' }}>{o.icon}</span>
+              <div style={{ width: 44, height: 44, flex: 'none', borderRadius: 'var(--radius-md)', background: on ? 'var(--primary-strong)' : 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 24, color: on ? '#fff' : 'var(--on-surface-variant)' }}>{o.icon}</span>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 16, fontWeight: 700, color: on ? 'var(--primary)' : 'var(--on-surface)' }}>{o.label}</div>
-                <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', marginTop: 2 }}>{o.desc}</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{o.label}</div>
+                <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', textWrap: 'pretty' as never }}>{o.desc}</div>
               </div>
-              {on && <span className="material-symbols-outlined icf" style={{ fontSize: 22, color: 'var(--primary-strong)', flex: 'none' }}>check_circle</span>}
-            </button>
+              <span style={{ width: 24, height: 24, flex: 'none', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', justifyContent: 'center', background: on ? 'var(--primary-strong)' : 'transparent', border: `2px solid ${on ? 'var(--primary-strong)' : 'var(--outline)'}` }}>
+                {on && <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: '#fff' }}>check</span>}
+              </span>
+            </div>
           );
         })}
-      </div>
 
-      <div style={{ padding: '24px 24px 48px' }}>
-        <button className="btn-primary" onClick={() => router.push('/auth/risk')}>Continuar</button>
+        <div style={{ flex: 1 }} />
+        <button onClick={() => router.push('/auth/risk')} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+          Continuar
+        </button>
       </div>
     </div>
   );
