@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import BottomNav from '@/components/ui/BottomNav';
 
 export default function BuyPage() {
   const router = useRouter();
@@ -12,8 +13,7 @@ export default function BuyPage() {
         <span style={{ fontSize: 18, fontWeight: 700 }}>Comprar</span>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Amount display */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '8px 20px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', marginBottom: 8 }}>Valor</div>
           <div style={{ fontSize: 44, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>7.956,90 €</div>
@@ -22,13 +22,11 @@ export default function BuyPage() {
           </div>
         </div>
 
-        {/* Order type */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 14, background: 'var(--surface-low)', borderRadius: 'var(--radius-md)' }}>
           <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Tipo de ordem</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>Mercado</span>
         </div>
 
-        {/* Buying power */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 14, background: 'var(--surface-low)', borderRadius: 'var(--radius-md)' }}>
           <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Saldo disponível</span>
           <span style={{ fontSize: 14, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>22.000,00 €</span>
@@ -41,6 +39,8 @@ export default function BuyPage() {
           Confirmar compra
         </button>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

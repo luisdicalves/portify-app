@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import BottomNav from '@/components/ui/BottomNav';
 
 export default function SellPage() {
   const router = useRouter();
@@ -12,8 +13,7 @@ export default function SellPage() {
         <span style={{ fontSize: 18, fontWeight: 700 }}>Vender</span>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '8px 20px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        {/* Amount display */}
+      <div style={{ flex: 1, overflow: 'auto', padding: '8px 20px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ textAlign: 'center', padding: '20px 0' }}>
           <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', marginBottom: 8 }}>Valor</div>
           <div style={{ fontSize: 44, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>8.493,00 €</div>
@@ -22,7 +22,6 @@ export default function SellPage() {
           </div>
         </div>
 
-        {/* Order type */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 14, background: 'var(--surface-low)', borderRadius: 'var(--radius-md)' }}>
           <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Tipo de ordem</span>
           <span style={{ fontSize: 14, fontWeight: 600 }}>Mercado</span>
@@ -35,6 +34,8 @@ export default function SellPage() {
           Confirmar venda
         </button>
       </div>
+
+      <BottomNav />
     </div>
   );
 }

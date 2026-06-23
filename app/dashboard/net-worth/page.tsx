@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import BottomNav from '@/components/ui/BottomNav';
 
 const ROWS = [
   { label: 'Investimentos',  value: '114.4k €', pct: 78, color: 'var(--primary)' },
@@ -14,15 +15,12 @@ export default function NetWorthPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px 10px' }}>
         <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer' }}>arrow_back_ios_new</span>
         <span style={{ fontSize: 18, fontWeight: 700 }}>Património líquido</span>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-        {/* Summary card */}
         <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 18, color: '#fff' }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>Património líquido</div>
           <div style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', marginTop: 4 }}>€ 131.430,00</div>
@@ -38,7 +36,6 @@ export default function NetWorthPage() {
           </div>
         </div>
 
-        {/* Breakdown */}
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 14 }}>Distribuição</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
@@ -55,8 +52,9 @@ export default function NetWorthPage() {
             ))}
           </div>
         </div>
-
       </div>
+
+      <BottomNav />
     </div>
   );
 }
