@@ -146,7 +146,7 @@ a { text-decoration: none; color: inherit; }
 
 /* Phone shell — centers app on large screens */
 .phone-shell {
-  min-height: 100vh;
+  height: 100dvh;
   background: var(--bg);
   display: flex;
   flex-direction: column;
