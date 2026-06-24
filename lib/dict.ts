@@ -21,7 +21,7 @@ const pt = {
   registerTitle: 'Criar a sua conta',
   registerSubtitle: 'Comece a investir em poucos minutos.',
   regFirstName: 'Primeiro Nome',
-  regLastName: 'Último Nome',
+  regLastName: 'Sobrenome',
   firstNamePh: 'Ricardo',
   lastNamePh: 'Ferreira',
   regDob: 'Data de Nascimento',
