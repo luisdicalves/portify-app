@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
 import Switch from '@/components/ui/Switch';
 
@@ -32,6 +33,7 @@ function Card({ children }: { children: React.ReactNode }) {
 export default function ProfilePage() {
   const router = useRouter();
   const { theme, toggleTheme, lang, setLang } = useApp();
+  const t = useDict(lang);
 
   async function signOut() {
     const supabase = createClient();
@@ -43,7 +45,7 @@ export default function ProfilePage() {
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>Perfil</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>{t.profileTitle}</span>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '18px 16px 100px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -58,7 +60,7 @@ export default function ProfilePage() {
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Ricardo Ferreira</div>
-            <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>Membro desde 2024</div>
+            <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>{t.memberSince}</div>
           </div>
         </div>
 
@@ -66,55 +68,55 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--primary)' }}>trending_up</span>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Risco</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>Moderado</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.risk}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{t.moderate}</span>
           </div>
           <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--gain)' }}>flag</span>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Objetivo</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>Longo prazo</span>
+            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.objective}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>{t.longTermGoal}</span>
           </div>
         </div>
 
         {/* Personal data */}
         <Card>
-          <SettingsRow icon="manage_accounts" label="Dados pessoais" onPress={() => router.push('/profile/personal')} border={false} />
+          <SettingsRow icon="manage_accounts" label={t.personalData} onPress={() => router.push('/profile/personal')} border={false} />
         </Card>
 
         {/* Investor profile */}
         <div>
-          <SectionLabel label="Perfil de investidor" />
+          <SectionLabel label={t.investorProfileSection} />
           <Card>
-            <SettingsRow icon="local_fire_department" label="Perfil de risco" value="Moderado" onPress={() => router.push('/auth/risk')} />
-            <SettingsRow icon="schedule" label="Horizonte temporal" value="5–10 anos" onPress={() => router.push('/auth/objective')} />
-            <SettingsRow icon="target" label="Objetivo" value="Longo prazo" onPress={() => router.push('/auth/objective')} />
-            <SettingsRow icon="sell" label="Setores" value="Tech, Saúde" onPress={() => router.push('/auth/sectors')} border={false} />
+            <SettingsRow icon="local_fire_department" label={t.riskProfileLabel} value={t.moderate} onPress={() => router.push('/auth/risk')} />
+            <SettingsRow icon="schedule" label={t.horizonLabel} value={t.horizonValue} onPress={() => router.push('/auth/objective')} />
+            <SettingsRow icon="target" label={t.objective} value={t.longTermGoal} onPress={() => router.push('/auth/objective')} />
+            <SettingsRow icon="sell" label={t.sectorsLabel} value={t.sectorsValue} onPress={() => router.push('/auth/sectors')} border={false} />
           </Card>
         </div>
 
         {/* Investment plan */}
         <div>
-          <SectionLabel label="Plano de investimento" />
+          <SectionLabel label={t.investmentPlanSection} />
           <Card>
-            <SettingsRow icon="account_balance_wallet" label="Plano ativo" value="250 €/Mensal" onPress={() => router.push('/auth/plan-set')} border={false} />
+            <SettingsRow icon="account_balance_wallet" label={t.activePlan} value={t.planValue} onPress={() => router.push('/auth/plan-set')} border={false} />
           </Card>
         </div>
 
         {/* Preferences */}
         <div>
-          <SectionLabel label="Preferências" />
+          <SectionLabel label={t.preferences} />
           <Card>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: '1px solid var(--hairline)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>dark_mode</span>
-                Tema Escuro
+                {t.darkTheme}
               </span>
               <Switch checked={theme === 'dark'} onChange={toggleTheme} />
             </div>
             <SettingsRow
               icon="language"
-              label="Idioma"
-              value={lang === 'pt' ? 'Português (PT)' : 'English (EN)'}
+              label={t.language}
+              value={t.langValue}
               onPress={() => setLang(lang === 'pt' ? 'en' : 'pt')}
               border={false}
             />
@@ -123,26 +125,26 @@ export default function ProfilePage() {
 
         {/* Import / Export */}
         <div>
-          <SectionLabel label="Portfólio" />
+          <SectionLabel label={t.portfolioSection} />
           <Card>
-            <SettingsRow icon="description" label="Importar CSV" value="Importar" onPress={() => {}} />
-            <SettingsRow icon="upload_file" label="Exportar dados" onPress={() => router.push('/profile/export')} />
-            <SettingsRow icon="link" label="Ligar corretora" border={false} />
+            <SettingsRow icon="description" label={t.importCsv} value={t.importAction} onPress={() => {}} />
+            <SettingsRow icon="upload_file" label={t.exportData} onPress={() => router.push('/profile/export')} />
+            <SettingsRow icon="link" label={t.linkBroker} border={false} />
           </Card>
         </div>
 
         {/* Account */}
         <div>
-          <SectionLabel label="Conta" />
+          <SectionLabel label={t.accountSection} />
           <Card>
-            <SettingsRow icon="lock" label="Segurança" onPress={() => router.push('/profile/security')} />
-            <SettingsRow icon="settings" label="Definições" onPress={() => {}} border={false} />
+            <SettingsRow icon="lock" label={t.security} onPress={() => router.push('/profile/security')} />
+            <SettingsRow icon="settings" label={t.settingsLabel} onPress={() => {}} border={false} />
           </Card>
         </div>
 
         {/* Sign out */}
         <button onClick={signOut} style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, color: 'var(--loss)', cursor: 'pointer', fontFamily: 'inherit' }}>
-          Terminar sessão
+          {t.signOut}
         </button>
 
       </div>
