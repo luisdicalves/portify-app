@@ -2,7 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { useApp } from '@/lib/context';
 import BottomNav from '@/components/ui/BottomNav';
+import Switch from '@/components/ui/Switch';
 
 function SectionLabel({ label }: { label: string }) {
   return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
@@ -29,6 +31,7 @@ function Card({ children }: { children: React.ReactNode }) {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { theme, toggleTheme, lang, setLang } = useApp();
 
   async function signOut() {
     const supabase = createClient();
@@ -94,6 +97,27 @@ export default function ProfilePage() {
           <SectionLabel label="Plano de investimento" />
           <Card>
             <SettingsRow icon="account_balance_wallet" label="Plano ativo" value="250 €/Mensal" onPress={() => router.push('/auth/plan-set')} border={false} />
+          </Card>
+        </div>
+
+        {/* Preferences */}
+        <div>
+          <SectionLabel label="Preferências" />
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: '1px solid var(--hairline)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>dark_mode</span>
+                Tema Escuro
+              </span>
+              <Switch checked={theme === 'dark'} onChange={toggleTheme} />
+            </div>
+            <SettingsRow
+              icon="language"
+              label="Idioma"
+              value={lang === 'pt' ? 'Português (PT)' : 'English (EN)'}
+              onPress={() => setLang(lang === 'pt' ? 'en' : 'pt')}
+              border={false}
+            />
           </Card>
         </div>
 
