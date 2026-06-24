@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { createClient } from '@/lib/supabase/client';
+import DatePicker from '@/components/ui/DatePicker';
 
 export default function RegisterPage() {
   const { lang } = useApp();
@@ -16,7 +17,6 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [terms, setTerms] = useState(false);
-  const [showDob, setShowDob] = useState(false);
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -49,8 +49,6 @@ export default function RegisterPage() {
   const strength = pwLen === 0 ? 0 : pwLen < 6 ? 1 : pwLen < 8 ? 2 : (hasUpper && hasNum) ? (hasSpecial ? 4 : 3) : 2;
   const strengthLabel = ['', 'Fraca', 'Razoável', 'Boa', 'Forte'][strength];
   const strengthColor = ['', 'var(--loss)', '#f59e0b', '#84cc16', 'var(--gain)'][strength];
-
-  const dobDisplay = form.dob ? new Date(form.dob).toLocaleDateString('pt-PT') : 'DD / MM / AAAA';
 
   const field = {
     display: 'flex', alignItems: 'center', gap: 9,
@@ -92,20 +90,14 @@ export default function RegisterPage() {
           </div>
 
           {/* Date of Birth */}
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>Data de nascimento</div>
-            <div style={{ position: 'relative' }}>
-              <div onClick={() => setShowDob(v => !v)} style={{ ...field, cursor: 'pointer' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>calendar_month</span>
-                <span style={{ flex: 1, fontSize: 15, color: form.dob ? 'var(--on-surface)' : 'var(--outline)' }}>{dobDisplay}</span>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>expand_more</span>
-              </div>
-              {showDob && (
-                <input type="date" value={form.dob} onChange={e => { setForm(f => ({ ...f, dob: e.target.value })); setShowDob(false); }}
-                  style={{ position: 'absolute', top: '110%', left: 0, zIndex: 10, width: '100%', padding: '12px', fontSize: 15, background: 'var(--surface-high)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', color: 'var(--on-surface)', outline: 'none', fontFamily: 'inherit' }} />
-              )}
-            </div>
-          </div>
+          <DatePicker
+            label={t.regDob}
+            placeholder={t.regDobPh}
+            value={form.dob}
+            onChange={iso => setForm(f => ({ ...f, dob: iso }))}
+            lang={lang}
+            confirmLabel={t.confirm}
+          />
 
           {/* Username */}
           <div>
