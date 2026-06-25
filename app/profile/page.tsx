@@ -170,12 +170,15 @@ export default function ProfilePage() {
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ position: 'relative' }}>
             <div style={{ width: 88, height: 88, borderRadius: 'var(--radius-full)', background: 'var(--primary-strong)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 700 }}>{initials}</div>
-            <div style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--bg)' }}>
+            <div onClick={() => router.push('/profile/personal')} style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--bg)', cursor: 'pointer' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>edit</span>
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
             <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{fullName}</div>
+            {profile?.user_handle && (
+              <div style={{ fontSize: 14, color: 'var(--primary)', fontWeight: 600, marginTop: 2 }}>@{profile.user_handle}</div>
+            )}
             <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>{profile?.investor_since ? `Membro desde ${profile.investor_since}` : ''}</div>
           </div>
         </div>
@@ -193,11 +196,6 @@ export default function ProfilePage() {
             <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>{goalLabel}</span>
           </div>
         </div>
-
-        {/* Personal data */}
-        <Card>
-          <SettingsRow icon="manage_accounts" label={t.personalData} onPress={() => router.push('/profile/personal')} border={false} />
-        </Card>
 
         {/* Investor profile */}
         <div>
