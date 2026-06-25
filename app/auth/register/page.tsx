@@ -1,12 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { createClient } from '@/lib/supabase/client';
 import DatePicker from '@/components/ui/DatePicker';
+
+const MIN_USERNAME_LENGTH = 3;
 
 export default function RegisterPage() {
   const { lang } = useApp();
@@ -18,25 +20,40 @@ export default function RegisterPage() {
   const [showPw, setShowPw] = useState(false);
   const [terms, setTerms] = useState(false);
 
+  const [usernameError, setUsernameError] = useState('');
+  const [checkingUsername, setCheckingUsername] = useState(false);
+  const usernameCheckTimer = useRef<ReturnType<typeof setTimeout>>();
+
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const MIN_USERNAME_LENGTH = 3;
+  // Validate the username as the user types: length immediately, availability debounced.
+  useEffect(() => {
+    if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current);
 
-  function calculateAge(dobIso: string) {
-    const dob = new Date(dobIso);
-    const today = new Date();
-    let age = today.getFullYear() - dob.getFullYear();
-    const monthDiff = today.getMonth() - dob.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
-    return age;
-  }
+    if (!form.username) { setUsernameError(''); setCheckingUsername(false); return; }
+    if (form.username.length < MIN_USERNAME_LENGTH) {
+      setUsernameError(`O ID de utilizador deve ter pelo menos ${MIN_USERNAME_LENGTH} caracteres.`);
+      setCheckingUsername(false);
+      return;
+    }
+
+    setCheckingUsername(true);
+    usernameCheckTimer.current = setTimeout(async () => {
+      const supabase = createClient();
+      const { data: available } = await supabase.rpc('is_username_available', { p_handle: form.username });
+      setUsernameError(available ? '' : 'Esse ID de utilizador já está em uso.');
+      setCheckingUsername(false);
+    }, 400);
+
+    return () => { if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current); };
+  }, [form.username]);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!terms) { setError('Aceite os termos para continuar.'); return; }
-    if (!form.dob) { setError('Indique a sua data de nascimento.'); return; }
-    if (calculateAge(form.dob) < 18) { setError('Tem de ter pelo menos 18 anos para criar conta.'); return; }
-    if (form.username.length < MIN_USERNAME_LENGTH) { setError(`O ID de utilizador deve ter pelo menos ${MIN_USERNAME_LENGTH} caracteres.`); return; }
+    if (!form.dob) { setError('Indique uma data de nascimento válida.'); return; }
+    if (form.username.length < MIN_USERNAME_LENGTH || checkingUsername) { setError('Aguarde a validação do ID de utilizador.'); return; }
+    if (usernameError) { setError(usernameError); return; }
 
     setLoading(true);
     setError('');
@@ -45,7 +62,7 @@ export default function RegisterPage() {
 
       const { data: available, error: checkError } = await supabase.rpc('is_username_available', { p_handle: form.username });
       if (checkError) throw checkError;
-      if (!available) { setError('Esse ID de utilizador já está em uso.'); return; }
+      if (!available) { setUsernameError('Esse ID de utilizador já está em uso.'); setError('Esse ID de utilizador já está em uso.'); return; }
 
       const { error } = await supabase.auth.signUp({
         email: form.email,
@@ -122,10 +139,15 @@ export default function RegisterPage() {
           {/* Username */}
           <div>
             <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>Nome de utilizador</div>
-            <div style={field}>
+            <div style={{ ...field, border: `1px solid ${usernameError ? 'var(--loss)' : 'var(--card-border)'}` }}>
               <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>alternate_email</span>
               <input style={input} placeholder="o_teu_username" value={form.username} onChange={set('username')} required autoComplete="username" />
+              {checkingUsername && <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--outline)' }}>progress_activity</span>}
+              {!checkingUsername && form.username.length >= MIN_USERNAME_LENGTH && !usernameError && (
+                <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--gain)' }}>check_circle</span>
+              )}
             </div>
+            {usernameError && <div style={{ fontSize: 12, color: 'var(--loss)', marginTop: 6 }}>{usernameError}</div>}
           </div>
 
           {/* Email */}
