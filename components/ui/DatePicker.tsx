@@ -33,7 +33,7 @@ export default function DatePicker({
   const field = {
     display: 'flex', alignItems: 'center', gap: 9,
     background: 'var(--surface-low)', border: '1px solid var(--card-border)',
-    borderRadius: 'var(--radius-md)', padding: '0 13px',
+    borderRadius: 'var(--radius-md)', padding: '13px',
   } as const;
 
   const display = value
