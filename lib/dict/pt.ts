@@ -36,6 +36,7 @@ export const pt = {
   pinTitle: 'Introduza o PIN',
   pinSub: 'Use o código de 6 dígitos para entrar',
   forgotPin: 'Esqueci o PIN',
+  pinWrong: 'PIN incorreto. Tenta de novo.',
   // Onboarding
   onbSteps: [
     { icon: 'monitoring', title: 'Todo o seu património num só lugar', text: 'Acompanhe ações, ETFs e cripto com dados de mercado em tempo real.' },

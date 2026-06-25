@@ -10,6 +10,9 @@ create table if not exists public.profiles (
   last_name text,
   user_handle text unique,
   avatar_url text,
+  date_of_birth date,
+  preferred_sectors text[],
+  pin_hash text,
   investor_since int default extract(year from now())::int,
   risk_profile text default 'moderate' check (risk_profile in ('conservative','moderate','aggressive')),
   investment_goal text default 'retirement',
@@ -30,11 +33,13 @@ create policy "Users can update their own profile"
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer as $$
 begin
-  insert into public.profiles (id, first_name, last_name)
+  insert into public.profiles (id, first_name, last_name, user_handle, date_of_birth)
   values (
     new.id,
     new.raw_user_meta_data->>'first_name',
-    new.raw_user_meta_data->>'last_name'
+    new.raw_user_meta_data->>'last_name',
+    new.raw_user_meta_data->>'username',
+    (new.raw_user_meta_data->>'dob')::date
   );
   return new;
 end;
@@ -43,6 +48,47 @@ $$;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+-- PIN: hashed server-side, never exposed in plaintext to the client
+create extension if not exists pgcrypto;
+
+create or replace function public.set_pin(p_pin text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_pin !~ '^[0-9]{6}$' then
+    raise exception 'PIN must be exactly 6 digits';
+  end if;
+  update public.profiles
+  set pin_hash = crypt(p_pin, gen_salt('bf'))
+  where id = auth.uid();
+end;
+$$;
+
+create or replace function public.verify_pin(p_pin text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  stored text;
+begin
+  select pin_hash into stored from public.profiles where id = auth.uid();
+  if stored is null then
+    return false;
+  end if;
+  return stored = crypt(p_pin, stored);
+end;
+$$;
+
+revoke all on function public.set_pin(text) from public;
+revoke all on function public.verify_pin(text) from public;
+grant execute on function public.set_pin(text) to authenticated;
+grant execute on function public.verify_pin(text) to authenticated;
 
 -- Holdings
 create table if not exists public.holdings (

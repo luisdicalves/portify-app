@@ -2,12 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 export default function PinSetPage() {
   const router = useRouter();
   const [pin, setPin] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [step, setStep] = useState<'set' | 'confirm'>('set');
+  const [step, setStep] = useState<'set' | 'confirm' | 'saving'>('set');
   const [error, setError] = useState('');
 
   const current = step === 'set' ? pin : confirm;
@@ -16,19 +17,19 @@ export default function PinSetPage() {
     setError('');
     if (k === 'del') {
       if (step === 'set') setPin(p => p.slice(0, -1));
-      else setConfirm(p => p.slice(0, -1));
+      else if (step === 'confirm') setConfirm(p => p.slice(0, -1));
       return;
     }
     if (step === 'set') {
       const next = (pin + k).slice(0, 6);
       setPin(next);
       if (next.length === 6) setStep('confirm');
-    } else {
+    } else if (step === 'confirm') {
       const next = (confirm + k).slice(0, 6);
       setConfirm(next);
       if (next.length === 6) {
         if (next === pin) {
-          router.push('/auth/assets');
+          savePin(next);
         } else {
           setError('PINs não coincidem. Tenta de novo.');
           setConfirm('');
@@ -38,6 +39,20 @@ export default function PinSetPage() {
       }
     }
   };
+
+  async function savePin(value: string) {
+    setStep('saving');
+    const supabase = createClient();
+    const { error: rpcError } = await supabase.rpc('set_pin', { p_pin: value });
+    if (rpcError) {
+      setError('Não foi possível guardar o PIN. Tenta de novo.');
+      setConfirm('');
+      setPin('');
+      setStep('set');
+      return;
+    }
+    router.push('/auth/assets');
+  }
 
   const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
 
@@ -56,10 +71,10 @@ export default function PinSetPage() {
         </div>
 
         <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em' }}>
-          {step === 'set' ? 'Defina o seu PIN' : 'Confirme o PIN'}
+          {step === 'set' ? 'Defina o seu PIN' : step === 'confirm' ? 'Confirme o PIN' : 'A guardar...'}
         </div>
         <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', maxWidth: 240 }}>
-          {step === 'set' ? 'Crie um código de 6 dígitos para proteger a conta' : 'Introduza o PIN novamente para confirmar'}
+          {step === 'set' ? 'Crie um código de 6 dígitos para proteger a conta' : step === 'confirm' ? 'Introduza o PIN novamente para confirmar' : ''}
         </div>
 
         {error && (
