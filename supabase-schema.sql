@@ -49,6 +49,28 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+-- Registration validations (defence in depth — the client also validates before sign up)
+alter table public.profiles
+  add constraint user_handle_min_length check (user_handle is null or char_length(user_handle) >= 3) not valid;
+
+alter table public.profiles
+  add constraint date_of_birth_min_age check (date_of_birth is null or date_of_birth <= (current_date - interval '18 years')) not valid;
+
+-- Lets the (unauthenticated) signup form check username availability before submitting
+create or replace function public.is_username_available(p_handle text)
+returns boolean
+language sql
+security definer
+set search_path = public
+as $$
+  select not exists (
+    select 1 from public.profiles where lower(user_handle) = lower(p_handle)
+  );
+$$;
+
+revoke all on function public.is_username_available(text) from public;
+grant execute on function public.is_username_available(text) to anon, authenticated;
+
 -- PIN: hashed server-side, never exposed in plaintext to the client
 create extension if not exists pgcrypto;
 
@@ -56,7 +78,7 @@ create or replace function public.set_pin(p_pin text)
 returns void
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 begin
   if p_pin !~ '^[0-9]{6}$' then
@@ -72,7 +94,7 @@ create or replace function public.verify_pin(p_pin text)
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   stored text;
