@@ -100,7 +100,8 @@ create table if not exists public.holdings (
   avg_price numeric not null,
   currency text default 'EUR',
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  unique (user_id, ticker)
 );
 
 alter table public.holdings enable row level security;

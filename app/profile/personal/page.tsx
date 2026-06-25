@@ -1,86 +1,107 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import BottomNav from '@/components/ui/BottomNav';
-
-function Row({ icon, label, value, onClick, border = true }: { icon: string; label: string; value?: string; onClick?: () => void; border?: boolean }) {
-  return (
-    <div onClick={onClick} style={{ cursor: onClick ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px', borderBottom: border ? '1px solid var(--hairline)' : 'none' }}>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>{icon}</span>
-        {label}
-      </span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, color: 'var(--on-surface-variant)' }}>
-        {value}
-        {onClick && <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span>}
-      </span>
-    </div>
-  );
-}
+import { createClient } from '@/lib/supabase/client';
+import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 
 export default function PersonalPage() {
   const router = useRouter();
+  const { lang } = useApp();
+  const t = useDict(lang);
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [dob, setDob] = useState('');
+  const [handle, setHandle] = useState('');
+  const [email, setEmail] = useState('');
+  const [savedEmail, setSavedEmail] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, date_of_birth, user_handle')
+        .eq('id', user.id)
+        .single();
+      if (profile) {
+        setFirstName(profile.first_name ?? '');
+        setLastName(profile.last_name ?? '');
+        setDob(profile.date_of_birth ?? '');
+        setHandle(profile.user_handle ?? '');
+      }
+      if (user.email) { setEmail(user.email); setSavedEmail(user.email); }
+    })();
+  }, []);
+
+  async function saveEmail() {
+    setMessage('');
+    if (email === savedEmail) { router.back(); return; }
+    setSaving(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({ email });
+    setSaving(false);
+    if (error) { setMessage(t.pdEmailError); return; }
+    setMessage(t.pdEmailSaved);
+  }
+
+  const dobDisplay = dob
+    ? new Date(dob).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB')
+    : '—';
+
+  const lockedRow = (label: string, value: string) => (
+    <div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-high)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '13px 14px', opacity: 0.7 }}>
+        <span style={{ fontSize: 15, color: 'var(--on-surface-variant)', fontVariantNumeric: 'tabular-nums' }}>{value || '—'}</span>
+        <span style={{ fontSize: 12, color: 'var(--outline)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16 }}>lock</span>{t.pdLocked}
+        </span>
+      </div>
+    </div>
+  );
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>Perfil</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 24px 8px' }}>
+        <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer' }}>arrow_back_ios_new</span>
+        <span style={{ fontSize: 20, fontWeight: 700 }}>{t.pdTitle}</span>
       </div>
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '18px 16px 100px', display: 'flex', flexDirection: 'column', gap: 18 }}>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ width: 88, height: 88, borderRadius: 'var(--radius-full)', background: 'var(--primary-strong)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 700 }}>RF</div>
-            <div style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--bg)' }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>edit</span>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Ricardo Ferreira</div>
-            <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>Membro desde jan 2024</div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', gap: 12 }}>
-          <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--primary)' }}>trending_up</span>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Risco</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>Moderado</span>
-          </div>
-          <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--gain)' }}>flag</span>
-            <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Objetivo</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>Reforma</span>
-          </div>
-        </div>
-
-        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <Row icon="manage_accounts" label="Dados pessoais" onClick={() => {}} border={false} />
-        </div>
+      <div style={{ flex: 1, overflow: 'auto', padding: '14px 20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {lockedRow(t.pdFirstName, firstName)}
+        {lockedRow(t.pdLastName, lastName)}
+        {lockedRow(t.pdDob, dobDisplay)}
+        {lockedRow(t.pdUserId, handle ? `@${handle}` : '—')}
 
         <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>Perfil de investidor</div>
-          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <Row icon="local_fire_department" label="Risco" value="Moderado" onClick={() => router.push('/auth/risk')} />
-            <Row icon="schedule" label="Horizonte" value="5-10 anos" onClick={() => router.push('/auth/objective')} />
-            <Row icon="target" label="Objetivo" value="Reforma" onClick={() => router.push('/auth/objective')} border={false} />
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.pdEmailLabel}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--surface-low)', border: '2px solid var(--primary-strong)', borderRadius: 'var(--radius-md)', padding: '0 13px', boxShadow: '0 0 0 3px rgba(0,82,204,0.14)' }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>mail</span>
+            <input
+              value={email}
+              onChange={e => { setEmail(e.target.value); setMessage(''); }}
+              type="email"
+              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '12px 0', fontSize: 15, color: 'var(--on-surface)', fontFamily: 'inherit' }}
+            />
           </div>
         </div>
 
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>Conta</div>
-          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-            <Row icon="security" label="Segurança" onClick={() => router.push('/profile/security')} />
-            <Row icon="upload_file" label="Exportar dados" onClick={() => router.push('/profile/export')} border={false} />
-          </div>
-        </div>
+        {message && (
+          <div style={{ fontSize: 13, color: message === t.pdEmailSaved ? 'var(--gain)' : 'var(--loss)' }}>{message}</div>
+        )}
 
-        <button style={{ background: 'var(--loss-container)', color: 'var(--loss)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Terminar sessão
+        <button onClick={saveEmail} disabled={saving}
+          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: saving ? 0.7 : 1 }}>
+          {t.save}
         </button>
       </div>
-
-      <BottomNav />
     </div>
   );
 }
