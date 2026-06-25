@@ -20,13 +20,33 @@ export default function RegisterPage() {
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const MIN_USERNAME_LENGTH = 3;
+
+  function calculateAge(dobIso: string) {
+    const dob = new Date(dobIso);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) age--;
+    return age;
+  }
+
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (!terms) { setError('Aceite os termos para continuar.'); return; }
+    if (!form.dob) { setError('Indique a sua data de nascimento.'); return; }
+    if (calculateAge(form.dob) < 18) { setError('Tem de ter pelo menos 18 anos para criar conta.'); return; }
+    if (form.username.length < MIN_USERNAME_LENGTH) { setError(`O ID de utilizador deve ter pelo menos ${MIN_USERNAME_LENGTH} caracteres.`); return; }
+
     setLoading(true);
     setError('');
     try {
       const supabase = createClient();
+
+      const { data: available, error: checkError } = await supabase.rpc('is_username_available', { p_handle: form.username });
+      if (checkError) throw checkError;
+      if (!available) { setError('Esse ID de utilizador já está em uso.'); return; }
+
       const { error } = await supabase.auth.signUp({
         email: form.email,
         password: form.password,

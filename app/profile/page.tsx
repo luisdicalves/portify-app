@@ -27,6 +27,7 @@ function horizonLabel(years: number | null | undefined) {
 type Profile = {
   first_name: string | null;
   last_name: string | null;
+  user_handle: string | null;
   risk_profile: string | null;
   investment_goal: string | null;
   preferred_sectors: string[] | null;
@@ -62,12 +63,40 @@ function Card({ children }: { children: React.ReactNode }) {
   return <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>{children}</div>;
 }
 
+type ParsedHolding = { ticker: string; units: number; avg_price: number; name?: string };
+
+function parseHoldingsCsv(text: string): ParsedHolding[] {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) throw new Error('empty');
+
+  const header = lines[0].split(',').map(h => h.trim().toLowerCase());
+  const tickerIdx = header.indexOf('ticker');
+  const unitsIdx = header.indexOf('units');
+  const priceIdx = header.findIndex(h => h === 'avg_price' || h === 'price');
+  const nameIdx = header.indexOf('name');
+  if (tickerIdx === -1 || unitsIdx === -1 || priceIdx === -1) throw new Error('missing columns');
+
+  return lines.slice(1).map(line => {
+    const cols = line.split(',').map(c => c.trim());
+    const ticker = cols[tickerIdx]?.toUpperCase();
+    const units = parseFloat(cols[unitsIdx]);
+    const avg_price = parseFloat(cols[priceIdx]);
+    if (!ticker || Number.isNaN(units) || Number.isNaN(avg_price)) throw new Error('bad row');
+    return { ticker, units, avg_price, name: nameIdx >= 0 ? cols[nameIdx] : undefined };
+  });
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { theme, toggleTheme, lang, setLang } = useApp();
   const t = useDict(lang);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+  const [importToast, setImportToast] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -75,7 +104,7 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const [{ data: p }, { data: pl }] = await Promise.all([
-        supabase.from('profiles').select('first_name, last_name, risk_profile, investment_goal, preferred_sectors, investor_since').eq('id', user.id).single(),
+        supabase.from('profiles').select('first_name, last_name, user_handle, risk_profile, investment_goal, preferred_sectors, investor_since').eq('id', user.id).single(),
         supabase.from('investment_plans').select('amount, frequency, horizon_years').eq('user_id', user.id).maybeSingle(),
       ]);
       if (p) setProfile(p);
@@ -98,8 +127,38 @@ export default function ProfilePage() {
     router.push('/');
   }
 
+  function closeImport() {
+    setImportOpen(false);
+    setImportFile(null);
+    setImportError('');
+  }
+
+  async function submitImport() {
+    if (!importFile) { setImportError(t.impNoFile); return; }
+    setImportError('');
+    setImporting(true);
+    try {
+      const text = await importFile.text();
+      const rows = parseHoldingsCsv(text);
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('no user');
+      await supabase.from('holdings').upsert(
+        rows.map(r => ({ user_id: user.id, ticker: r.ticker, units: r.units, avg_price: r.avg_price, name: r.name })),
+        { onConflict: 'user_id,ticker' }
+      );
+      setImporting(false);
+      closeImport();
+      setImportToast(true);
+      setTimeout(() => setImportToast(false), 3000);
+    } catch {
+      setImporting(false);
+      setImportError(t.impParseError);
+    }
+  }
+
   return (
-    <div className="phone-shell" style={{ overflow: 'hidden' }}>
+    <div className="phone-shell" style={{ overflow: 'hidden', position: 'relative' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>{t.profileTitle}</span>
@@ -184,7 +243,7 @@ export default function ProfilePage() {
         <div>
           <SectionLabel label={t.portfolioSection} />
           <Card>
-            <SettingsRow icon="description" label={t.importCsv} value={t.importAction} onPress={() => {}} />
+            <SettingsRow icon="upload_file" label={t.importCsv} value={t.importAction} onPress={() => setImportOpen(true)} />
             <SettingsRow icon="upload_file" label={t.exportData} onPress={() => router.push('/profile/export')} />
             <SettingsRow icon="link" label={t.linkBroker} border={false} />
           </Card>
@@ -205,6 +264,53 @@ export default function ProfilePage() {
         </button>
 
       </div>
+
+      {importOpen && (
+        <div onClick={closeImport} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.impTitle}</span>
+              <span onClick={closeImport} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>{t.impSub}</div>
+
+            <label style={{ border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-low)', padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center', cursor: 'pointer' }}>
+              <input type="file" accept=".csv,text/csv" onChange={e => { setImportFile(e.target.files?.[0] ?? null); setImportError(''); }} style={{ display: 'none' }} />
+              <div style={{ width: 52, height: 52, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 26, color: 'var(--primary)' }}>upload_file</span>
+              </div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>{importFile ? importFile.name : t.impDrop}</div>
+              <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{t.impDropHint}</div>
+            </label>
+
+            {importError && (
+              <div style={{ fontSize: 13, color: 'var(--loss)', marginTop: 12 }}>{importError}</div>
+            )}
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+              <button onClick={closeImport} disabled={importing} style={{ flex: 1, background: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {t.impCancel}
+              </button>
+              <button onClick={submitImport} disabled={importing} style={{ flex: 1, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: importing ? 0.7 : 1 }}>
+                {importing ? t.impImporting : t.impConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importToast && (
+        <div style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', gap: 12, background: 'var(--inverse-surface)', borderRadius: 'var(--radius-md)', padding: '13px 16px', boxShadow: 'var(--shadow)', zIndex: 110 }}>
+          <span style={{ width: 34, height: 34, flex: 'none', borderRadius: 'var(--radius-full)', background: 'var(--gain-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: '#fff' }}>check</span>
+          </span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.impToastTitle}</div>
+            <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.impToastSub}</div>
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
