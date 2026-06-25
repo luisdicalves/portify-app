@@ -118,8 +118,8 @@ export default function ProfilePage() {
               label={t.language}
               value={t.langValue}
               onPress={() => setLang(lang === 'pt' ? 'en' : 'pt')}
-              border={false}
             />
+            <SettingsRow icon="euro" label={t.currency} value="EUR (€)" border={false} />
           </Card>
         </div>
 

@@ -1,10 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 
+const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
+
 export default function DashboardPage() {
   const router = useRouter();
+  const [tf, setTf] = useState(4);
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -33,7 +37,19 @@ export default function DashboardPage() {
         </div>
 
         {/* Performance chart */}
-        <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+          <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 3, marginBottom: 12 }}>
+            {TIMEFRAMES.map((t, i) => (
+              <button key={t} onClick={() => setTf(i)} style={{
+                flex: 1, padding: '6px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+                fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
+                background: tf === i ? 'var(--surface-lowest)' : 'transparent',
+                color: tf === i ? 'var(--primary)' : 'var(--on-surface-variant)',
+                boxShadow: tf === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              }}>{t}</button>
+            ))}
+          </div>
+          <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
           <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
             <defs>
               <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
@@ -44,6 +60,7 @@ export default function DashboardPage() {
             <path d="M0,76 Q40,70 70,72 T140,44 T210,54 T270,16 T320,28 L320,96 L0,96 Z" fill="url(#pHomeG)" />
             <path d="M0,76 Q40,70 70,72 T140,44 T210,54 T270,16 T320,28" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" />
           </svg>
+          </div>
         </div>
 
         {/* Stat cards row */}
