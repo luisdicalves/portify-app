@@ -1,11 +1,43 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
 import Switch from '@/components/ui/Switch';
+
+const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
+const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
+const SECTOR_LABELS: Record<string, string> = {
+  tech: 'Tecnologia', health: 'Saúde', finance: 'Finanças', energy: 'Energia',
+  consumer: 'Consumo', industry: 'Indústria', realestate: 'Imobiliário', materials: 'Materiais', comms: 'Comunicações',
+};
+const FREQ_LABELS: Record<string, string> = { weekly: 'Semanal', monthly: 'Mensal', quarterly: 'Trimestral', annual: 'Anual' };
+
+function horizonLabel(years: number | null | undefined) {
+  if (years == null) return '—';
+  if (years < 2) return '< 2 anos';
+  if (years <= 5) return '2 – 5 anos';
+  if (years <= 10) return '5 – 10 anos';
+  return '> 10 anos';
+}
+
+type Profile = {
+  first_name: string | null;
+  last_name: string | null;
+  risk_profile: string | null;
+  investment_goal: string | null;
+  preferred_sectors: string[] | null;
+  investor_since: number | null;
+};
+
+type Plan = {
+  amount: number;
+  frequency: string;
+  horizon_years: number;
+};
 
 function SectionLabel({ label }: { label: string }) {
   return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
@@ -34,6 +66,31 @@ export default function ProfilePage() {
   const router = useRouter();
   const { theme, toggleTheme, lang, setLang } = useApp();
   const t = useDict(lang);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const [{ data: p }, { data: pl }] = await Promise.all([
+        supabase.from('profiles').select('first_name, last_name, risk_profile, investment_goal, preferred_sectors, investor_since').eq('id', user.id).single(),
+        supabase.from('investment_plans').select('amount, frequency, horizon_years').eq('user_id', user.id).maybeSingle(),
+      ]);
+      if (p) setProfile(p);
+      if (pl) setPlan(pl);
+    })();
+  }, []);
+
+  const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '...';
+  const initials = [profile?.first_name?.[0], profile?.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?';
+  const riskLabel = profile?.risk_profile ? RISK_LABELS[profile.risk_profile] ?? profile.risk_profile : '—';
+  const goalLabel = profile?.investment_goal ? GOAL_LABELS[profile.investment_goal] ?? profile.investment_goal : '—';
+  const sectorsLabel = profile?.preferred_sectors?.length
+    ? profile.preferred_sectors.map(s => SECTOR_LABELS[s] ?? s).join(', ')
+    : '—';
+  const planLabel = plan ? `${plan.amount} €/${FREQ_LABELS[plan.frequency] ?? plan.frequency}` : '—';
 
   async function signOut() {
     const supabase = createClient();
@@ -53,14 +110,14 @@ export default function ProfilePage() {
         {/* Identity */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
           <div style={{ position: 'relative' }}>
-            <div style={{ width: 88, height: 88, borderRadius: 'var(--radius-full)', background: 'var(--primary-strong)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 700 }}>RF</div>
+            <div style={{ width: 88, height: 88, borderRadius: 'var(--radius-full)', background: 'var(--primary-strong)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, fontWeight: 700 }}>{initials}</div>
             <div style={{ position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 'var(--radius-full)', background: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '3px solid var(--bg)' }}>
               <span className="material-symbols-outlined" style={{ fontSize: 15, color: '#fff' }}>edit</span>
             </div>
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>Ricardo Ferreira</div>
-            <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>{t.memberSince}</div>
+            <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em' }}>{fullName}</div>
+            <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 2 }}>{profile?.investor_since ? `Membro desde ${profile.investor_since}` : ''}</div>
           </div>
         </div>
 
@@ -69,12 +126,12 @@ export default function ProfilePage() {
           <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--primary)' }}>trending_up</span>
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.risk}</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{t.moderate}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--primary)' }}>{riskLabel}</span>
           </div>
           <div style={{ flex: 1, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--gain)' }}>flag</span>
             <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.objective}</span>
-            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>{t.longTermGoal}</span>
+            <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>{goalLabel}</span>
           </div>
         </div>
 
@@ -87,10 +144,10 @@ export default function ProfilePage() {
         <div>
           <SectionLabel label={t.investorProfileSection} />
           <Card>
-            <SettingsRow icon="local_fire_department" label={t.riskProfileLabel} value={t.moderate} onPress={() => router.push('/auth/risk')} />
-            <SettingsRow icon="schedule" label={t.horizonLabel} value={t.horizonValue} onPress={() => router.push('/auth/objective')} />
-            <SettingsRow icon="target" label={t.objective} value={t.longTermGoal} onPress={() => router.push('/auth/objective')} />
-            <SettingsRow icon="sell" label={t.sectorsLabel} value={t.sectorsValue} onPress={() => router.push('/auth/sectors')} border={false} />
+            <SettingsRow icon="local_fire_department" label={t.riskProfileLabel} value={riskLabel} onPress={() => router.push('/auth/risk')} />
+            <SettingsRow icon="schedule" label={t.horizonLabel} value={horizonLabel(plan?.horizon_years)} onPress={() => router.push('/auth/plan-set')} />
+            <SettingsRow icon="target" label={t.objective} value={goalLabel} onPress={() => router.push('/auth/objective')} />
+            <SettingsRow icon="sell" label={t.sectorsLabel} value={sectorsLabel} onPress={() => router.push('/auth/sectors')} border={false} />
           </Card>
         </div>
 
@@ -98,7 +155,7 @@ export default function ProfilePage() {
         <div>
           <SectionLabel label={t.investmentPlanSection} />
           <Card>
-            <SettingsRow icon="account_balance_wallet" label={t.activePlan} value={t.planValue} onPress={() => router.push('/auth/plan-set')} border={false} />
+            <SettingsRow icon="account_balance_wallet" label={t.activePlan} value={planLabel} onPress={() => router.push('/auth/plan-set')} border={false} />
           </Card>
         </div>
 

@@ -35,6 +35,7 @@ export const en: typeof pt = {
   pinTitle: 'Enter PIN',
   pinSub: 'Use your 6-digit code to sign in',
   forgotPin: 'Forgot PIN',
+  pinWrong: 'Incorrect PIN. Try again.',
   onbSteps: [
     { icon: 'monitoring', title: 'All your wealth in one place', text: 'Track stocks, ETFs and crypto with real-time market data.' },
     { icon: 'donut_small', title: 'Make decisions with clarity', text: 'Visualize sector allocation and performance with simple, accurate charts.' },

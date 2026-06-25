@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 const AMOUNTS  = ['100 €','250 €','300 €','500 €','1.000 €'];
 const PERIODS  = ['Semanal','Mensal','Trimestral','Anual'];
 const HORIZONS = ['< 2 anos','2 – 5 anos','5 – 10 anos','> 10 anos'];
+
+const AMOUNT_VALUES = [100, 250, 300, 500, 1000];
+const FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'annual'] as const;
+const HORIZON_YEARS = [1, 3, 7, 15];
 
 function Chip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
   return (
@@ -30,6 +35,23 @@ export default function PlanSetPage() {
   const [amt, setAmt] = useState(1);
   const [period, setPeriod] = useState(1);
   const [horizon, setHorizon] = useState(2);
+  const [saving, setSaving] = useState(false);
+
+  async function handleContinue() {
+    setSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('investment_plans').upsert({
+        user_id: user.id,
+        amount: AMOUNT_VALUES[amt],
+        frequency: FREQUENCIES[period],
+        horizon_years: HORIZON_YEARS[horizon],
+        goal_amount: parseFloat(goal) || 0,
+      });
+    }
+    router.push('/auth/summary');
+  }
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -78,8 +100,8 @@ export default function PlanSetPage() {
 
         <div style={{ flex: 1, minHeight: 8 }} />
 
-        <button onClick={() => router.push('/auth/summary')}
-          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={handleContinue} disabled={saving}
+          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
           Ver resumo
         </button>
       </div>

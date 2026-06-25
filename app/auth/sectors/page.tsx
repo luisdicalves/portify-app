@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
+import { createClient } from '@/lib/supabase/client';
 
 const SECTORS = [
   { id: 'tech', label: 'Tecnologia', icon: 'computer' },
@@ -20,11 +21,23 @@ export default function SectorsPage() {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set(['tech']));
 
+  const [saving, setSaving] = useState(false);
+
   const toggle = (id: string) => setSelected(s => {
     const n = new Set(s);
     n.has(id) ? n.delete(id) : n.add(id);
     return n;
   });
+
+  async function handleContinue() {
+    setSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', user.id);
+    }
+    router.push('/auth/plan-ask');
+  }
 
   return (
     <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
@@ -53,7 +66,7 @@ export default function SectorsPage() {
       </div>
 
       <div style={{ padding: '24px 24px 48px' }}>
-        <button className="btn-primary" disabled={selected.size === 0} onClick={() => router.push('/auth/plan-ask')} style={{ opacity: selected.size === 0 ? 0.5 : 1 }}>
+        <button className="btn-primary" disabled={selected.size === 0 || saving} onClick={handleContinue} style={{ opacity: selected.size === 0 ? 0.5 : 1 }}>
           Continuar
         </button>
       </div>

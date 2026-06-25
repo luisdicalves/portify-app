@@ -4,21 +4,37 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { createClient } from '@/lib/supabase/client';
 
 export default function PinPage() {
   const { lang } = useApp();
   const t = useDict(lang);
   const router = useRouter();
   const [pin, setPin] = useState('');
+  const [error, setError] = useState(false);
+  const [checking, setChecking] = useState(false);
 
   const press = (k: string) => {
+    if (checking) return;
+    setError(false);
     if (k === 'del') { setPin(p => p.slice(0, -1)); return; }
     const next = (pin + k).slice(0, 6);
     setPin(next);
-    if (next.length === 6) {
-      setTimeout(() => router.push('/dashboard'), 200);
-    }
+    if (next.length === 6) verify(next);
   };
+
+  async function verify(value: string) {
+    setChecking(true);
+    const supabase = createClient();
+    const { data: ok } = await supabase.rpc('verify_pin', { p_pin: value });
+    if (ok) {
+      router.push('/dashboard');
+      return;
+    }
+    setError(true);
+    setPin('');
+    setChecking(false);
+  }
 
   const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
 
@@ -30,7 +46,7 @@ export default function PinPage() {
           <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--primary)' }}>lock</span>
         </div>
         <div style={{ fontSize: 22, fontWeight: 700 }}>{t.pinTitle}</div>
-        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', textAlign: 'center' }}>{t.pinSub}</div>
+        <div style={{ fontSize: 14, color: error ? 'var(--loss)' : 'var(--on-surface-variant)', textAlign: 'center' }}>{error ? t.pinWrong : t.pinSub}</div>
 
         {/* PIN dots */}
         <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>

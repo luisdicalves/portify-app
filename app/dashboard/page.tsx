@@ -1,14 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import { createClient } from '@/lib/supabase/client';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
 
 export default function DashboardPage() {
   const router = useRouter();
   const [tf, setTf] = useState(4);
+  const [fullName, setFullName] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name')
+        .eq('id', user.id)
+        .single();
+      if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
+    })();
+  }, []);
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -18,7 +34,7 @@ export default function DashboardPage() {
           <span className="material-symbols-outlined icf" style={{ fontSize: 30, color: 'var(--primary)' }}>account_circle</span>
           <div style={{ lineHeight: 1.15 }}>
             <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Bem-vindo de volta</div>
-            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.01em' }}>Luís</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.01em' }}>{fullName || '...'}</div>
           </div>
         </div>
         <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)' }}>notifications</span>
