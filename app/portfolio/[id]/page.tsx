@@ -1,17 +1,118 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import TradeDateDialog from '@/components/ui/TradeDateDialog';
+import { createClient } from '@/lib/supabase/client';
+import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 
-export default function AssetDetailPage() {
+const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+function todayIso() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function nowTime() {
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+export default function AssetDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const { lang } = useApp();
+  const t = useDict(lang);
+  const ticker = params.id.toUpperCase();
+
+  const [holding, setHolding] = useState<{ units: number; avg_price: number } | null>(null);
+  const [sheet, setSheet] = useState<'buy' | 'sell' | null>(null);
+  const [shares, setShares] = useState('');
+  const [avgPrice, setAvgPrice] = useState('');
+  const [tradeDate, setTradeDate] = useState(todayIso());
+  const [time, setTime] = useState(nowTime());
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase.from('holdings').select('units, avg_price').eq('user_id', user.id).eq('ticker', ticker).maybeSingle();
+      setHolding(data ?? null);
+    })();
+  }, [ticker]);
+
+  function openSheet(mode: 'buy' | 'sell') {
+    setShares('');
+    setAvgPrice('');
+    setTradeDate(todayIso());
+    setTime(nowTime());
+    setError('');
+    setSheet(mode);
+  }
+
+  function closeSheet() {
+    setSheet(null);
+    setError('');
+  }
+
+  async function confirmTrade() {
+    const unitsNum = parseFloat(shares.replace(',', '.'));
+    const priceNum = parseFloat(avgPrice.replace(',', '.'));
+    if (!unitsNum || unitsNum <= 0 || !priceNum || priceNum <= 0) { setError(t.bsError); return; }
+
+    setSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+
+    const [hh, mm] = time.split(':').map(Number);
+    const executedAt = new Date(tradeDate);
+    if (!Number.isNaN(hh) && !Number.isNaN(mm)) executedAt.setHours(hh, mm);
+    const amount = unitsNum * priceNum;
+
+    await supabase.from('transactions').insert({
+      user_id: user.id, ticker, type: sheet, units: unitsNum, price: priceNum, amount, executed_at: executedAt.toISOString(),
+    });
+
+    if (sheet === 'buy') {
+      if (holding) {
+        const newUnits = holding.units + unitsNum;
+        const newAvg = (holding.units * holding.avg_price + unitsNum * priceNum) / newUnits;
+        await supabase.from('holdings').update({ units: newUnits, avg_price: newAvg }).eq('user_id', user.id).eq('ticker', ticker);
+        setHolding({ units: newUnits, avg_price: newAvg });
+      } else {
+        await supabase.from('holdings').insert({ user_id: user.id, ticker, units: unitsNum, avg_price: priceNum });
+        setHolding({ units: unitsNum, avg_price: priceNum });
+      }
+    } else if (holding) {
+      const newUnits = holding.units - unitsNum;
+      if (newUnits <= 0) {
+        await supabase.from('holdings').delete().eq('user_id', user.id).eq('ticker', ticker);
+        setHolding(null);
+      } else {
+        await supabase.from('holdings').update({ units: newUnits }).eq('user_id', user.id).eq('ticker', ticker);
+        setHolding({ ...holding, units: newUnits });
+      }
+    }
+
+    setSaving(false);
+    closeSheet();
+  }
+
+  const tradeDateText = new Date(tradeDate).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB');
+  const fieldStyle = { display: 'flex', alignItems: 'center', gap: 9, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 13px' } as const;
+  const inputStyle = { flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '13px 0', fontSize: 15, color: 'var(--on-surface)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' } as const;
 
   return (
-    <div className="phone-shell" style={{ overflow: 'hidden' }}>
+    <div className="phone-shell" style={{ overflow: 'hidden', position: 'relative' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px 10px' }}>
         <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer' }}>arrow_back_ios_new</span>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>AAPL</span>
-        <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Apple Inc.</span>
+        <span style={{ fontSize: 18, fontWeight: 700 }}>{ticker}</span>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 16px 160px', display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -31,10 +132,17 @@ export default function AssetDetailPage() {
           <path d="M0,88 Q40,84 70,80 T140,52 T210,60 T270,24 T320,30" fill="none" stroke="var(--gain)" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
 
+        {holding && (
+          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.units} · {t.avgPrice}</span>
+            <b style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{holding.units} · {eur.format(holding.avg_price)} €</b>
+          </div>
+        )}
+
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 12 }}>Estatísticas</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 12 }}>{t.detailStats}</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[['Abertura','186,20'],['Volume','48,2M'],['Máx. dia','190,10'],['Mín. dia','185,80']].map(([l,v]) => (
+            {[[t.open, '186,20'], [t.volume, '48,2M'], [t.dayHigh, '190,10'], [t.dayLow, '185,80']].map(([l, v]) => (
               <div key={l} style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{l}</span>
                 <b style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{v}</b>
@@ -44,24 +152,91 @@ export default function AssetDetailPage() {
         </div>
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 8 }}>Sobre</div>
-          <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>
-            Apple Inc. projeta, fabrica e comercializa smartphones, computadores pessoais, tablets, wearables e acessórios, além de serviços de software.
-          </div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 8 }}>{t.detailAbout}</div>
+          <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{t.detailAboutText}</div>
         </div>
       </div>
 
-      {/* Buy / Sell — above BottomNav */}
       <div style={{ position: 'absolute', left: 14, right: 14, bottom: 82, display: 'flex', gap: 10 }}>
-        <button onClick={() => router.push('/portfolio/buy')}
+        <button onClick={() => openSheet('buy')}
           style={{ flex: 1, background: 'var(--gain-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Comprar
+          {t.buy}
         </button>
-        <button onClick={() => router.push('/portfolio/sell')}
+        <button onClick={() => openSheet('sell')}
           style={{ flex: 1, background: 'var(--loss-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-          Vender
+          {t.sell}
         </button>
       </div>
+
+      {sheet && (
+        <div onClick={closeSheet} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 20, fontWeight: 700 }}>{sheet === 'buy' ? t.bsBuyTitle : t.bsSellTitle}</span>
+                <span style={{
+                  fontSize: 13, fontWeight: 600, padding: '3px 9px', borderRadius: 'var(--radius-full)',
+                  color: sheet === 'buy' ? 'var(--gain)' : 'var(--loss)',
+                  background: sheet === 'buy' ? 'var(--gain-container)' : 'var(--loss-container)',
+                }}>{ticker}</span>
+              </span>
+              <span onClick={closeSheet} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.bsShares}</div>
+                <div style={fieldStyle}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>tag</span>
+                  <input value={shares} onChange={e => setShares(e.target.value)} type="text" inputMode="decimal" placeholder="0" style={inputStyle} />
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.bsAvgPrice}</div>
+                <div style={fieldStyle}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>payments</span>
+                  <input value={avgPrice} onChange={e => setAvgPrice(e.target.value)} type="text" inputMode="decimal" placeholder="0,00" style={inputStyle} />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.bsDate}</div>
+                  <div onClick={() => setDateDialogOpen(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 10px', cursor: 'pointer' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)', flex: 'none' }}>calendar_month</span>
+                    <span style={{ flex: 1, minWidth: 0, padding: '13px 0', fontSize: 14, color: 'var(--on-surface)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tradeDateText}</span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.bsTime}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 10px' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--outline)', flex: 'none' }}>schedule</span>
+                    <input value={time} onChange={e => setTime(e.target.value)} type="text" placeholder="14:32" style={{ ...inputStyle, minWidth: 0, width: '100%' }} />
+                  </div>
+                </div>
+              </div>
+
+              {error && <div style={{ fontSize: 13, color: 'var(--loss)' }}>{error}</div>}
+
+              <button onClick={confirmTrade} disabled={saving} style={{
+                background: sheet === 'buy' ? 'var(--gain-strong)' : 'var(--loss-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: saving ? 0.7 : 1,
+              }}>
+                {sheet === 'buy' ? t.bsConfirm : t.bsSellConfirm}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {dateDialogOpen && (
+        <TradeDateDialog
+          value={tradeDate}
+          lang={lang}
+          confirmLabel={t.confirm}
+          onClose={() => setDateDialogOpen(false)}
+          onConfirm={iso => { setTradeDate(iso); setDateDialogOpen(false); }}
+        />
+      )}
 
       <BottomNav />
     </div>

@@ -97,6 +97,10 @@ export default function ProfilePage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [importToast, setImportToast] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
+  const [exportPeriodOpen, setExportPeriodOpen] = useState(false);
+  const [exportPeriod, setExportPeriod] = useState<'allTime' | 'thisMonth' | 'thisYear' | 'last12'>('allTime');
 
   useEffect(() => {
     (async () => {
@@ -155,6 +159,32 @@ export default function ProfilePage() {
       setImporting(false);
       setImportError(t.impParseError);
     }
+  }
+
+  const PERIODS = [
+    { id: 'allTime' as const, label: t.periodAllTime },
+    { id: 'thisMonth' as const, label: t.periodThisMonth },
+    { id: 'thisYear' as const, label: t.periodThisYear },
+    { id: 'last12' as const, label: t.periodLast12 },
+  ];
+
+  async function downloadExport() {
+    if (exportFormat === 'csv') {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data: holdings } = await supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id);
+      const rows = [['ticker', 'units', 'avg_price'], ...(holdings ?? []).map(h => [h.ticker, String(h.units), String(h.avg_price)])];
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'portify-portfolio.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    setExportOpen(false);
   }
 
   return (
@@ -242,7 +272,7 @@ export default function ProfilePage() {
           <SectionLabel label={t.portfolioSection} />
           <Card>
             <SettingsRow icon="upload_file" label={t.importCsv} value={t.importAction} onPress={() => setImportOpen(true)} />
-            <SettingsRow icon="upload_file" label={t.exportData} onPress={() => router.push('/profile/export')} />
+            <SettingsRow icon="upload_file" label={t.exportData} onPress={() => setExportOpen(true)} />
             <SettingsRow icon="link" label={t.linkBroker} border={false} />
           </Card>
         </div>
@@ -294,6 +324,58 @@ export default function ProfilePage() {
                 {importing ? t.impImporting : t.impConfirm}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {exportOpen && (
+        <div onClick={() => setExportOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.exportTitle}</span>
+              <span onClick={() => setExportOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>{t.exportDesc}</div>
+
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 8 }}>{t.format}</div>
+              <div style={{ display: 'flex', gap: 10 }}>
+                <button onClick={() => setExportFormat('csv')} style={{
+                  flex: 1, border: 'none', borderRadius: 'var(--radius-md)', padding: 13, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  background: exportFormat === 'csv' ? 'var(--primary-strong)' : 'var(--surface-high)', color: exportFormat === 'csv' ? '#fff' : 'var(--on-surface)',
+                }}>{t.exportCsv}</button>
+                <button onClick={() => setExportFormat('pdf')} style={{
+                  flex: 1, border: 'none', borderRadius: 'var(--radius-md)', padding: 13, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  background: exportFormat === 'pdf' ? 'var(--primary-strong)' : 'var(--surface-high)', color: exportFormat === 'pdf' ? '#fff' : 'var(--on-surface)',
+                }}>{t.exportPdf}</button>
+              </div>
+            </div>
+
+            <div onClick={() => setExportPeriodOpen(v => !v)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 14, background: 'var(--surface-low)', borderRadius: 'var(--radius-md)', marginBottom: 10, cursor: 'pointer' }}>
+              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.period}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, fontWeight: 600 }}>
+                {PERIODS.find(p => p.id === exportPeriod)?.label}
+                <span className="material-symbols-outlined" style={{ fontSize: 20, transition: 'transform .2s', transform: exportPeriodOpen ? 'rotate(180deg)' : 'none' }}>expand_more</span>
+              </span>
+            </div>
+
+            {exportPeriodOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 18 }}>
+                {PERIODS.map(p => (
+                  <button key={p.id} onClick={() => { setExportPeriod(p.id); setExportPeriodOpen(false); }} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-low)', border: 'none', borderRadius: 'var(--radius-md)', padding: '12px 14px', fontSize: 14, fontWeight: 600, color: 'var(--on-surface)', cursor: 'pointer', fontFamily: 'inherit',
+                  }}>
+                    <span>{p.label}</span>
+                    {exportPeriod === p.id && <span className="material-symbols-outlined" style={{ fontSize: 19, color: 'var(--primary)' }}>check</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button onClick={downloadExport} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 21 }}>download</span>{t.download}
+            </button>
           </div>
         </div>
       )}

@@ -1,17 +1,21 @@
 'use client';
 
 import { useRouter, usePathname } from 'next/navigation';
-
-const TABS = [
-  { path: '/dashboard', icon: 'dashboard',             label: 'Painel' },
-  { path: '/portfolio', icon: 'account_balance_wallet', label: 'Portfólio' },
-  { path: '/activity',  icon: 'payments',              label: 'Movimentos' },
-  { path: '/profile',   icon: 'person',                label: 'Perfil' },
-];
+import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
+  const { lang } = useApp();
+  const t = useDict(lang);
+
+  const TABS = [
+    { path: '/dashboard', icon: 'dashboard',              label: t.navDash },
+    { path: '/portfolio', icon: 'account_balance_wallet', label: t.navPort },
+    { path: '/for-you',   icon: 'auto_awesome',           label: t.navFor },
+    { path: '/profile',   icon: 'person',                 label: t.navProfile },
+  ];
 
   return (
     <div style={{
