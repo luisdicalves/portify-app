@@ -66,6 +66,7 @@ export default function DatePicker({
   const [viewYear, setViewYear] = useState(initial.getFullYear());
   const [viewMonth, setViewMonth] = useState(initial.getMonth());
   const [picked, setPicked] = useState(value);
+  const [yearsView, setYearsView] = useState(false);
 
   useEffect(() => {
     setDigits(digitsFromIso(value, lang));
@@ -110,6 +111,7 @@ export default function DatePicker({
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth());
     setPicked(value);
+    setYearsView(false);
     setOpen(true);
   }
 
@@ -119,6 +121,8 @@ export default function DatePicker({
 
   const viewIsAtOrAfterMaxMonth = viewYear === max.getFullYear() ? viewMonth >= max.getMonth() : viewYear > max.getFullYear();
 
+  const years = Array.from({ length: max.getFullYear() - (max.getFullYear() - 100) + 1 }, (_, i) => max.getFullYear() - i);
+
   function shiftMonth(delta: number) {
     let m = viewMonth + delta;
     let y = viewYear;
@@ -127,6 +131,12 @@ export default function DatePicker({
     if (y > max.getFullYear() || (y === max.getFullYear() && m > max.getMonth())) { y = max.getFullYear(); m = max.getMonth(); }
     setViewMonth(m);
     setViewYear(y);
+  }
+
+  function pickYear(y: number) {
+    setViewYear(y);
+    if (y === max.getFullYear() && viewMonth > max.getMonth()) setViewMonth(max.getMonth());
+    setYearsView(false);
   }
 
   function confirm() {
@@ -156,45 +166,74 @@ export default function DatePicker({
       {open && (
         <div onClick={() => setOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl)', padding: 20, boxShadow: 'var(--shadow)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, gap: 4 }}>
-              <button type="button" onClick={() => shiftMonth(-12)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>keyboard_double_arrow_left</span>
+            {/* Selected-date display */}
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{label}</div>
+                <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.01em', marginTop: 3, fontVariantNumeric: 'tabular-nums' }}>
+                  {picked ? new Date(picked).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB') : placeholder}
+                </div>
+              </div>
+              <span onClick={() => setOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer', flex: 'none' }}>close</span>
+            </div>
+
+            {/* Month / year navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <button type="button" onClick={() => setYearsView(v => !v)} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--on-surface)', fontFamily: 'inherit', padding: '6px 4px' }}>
+                <span style={{ fontSize: 17, fontWeight: 700 }}>{months[viewMonth]} {viewYear}</span>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)', transition: 'transform .2s', transform: yearsView ? 'rotate(180deg)' : 'none' }}>expand_more</span>
               </button>
-              <button type="button" onClick={() => shiftMonth(-1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)' }}>
+              <button type="button" disabled={yearsView} onClick={() => shiftMonth(-1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: yearsView ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: yearsView ? 0.35 : 1 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_left</span>
               </button>
-              <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700 }}>{months[viewMonth]} {viewYear}</div>
-              <button type="button" disabled={viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: viewIsAtOrAfterMaxMonth ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: viewIsAtOrAfterMaxMonth ? 0.35 : 1 }}>
+              <button type="button" disabled={yearsView || viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: (yearsView || viewIsAtOrAfterMaxMonth) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: (yearsView || viewIsAtOrAfterMaxMonth) ? 0.35 : 1 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span>
               </button>
-              <button type="button" disabled={viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(12)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: viewIsAtOrAfterMaxMonth ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: viewIsAtOrAfterMaxMonth ? 0.35 : 1 }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 20 }}>keyboard_double_arrow_right</span>
-              </button>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, justifyItems: 'center', marginBottom: 6 }}>
-              {weekdays.map((w, i) => (
-                <span key={i} style={{ width: 36, textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--on-surface-variant)' }}>{w}</span>
-              ))}
-            </div>
+            {!yearsView ? (
+              <div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, justifyItems: 'center', marginBottom: 6 }}>
+                  {weekdays.map((w, i) => (
+                    <span key={i} style={{ width: 36, textAlign: 'center', fontSize: 11, fontWeight: 600, color: 'var(--on-surface-variant)' }}>{w}</span>
+                  ))}
+                </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, justifyItems: 'center' }}>
-              {cells.map((d, i) => {
-                if (d === null) return <span key={i} style={{ width: 36, height: 36 }} />;
-                const iso = toISO(viewYear, viewMonth, d);
-                const disabled = new Date(viewYear, viewMonth, d) > max;
-                const isPicked = picked === iso;
-                return (
-                  <button key={i} type="button" disabled={disabled} onClick={() => setPicked(iso)} style={{
-                    width: 36, height: 36, border: 'none', borderRadius: 'var(--radius-full)', cursor: disabled ? 'default' : 'pointer',
-                    background: isPicked ? 'var(--primary-strong)' : 'transparent',
-                    color: disabled ? 'var(--outline-variant)' : isPicked ? '#fff' : 'var(--on-surface)',
-                    opacity: disabled ? 0.5 : 1,
-                    fontSize: 13, fontWeight: isPicked ? 700 : 500, fontFamily: 'inherit',
-                  }}>{d}</button>
-                );
-              })}
-            </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', gap: 2, justifyItems: 'center' }}>
+                  {cells.map((d, i) => {
+                    if (d === null) return <span key={i} style={{ width: 36, height: 36 }} />;
+                    const iso = toISO(viewYear, viewMonth, d);
+                    const disabled = new Date(viewYear, viewMonth, d) > max;
+                    const isPicked = picked === iso;
+                    return (
+                      <button key={i} type="button" disabled={disabled} onClick={() => setPicked(iso)} style={{
+                        width: 36, height: 36, border: 'none', borderRadius: 'var(--radius-full)', cursor: disabled ? 'default' : 'pointer',
+                        background: isPicked ? 'var(--primary-strong)' : 'transparent',
+                        color: disabled ? 'var(--outline-variant)' : isPicked ? '#fff' : 'var(--on-surface)',
+                        opacity: disabled ? 0.5 : 1,
+                        fontSize: 13, fontWeight: isPicked ? 700 : 500, fontFamily: 'inherit',
+                      }}>{d}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div style={{ height: 236, overflow: 'auto', padding: 2 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                  {years.map(yr => {
+                    const isViewYear = yr === viewYear;
+                    return (
+                      <button key={yr} type="button" onClick={() => pickYear(yr)} style={{
+                        padding: '10px 0', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer',
+                        background: isViewYear ? 'var(--primary-strong)' : 'var(--surface-low)',
+                        color: isViewYear ? '#fff' : 'var(--on-surface)',
+                        fontSize: 14, fontWeight: isViewYear ? 700 : 500, fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums',
+                      }}>{yr}</button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <button
               type="button"

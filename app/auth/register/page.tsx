@@ -10,6 +10,14 @@ import DatePicker from '@/components/ui/DatePicker';
 
 const MIN_USERNAME_LENGTH = 3;
 
+function friendlySignUpError(err: unknown): string {
+  const message = err instanceof Error ? err.message : '';
+  if (/already registered|already exists/i.test(message)) return 'Já existe uma conta com este email.';
+  if (/password.*(least|characters)/i.test(message)) return 'A palavra-passe é demasiado curta.';
+  if (/invalid email/i.test(message)) return 'Email inválido.';
+  return message || 'Erro ao criar conta.';
+}
+
 export default function RegisterPage() {
   const { lang } = useApp();
   const t = useDict(lang);
@@ -72,7 +80,7 @@ export default function RegisterPage() {
       if (error) throw error;
       router.push('/auth/pin-set');
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao criar conta.');
+      setError(friendlySignUpError(err));
     } finally {
       setLoading(false);
     }
