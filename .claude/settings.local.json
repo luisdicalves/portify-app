@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(gh pr *)",
+      "Bash(gh --version)",
+      "Bash(git add *)",
+      "Read(//private/tmp/**)",
+      "Bash(curl -sL https://api.github.com/repos/cli/cli/releases/latest)",
+      "Bash(curl -sL -o gh.tar.gz https://github.com/cli/cli/releases/download/v2.95.0/gh_2.95.0_macOS_arm64.tar.gz)",
+      "Bash(tar -xzf gh.tar.gz)",
+      "Bash(curl -sL -o gh.zip https://github.com/cli/cli/releases/download/v2.95.0/gh_2.95.0_macOS_arm64.zip)",
+      "Bash(unzip -q gh.zip)",
+      "Read(//Users/alves/**)",
+      "Bash(echo 'export PATH=\"$HOME/bin:$PATH\"')",
+      "Bash(~/bin/gh auth *)"
+    ]
+  }
+}
