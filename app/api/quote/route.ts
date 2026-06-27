@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchYahooQuote } from '@/lib/marketData';
 import { getCached } from '@/lib/cache';
+import { getAuthedUser } from '@/lib/apiAuth';
 
 const QUOTE_TTL_SECONDS = 45;
 
@@ -56,6 +57,9 @@ async function fetchFinnhubQuote(ticker: string, apiKey: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const user = await getAuthedUser();
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
   const ticker = req.nextUrl.searchParams.get('symbol');
   if (!ticker) return NextResponse.json({ error: 'missing symbol' }, { status: 400 });
 

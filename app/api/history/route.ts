@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchYahooHistory } from '@/lib/marketData';
 import { getCached } from '@/lib/cache';
+import { getAuthedUser } from '@/lib/apiAuth';
 
 // Daily candles only change once a day — safe to cache for hours.
 const HISTORY_TTL_SECONDS = 6 * 60 * 60;
@@ -45,6 +46,9 @@ async function fetchTwelveDataHistory(ticker: string, outputsize: string, apiKey
 }
 
 export async function GET(req: NextRequest) {
+  const user = await getAuthedUser();
+  if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
   const ticker = req.nextUrl.searchParams.get('symbol');
   if (!ticker) return NextResponse.json({ error: 'missing symbol' }, { status: 400 });
 
