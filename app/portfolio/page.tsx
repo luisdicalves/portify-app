@@ -81,14 +81,14 @@ export default function PortfolioPage() {
       .order('executed_at', { ascending: false });
 
     const mapped: Transaction[] = (data ?? []).map(row => {
-      const gain = row.type !== 'buy';
+      const gain = row.type === 'buy' ? false : row.amount >= 0;
       return {
         id: row.id,
         sym: row.ticker,
         avatar: row.ticker.charAt(0),
         type: row.type as Transaction['type'],
         dateText: new Date(row.executed_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
-        total: `${gain ? '+' : '-'}${eur.format(row.amount)} €`,
+        total: `${gain ? '+' : '-'}${eur.format(Math.abs(row.amount))} €`,
         totalColor: gain ? 'var(--gain)' : 'var(--on-surface)',
         units: row.units != null ? String(row.units) : undefined,
         unitVal: row.price != null ? `${eur.format(row.price)} €` : undefined,

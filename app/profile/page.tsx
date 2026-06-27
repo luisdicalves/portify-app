@@ -158,9 +158,7 @@ async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
           executed_at: executedAt,
         });
       } else if (typeLow === 'divident' || typeLow === 'dividend') {
-        if (!symbol || amount === 0) continue;
-        // Only import positive dividends (skip correction entries)
-        if (amount < 0) continue;
+        if (!symbol) continue;
         transactions.push({
           external_id: `xtb_${extId}`,
           ticker: symbol,
