@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
+import RiskReport from '@/components/ui/RiskReport';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import type { RiskReport as RiskReportData } from '@/lib/riskScore';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -71,6 +73,9 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [quote, setQuote] = useState<Quote | null>(null);
   const [quoteLoading, setQuoteLoading] = useState(true);
   const [history, setHistory] = useState<HistoryPoint[] | null>(null);
+  const [riskReport, setRiskReport] = useState<RiskReportData | null>(null);
+  const [riskLoading, setRiskLoading] = useState(false);
+  const [riskRequested, setRiskRequested] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -109,6 +114,20 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       }
     })();
   }, [ticker]);
+
+  async function loadRiskReport() {
+    setRiskRequested(true);
+    setRiskLoading(true);
+    try {
+      const res = await fetch(`/api/risk?symbol=${encodeURIComponent(ticker)}&lang=${lang}`);
+      if (!res.ok) throw new Error('risk_failed');
+      setRiskReport(await res.json());
+    } catch {
+      setRiskReport(null);
+    } finally {
+      setRiskLoading(false);
+    }
+  }
 
   function openSheet(mode: 'buy' | 'sell') {
     setShares('');
@@ -255,6 +274,24 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
             <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{t.detailNoInfo}</div>
           )}
         </div>
+
+        {/* Análise de risco */}
+        {riskReport ? (
+          <RiskReport report={riskReport} price={quote?.price ?? 0} lang={lang} />
+        ) : (
+          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 10 }}>{t.riskTitle}</div>
+            {riskLoading ? (
+              <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.riskLoading}</div>
+            ) : riskRequested ? (
+              <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.riskUnavailable}</div>
+            ) : (
+              <button onClick={loadRiskReport} style={{ width: '100%', background: 'var(--surface-high)', color: 'var(--on-surface)', border: 'none', borderRadius: 'var(--radius-md)', padding: 13, fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 19 }}>analytics</span>{t.riskCta}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div style={{ position: 'absolute', left: 14, right: 14, bottom: 82, display: 'flex', gap: 10 }}>
