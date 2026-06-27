@@ -85,6 +85,7 @@ export const pt = {
   avgPrice: 'Preço Médio',
   detailStats: 'Estatísticas',
   detailAbout: 'Sobre',
+  detailAboutName: 'Nome',
   detailAboutSector: 'Setor',
   detailAboutExchange: 'Bolsa',
   detailNoInfo: 'Sem informação disponível.',
