@@ -1,14 +1,150 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import { createClient } from '@/lib/supabase/client';
 
-const TIMEFRAMES = ['1S','1M','3M','6M','1A','Max'];
+const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
+const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
+
+const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+
+type Holding = { ticker: string; units: number; avg_price: number };
+type Quote = { price: number; companyName: string | null };
+type HistoryPoint = { date: string; close: number };
+
+async function fetchQuote(ticker: string): Promise<Quote | null> {
+  try {
+    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (typeof data.price !== 'number') return null;
+    return { price: data.price, companyName: data.companyName ?? null };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchHistory(ticker: string, outputsize: number): Promise<HistoryPoint[] | null> {
+  try {
+    const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=${outputsize}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data.points) && data.points.length > 1 ? data.points : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildLinePath(values: number[]) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const w = 320, h = 120, pad = 8;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return [x, y];
+  });
+  const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+  const area = `${line} L${w},${h} L0,${h} Z`;
+  return { line, area };
+}
 
 export default function PerformancePage() {
   const router = useRouter();
   const [tf, setTf] = useState(4);
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const [avgDaysHeld, setAvgDaysHeld] = useState(365);
+  const [chartValues, setChartValues] = useState<number[] | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      const [{ data: holdingsData }, { data: buys }] = await Promise.all([
+        supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
+        supabase.from('transactions').select('amount, executed_at').eq('user_id', user.id).eq('type', 'buy'),
+      ]);
+
+      const hs = holdingsData ?? [];
+      setHoldings(hs);
+
+      if (buys && buys.length > 0) {
+        const now = Date.now();
+        const totalAmount = buys.reduce((s, b) => s + Math.abs(b.amount), 0);
+        const weightedDays = buys.reduce((s, b) => {
+          const days = (now - new Date(b.executed_at).getTime()) / 86400000;
+          return s + Math.abs(b.amount) * days;
+        }, 0);
+        setAvgDaysHeld(Math.max(30, totalAmount > 0 ? weightedDays / totalAmount : 365));
+      }
+
+      const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
+      const quoteMap: Record<string, Quote> = {};
+      hs.forEach((h, i) => { if (quoteResults[i]) quoteMap[h.ticker] = quoteResults[i]!; });
+      setQuotes(quoteMap);
+      setLoading(false);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (holdings.length === 0) { setChartValues(null); return; }
+    (async () => {
+      const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
+      const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
+
+      const backbone = histories
+        .filter((h): h is HistoryPoint[] => h !== null)
+        .sort((a, b) => b.length - a.length)[0];
+      if (!backbone) { setChartValues(null); return; }
+
+      const seriesMaps = histories.map(h => {
+        const map = new Map<string, number>();
+        h?.forEach(p => map.set(p.date, p.close));
+        return map;
+      });
+
+      const lastKnown = new Map<string, number>();
+      const values = backbone.map(({ date }) => {
+        let total = 0;
+        holdings.forEach((h, i) => {
+          const map = seriesMaps[i];
+          const closeToday = map.get(date);
+          const close = closeToday ?? lastKnown.get(h.ticker) ?? h.avg_price;
+          if (closeToday != null) lastKnown.set(h.ticker, closeToday);
+          total += h.units * close;
+        });
+        return total;
+      });
+      setChartValues(values.length > 1 ? values : null);
+    })();
+  }, [holdings, tf]);
+
+  const totalValue = holdings.reduce((sum, h) => sum + h.units * (quotes[h.ticker]?.price ?? h.avg_price), 0);
+  const totalInvested = holdings.reduce((sum, h) => sum + h.units * h.avg_price, 0);
+  const totalReturn = totalValue - totalInvested;
+  const totalReturnPct = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
+  const annualizedPct = totalInvested > 0 ? (Math.pow(1 + totalReturnPct / 100, 365 / avgDaysHeld) - 1) * 100 : 0;
+
+  const movers = holdings
+    .filter(h => quotes[h.ticker] !== undefined)
+    .map(h => ({
+      ticker: h.ticker,
+      companyName: quotes[h.ticker].companyName ?? h.ticker,
+      gainPct: h.avg_price > 0 ? ((quotes[h.ticker].price - h.avg_price) / h.avg_price) * 100 : 0,
+    }))
+    .sort((a, b) => b.gainPct - a.gainPct);
+  const best = movers[0];
+  const worst = movers.length > 1 ? movers[movers.length - 1] : null;
+
+  const chartColor = chartValues && chartValues.length > 1 && chartValues[chartValues.length - 1] >= chartValues[0] ? 'var(--gain)' : 'var(--loss)';
+  const { line, area } = chartValues && chartValues.length > 1 ? buildLinePath(chartValues) : { line: '', area: '' };
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -21,11 +157,15 @@ export default function PerformancePage() {
         <div style={{ display: 'flex', gap: 12 }}>
           <div style={{ flex: 1, background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Retorno total</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+15.780 €</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: totalReturn >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+              {loading ? '—' : `${totalReturn >= 0 ? '+' : ''}${eur.format(totalReturn)} €`}
+            </div>
           </div>
           <div style={{ flex: 1, background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Anualizado</div>
-            <div style={{ fontSize: 22, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+8,9%</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: annualizedPct >= 0 ? 'var(--on-surface)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+              {loading ? '—' : `${annualizedPct >= 0 ? '+' : ''}${annualizedPct.toFixed(1)}%`}
+            </div>
           </div>
         </div>
 
@@ -41,33 +181,45 @@ export default function PerformancePage() {
               }}>{t}</button>
             ))}
           </div>
-          <svg viewBox="0 0 320 120" style={{ width: '100%', height: 110, display: 'block' }}>
-            <defs>
-              <linearGradient id="pPerfG" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--gain)" stopOpacity="0.26" />
-                <stop offset="100%" stopColor="var(--gain)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d="M0,96 Q50,90 90,84 T170,58 T240,66 T320,18 L320,120 L0,120 Z" fill="url(#pPerfG)" />
-            <path d="M0,96 Q50,90 90,84 T170,58 T240,66 T320,18" fill="none" stroke="var(--gain)" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
+          {chartValues && chartValues.length > 1 ? (
+            <svg viewBox="0 0 320 120" style={{ width: '100%', height: 110, display: 'block' }}>
+              <defs>
+                <linearGradient id="pPerfG" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={chartColor} stopOpacity="0.26" />
+                  <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={area} fill="url(#pPerfG)" />
+              <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          ) : (
+            <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
+              {loading ? 'A carregar...' : 'Sem dados históricos suficientes.'}
+            </div>
+          )}
         </div>
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderBottom: '1px solid var(--hairline)' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>trending_up</span>
-              Melhor ativo
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>NVDA <span style={{ color: 'var(--gain)' }}>+42%</span></span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--loss)' }}>trending_down</span>
-              Pior ativo
-            </span>
-            <span style={{ fontSize: 14, fontWeight: 700 }}>TSLA <span style={{ color: 'var(--loss)' }}>-12%</span></span>
-          </div>
+          {loading && <div style={{ padding: 14, fontSize: 13, color: 'var(--on-surface-variant)' }}>A carregar...</div>}
+          {!loading && !best && <div style={{ padding: 14, fontSize: 13, color: 'var(--on-surface-variant)' }}>Sem posições registadas.</div>}
+          {!loading && best && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderBottom: worst ? '1px solid var(--hairline)' : 'none' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>trending_up</span>
+                Melhor ativo
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{best.ticker} <span style={{ color: 'var(--gain)' }}>{best.gainPct >= 0 ? '+' : ''}{best.gainPct.toFixed(0)}%</span></span>
+            </div>
+          )}
+          {!loading && worst && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 14 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--loss)' }}>trending_down</span>
+                Pior ativo
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{worst.ticker} <span style={{ color: 'var(--loss)' }}>{worst.gainPct >= 0 ? '+' : ''}{worst.gainPct.toFixed(0)}%</span></span>
+            </div>
+          )}
         </div>
       </div>
 
