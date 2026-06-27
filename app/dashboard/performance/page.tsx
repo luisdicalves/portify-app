@@ -208,7 +208,7 @@ export default function PerformancePage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>trending_up</span>
                 Melhor ativo
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{best.ticker} <span style={{ color: 'var(--gain)' }}>{best.gainPct >= 0 ? '+' : ''}{best.gainPct.toFixed(0)}%</span></span>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{best.companyName} <span style={{ color: 'var(--gain)' }}>{best.gainPct >= 0 ? '+' : ''}{best.gainPct.toFixed(0)}%</span></span>
             </div>
           )}
           {!loading && worst && (
@@ -217,7 +217,7 @@ export default function PerformancePage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--loss)' }}>trending_down</span>
                 Pior ativo
               </span>
-              <span style={{ fontSize: 14, fontWeight: 700 }}>{worst.ticker} <span style={{ color: 'var(--loss)' }}>{worst.gainPct >= 0 ? '+' : ''}{worst.gainPct.toFixed(0)}%</span></span>
+              <span style={{ fontSize: 14, fontWeight: 700 }}>{worst.companyName} <span style={{ color: 'var(--loss)' }}>{worst.gainPct >= 0 ? '+' : ''}{worst.gainPct.toFixed(0)}%</span></span>
             </div>
           )}
         </div>
