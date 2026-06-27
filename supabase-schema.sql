@@ -142,8 +142,14 @@ create table if not exists public.transactions (
   amount numeric not null,
   currency text default 'EUR',
   executed_at timestamptz default now(),
-  notes text
+  notes text,
+  external_id text
 );
+
+-- Plain (non-partial) unique index: required so upsert(... onConflict: 'user_id,external_id')
+-- can target it via ON CONFLICT. Postgres allows multiple NULL external_id rows under this
+-- index (NULL <> NULL), so manually-entered trades (no external_id) are unaffected.
+create unique index if not exists transactions_user_external_id_idx on public.transactions (user_id, external_id);
 
 alter table public.transactions enable row level security;
 

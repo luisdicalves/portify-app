@@ -20,6 +20,39 @@ function nowTime() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+type Quote = {
+  price: number;
+  change: number;
+  changePercent: number;
+  open: number;
+  high: number;
+  low: number;
+  prevClose: number;
+  companyName: string | null;
+  industry: string | null;
+  exchange: string | null;
+};
+
+type HistoryPoint = { date: string; close: number };
+
+// Builds an SVG line/area path from a series of values, scaled to the viewBox.
+// Used both for the real Twelve Data history and, as a fallback, for a
+// representative day-range sparkline from open/low/high/price.
+function buildLinePath(values: number[]) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const w = 320, h = 110, pad = 10;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return [x, y];
+  });
+  const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+  const area = `${line} L${w},${h} L0,${h} Z`;
+  return { line, area };
+}
+
 export default function AssetDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const { lang } = useApp();
@@ -35,6 +68,9 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(true);
+  const [history, setHistory] = useState<HistoryPoint[] | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -43,6 +79,34 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       if (!user) return;
       const { data } = await supabase.from('holdings').select('units, avg_price').eq('user_id', user.id).eq('ticker', ticker).maybeSingle();
       setHolding(data ?? null);
+    })();
+  }, [ticker]);
+
+  useEffect(() => {
+    (async () => {
+      setQuoteLoading(true);
+      try {
+        const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
+        if (!res.ok) throw new Error('quote_failed');
+        setQuote(await res.json());
+      } catch {
+        setQuote(null);
+      } finally {
+        setQuoteLoading(false);
+      }
+    })();
+  }, [ticker]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=30`);
+        if (!res.ok) throw new Error('history_failed');
+        const data = await res.json();
+        setHistory(Array.isArray(data.points) && data.points.length > 1 ? data.points : null);
+      } catch {
+        setHistory(null);
+      }
     })();
   }, [ticker]);
 
@@ -117,20 +181,41 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 16px 160px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>189,45 €</span>
-          <span style={{ color: 'var(--gain)', fontSize: 14, fontWeight: 600 }}>+15,20%</span>
+          {quoteLoading ? (
+            <span style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>…</span>
+          ) : quote ? (
+            <>
+              <span style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{eur.format(quote.price)} €</span>
+              <span style={{ color: quote.change >= 0 ? 'var(--gain)' : 'var(--loss)', fontSize: 14, fontWeight: 600 }}>
+                {quote.change >= 0 ? '+' : ''}{quote.changePercent.toFixed(2)}%
+              </span>
+            </>
+          ) : (
+            <span style={{ fontSize: 14, color: 'var(--on-surface-variant)' }}>{t.detailNoQuote}</span>
+          )}
         </div>
 
-        <svg viewBox="0 0 320 110" style={{ width: '100%', height: 100, display: 'block' }}>
-          <defs>
-            <linearGradient id="pDetG" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--gain)" stopOpacity="0.26" />
-              <stop offset="100%" stopColor="var(--gain)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d="M0,88 Q40,84 70,80 T140,52 T210,60 T270,24 T320,30 L320,110 L0,110 Z" fill="url(#pDetG)" />
-          <path d="M0,88 Q40,84 70,80 T140,52 T210,60 T270,24 T320,30" fill="none" stroke="var(--gain)" strokeWidth="2.5" strokeLinecap="round" />
-        </svg>
+        {quote && (() => {
+          const gain = history && history.length > 1
+            ? history[history.length - 1].close >= history[0].close
+            : quote.change >= 0;
+          const values = history && history.length > 1
+            ? history.map(p => p.close)
+            : [quote.open, quote.low, quote.high, quote.price];
+          const { line, area } = buildLinePath(values);
+          return (
+            <svg viewBox="0 0 320 110" style={{ width: '100%', height: 100, display: 'block' }}>
+              <defs>
+                <linearGradient id="pDetG" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={gain ? 'var(--gain)' : 'var(--loss)'} stopOpacity="0.26" />
+                  <stop offset="100%" stopColor={gain ? 'var(--gain)' : 'var(--loss)'} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={area} fill="url(#pDetG)" />
+              <path d={line} fill="none" stroke={gain ? 'var(--gain)' : 'var(--loss)'} strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+          );
+        })()}
 
         {holding && (
           <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', justifyContent: 'space-between' }}>
@@ -139,21 +224,39 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           </div>
         )}
 
-        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 12 }}>{t.detailStats}</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            {[[t.open, '186,20'], [t.volume, '48,2M'], [t.dayHigh, '190,10'], [t.dayLow, '185,80']].map(([l, v]) => (
-              <div key={l} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{l}</span>
-                <b style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{v}</b>
-              </div>
-            ))}
+        {quote && (
+          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 12 }}>{t.detailStats}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              {[[t.open, quote.open], [t.prevClose, quote.prevClose], [t.dayHigh, quote.high], [t.dayLow, quote.low]].map(([l, v]) => (
+                <div key={l as string} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{l}</span>
+                  <b style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{eur.format(v as number)} €</b>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 8 }}>{t.detailAbout}</div>
-          <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{t.detailAboutText}</div>
+          {quote?.industry || quote?.exchange ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {quote.companyName && <div style={{ fontSize: 14, fontWeight: 700 }}>{quote.companyName}</div>}
+              {quote.industry && (
+                <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t.detailAboutSector}</span><b style={{ color: 'var(--on-surface)' }}>{quote.industry}</b>
+                </div>
+              )}
+              {quote.exchange && (
+                <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t.detailAboutExchange}</span><b style={{ color: 'var(--on-surface)' }}>{quote.exchange}</b>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{t.detailNoInfo}</div>
+          )}
         </div>
       </div>
 
