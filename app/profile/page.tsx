@@ -66,25 +66,48 @@ function Card({ children }: { children: React.ReactNode }) {
 
 type ParsedHolding = { ticker: string; units: number; avg_price: number; name?: string };
 
+function rowsToHoldings(header: string[], rows: string[][]): ParsedHolding[] {
+  const h = header.map(c => c.toLowerCase().trim());
+  const tickerIdx = h.indexOf('ticker');
+  const unitsIdx = h.indexOf('units');
+  const priceIdx = h.findIndex(c => c === 'avg_price' || c === 'price');
+  const nameIdx = h.indexOf('name');
+  if (tickerIdx === -1 || unitsIdx === -1 || priceIdx === -1) throw new Error('missing columns');
+  return rows.map(cols => {
+    const ticker = String(cols[tickerIdx] ?? '').trim().toUpperCase();
+    const units = parseFloat(String(cols[unitsIdx]).replace(',', '.'));
+    const avg_price = parseFloat(String(cols[priceIdx]).replace(',', '.'));
+    if (!ticker || Number.isNaN(units) || Number.isNaN(avg_price)) throw new Error('bad row');
+    return { ticker, units, avg_price, name: nameIdx >= 0 ? String(cols[nameIdx] ?? '').trim() || undefined : undefined };
+  });
+}
+
 function parseHoldingsCsv(text: string): ParsedHolding[] {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) throw new Error('empty');
+  const header = lines[0].split(',');
+  const rows = lines.slice(1).map(l => l.split(','));
+  return rowsToHoldings(header, rows);
+}
 
-  const header = lines[0].split(',').map(h => h.trim().toLowerCase());
-  const tickerIdx = header.indexOf('ticker');
-  const unitsIdx = header.indexOf('units');
-  const priceIdx = header.findIndex(h => h === 'avg_price' || h === 'price');
-  const nameIdx = header.indexOf('name');
-  if (tickerIdx === -1 || unitsIdx === -1 || priceIdx === -1) throw new Error('missing columns');
+async function parseHoldingsXlsx(buffer: ArrayBuffer): Promise<ParsedHolding[]> {
+  // Dynamically import xlsx (SheetJS) to avoid SSR issues
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as string[][];
+  if (data.length < 2) throw new Error('empty');
+  return rowsToHoldings(data[0], data.slice(1).filter(r => r.some(c => c != null && c !== '')));
+}
 
-  return lines.slice(1).map(line => {
-    const cols = line.split(',').map(c => c.trim());
-    const ticker = cols[tickerIdx]?.toUpperCase();
-    const units = parseFloat(cols[unitsIdx]);
-    const avg_price = parseFloat(cols[priceIdx]);
-    if (!ticker || Number.isNaN(units) || Number.isNaN(avg_price)) throw new Error('bad row');
-    return { ticker, units, avg_price, name: nameIdx >= 0 ? cols[nameIdx] : undefined };
-  });
+async function parseHoldingsFile(file: File): Promise<ParsedHolding[]> {
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  if (ext === 'xlsx') {
+    const buffer = await file.arrayBuffer();
+    return parseHoldingsXlsx(buffer);
+  }
+  const text = await file.text();
+  return parseHoldingsCsv(text);
 }
 
 export default function ProfilePage() {
@@ -147,8 +170,7 @@ export default function ProfilePage() {
     setImportError('');
     setImporting(true);
     try {
-      const text = await importFile.text();
-      const rows = parseHoldingsCsv(text);
+      const rows = await parseHoldingsFile(importFile);
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('no user');
@@ -311,7 +333,7 @@ export default function ProfilePage() {
             <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>{t.impSub}</div>
 
             <label style={{ border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-low)', padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center', cursor: 'pointer' }}>
-              <input type="file" accept=".csv,text/csv" onChange={e => { setImportFile(e.target.files?.[0] ?? null); setImportError(''); }} style={{ display: 'none' }} />
+              <input type="file" accept=".csv,text/csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e => { setImportFile(e.target.files?.[0] ?? null); setImportError(''); }} style={{ display: 'none' }} />
               <div style={{ width: 52, height: 52, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 26, color: 'var(--primary)' }}>upload_file</span>
               </div>
