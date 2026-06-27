@@ -10,10 +10,15 @@ import { useDict } from '@/lib/dict';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Sem feed de preços de mercado: simula um ganho estável (não aleatório a cada render) a partir do ticker.
-function simulatedGainPct(ticker: string) {
-  const hash = ticker.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-  return ((hash % 41) - 15) / 100; // entre -15% e +25%
+async function fetchCurrentPrice(ticker: string): Promise<number | null> {
+  try {
+    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data.price === 'number' ? data.price : null;
+  } catch {
+    return null;
+  }
 }
 
 type Asset = {
@@ -52,14 +57,16 @@ export default function PortfolioPage() {
       .select('ticker, units, avg_price')
       .eq('user_id', user.id);
 
-    const mapped: Asset[] = (holdings ?? []).map(h => {
-      const gainPct = simulatedGainPct(h.ticker);
-      const cost = h.units * h.avg_price;
+    const prices = await Promise.all((holdings ?? []).map(h => fetchCurrentPrice(h.ticker)));
+
+    const mapped: Asset[] = (holdings ?? []).map((h, i) => {
+      const price = prices[i] ?? h.avg_price;
+      const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
       return {
         ticker: h.ticker,
         letter: h.ticker.charAt(0),
         units: h.units,
-        value: cost * (1 + gainPct),
+        value: h.units * price,
         gainPct,
         gain: gainPct >= 0,
       };
