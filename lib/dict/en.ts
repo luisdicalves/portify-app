@@ -172,7 +172,7 @@ export const en: typeof pt = {
   activePlan: 'Active plan',
   planValue: '€250/Monthly',
   portfolioSection: 'Portfolio',
-  importCsv: 'Import CSV',
+  importCsv: 'Import Portfolio',
   importAction: 'Import',
   exportData: 'Export data',
   linkBroker: 'Link broker',

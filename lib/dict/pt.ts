@@ -178,7 +178,7 @@ export const pt = {
   activePlan: 'Plano ativo',
   planValue: '250 €/Mensal',
   portfolioSection: 'Portfólio',
-  importCsv: 'Importar CSV',
+  importCsv: 'Importar Portfólio',
   importAction: 'Importar',
   exportData: 'Exportar dados',
   linkBroker: 'Ligar corretora',
