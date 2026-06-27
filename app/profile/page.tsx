@@ -65,6 +65,21 @@ function Card({ children }: { children: React.ReactNode }) {
 }
 
 type ParsedHolding = { ticker: string; units: number; avg_price: number; name?: string };
+type ParsedTransaction = {
+  external_id: string;
+  ticker: string;
+  type: 'buy' | 'sell' | 'dividend';
+  units?: number;
+  price?: number;
+  amount: number;
+  executed_at: string;
+};
+type ParseResult = { holdings: ParsedHolding[]; transactions: ParsedTransaction[] };
+
+// Excel serial date → ISO string
+function xlDateToIso(serial: number): string {
+  return new Date(Date.UTC(1899, 11, 30) + serial * 86400000).toISOString();
+}
 
 function rowsToHoldings(header: string[], rows: string[][]): ParsedHolding[] {
   const h = header.map(c => c.toLowerCase().trim());
@@ -82,15 +97,15 @@ function rowsToHoldings(header: string[], rows: string[][]): ParsedHolding[] {
   });
 }
 
-function parseHoldingsCsv(text: string): ParsedHolding[] {
+function parseHoldingsCsv(text: string): ParseResult {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   if (lines.length === 0) throw new Error('empty');
   const header = lines[0].split(',');
   const rows = lines.slice(1).map(l => l.split(','));
-  return rowsToHoldings(header, rows);
+  return { holdings: rowsToHoldings(header, rows), transactions: [] };
 }
 
-async function parseHoldingsXlsx(buffer: ArrayBuffer): Promise<ParsedHolding[]> {
+async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
   const XLSX = await import('xlsx');
   const wb = XLSX.read(buffer, { type: 'array' });
 
@@ -101,47 +116,83 @@ async function parseHoldingsXlsx(buffer: ArrayBuffer): Promise<ParsedHolding[]> 
     const data = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1 });
     const headerIdx = data.findIndex(row => String(row[0]).trim() === 'ID' && String(row[1]).trim() === 'Type');
     if (headerIdx === -1) throw new Error('xtb_no_header');
-    const holdings = new Map<string, { units: number; totalCost: number }>();
+
+    const holdingsMap = new Map<string, { units: number; totalCost: number }>();
+    const transactions: ParsedTransaction[] = [];
+
     for (const row of data.slice(headerIdx + 1)) {
-      const type = String(row[1] ?? '').toLowerCase();
-      if (!type.includes('stock')) continue;
+      const extId = String(row[0] ?? '').trim();
+      const type = String(row[1] ?? '');
+      const timeSer = typeof row[2] === 'number' ? row[2] : null;
       const comment = String(row[3] ?? '');
       const symbol = String(row[4] ?? '').trim();
-      if (!symbol) continue;
-      const volumeMatch = comment.match(/OPEN (?:BUY|SELL) ([0-9.]+)/);
-      const priceMatch = comment.match(/@ ([0-9.]+)/);
-      if (!volumeMatch || !priceMatch) continue;
-      const volume = parseFloat(volumeMatch[1]);
-      const price = parseFloat(priceMatch[1]);
-      if (isNaN(volume) || isNaN(price)) continue;
-      const isSale = type.includes('sale') || type.includes('sell');
-      const h = holdings.get(symbol) ?? { units: 0, totalCost: 0 };
-      if (isSale) { h.units -= volume; }
-      else { h.units += volume; h.totalCost += volume * price; }
-      holdings.set(symbol, h);
+      const amount = typeof row[5] === 'number' ? row[5] : 0;
+      if (!extId || !type) continue;
+
+      const typeLow = type.toLowerCase();
+      const executedAt = timeSer ? xlDateToIso(timeSer) : new Date().toISOString();
+
+      if (typeLow.includes('stock')) {
+        const volumeMatch = comment.match(/OPEN (?:BUY|SELL) ([0-9.]+)/);
+        const priceMatch = comment.match(/@ ([0-9.]+)/);
+        if (!volumeMatch || !priceMatch || !symbol) continue;
+        const volume = parseFloat(volumeMatch[1]);
+        const price = parseFloat(priceMatch[1]);
+        if (isNaN(volume) || isNaN(price)) continue;
+        const isSale = typeLow.includes('sale') || typeLow.includes('sell');
+        const txType = isSale ? 'sell' : 'buy';
+
+        // Update holdings map
+        const h = holdingsMap.get(symbol) ?? { units: 0, totalCost: 0 };
+        if (isSale) { h.units -= volume; }
+        else { h.units += volume; h.totalCost += volume * price; }
+        holdingsMap.set(symbol, h);
+
+        transactions.push({
+          external_id: `xtb_${extId}`,
+          ticker: symbol,
+          type: txType,
+          units: volume,
+          price,
+          amount: Math.abs(amount),
+          executed_at: executedAt,
+        });
+      } else if (typeLow === 'divident' || typeLow === 'dividend') {
+        if (!symbol || amount === 0) continue;
+        // Only import positive dividends (skip correction entries)
+        if (amount < 0) continue;
+        transactions.push({
+          external_id: `xtb_${extId}`,
+          ticker: symbol,
+          type: 'dividend',
+          amount,
+          executed_at: executedAt,
+        });
+      }
     }
-    return Array.from(holdings.entries())
+
+    const holdings = Array.from(holdingsMap.entries())
       .filter(([, h]) => h.units > 0.0001)
       .map(([ticker, h]) => ({
         ticker,
         units: Math.round(h.units * 10000) / 10000,
         avg_price: Math.round((h.totalCost / h.units) * 100) / 100,
       }));
+
+    return { holdings, transactions };
   }
 
-  // ── Generic format: first sheet with header row ───────────────────
+  // ── Generic format ────────────────────────────────────────────────
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as string[][];
   if (data.length < 2) throw new Error('empty');
-  return rowsToHoldings(data[0], data.slice(1).filter(r => r.some(c => c != null && c !== '')));
+  const holdings = rowsToHoldings(data[0], data.slice(1).filter(r => r.some(c => c != null && c !== '')));
+  return { holdings, transactions: [] };
 }
 
-async function parseHoldingsFile(file: File): Promise<ParsedHolding[]> {
+async function parseFile(file: File): Promise<ParseResult> {
   const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'xlsx') {
-    const buffer = await file.arrayBuffer();
-    return parseHoldingsXlsx(buffer);
-  }
+  if (ext === 'xlsx') return parseXlsxFile(await file.arrayBuffer());
   const text = await file.text();
   return parseHoldingsCsv(text);
 }
@@ -156,7 +207,7 @@ export default function ProfilePage() {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
-  const [importToast, setImportToast] = useState(false);
+  const [importToast, setImportToast] = useState<{ holdings: number; transactions: number } | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [exportPeriodOpen, setExportPeriodOpen] = useState(false);
@@ -206,18 +257,43 @@ export default function ProfilePage() {
     setImportError('');
     setImporting(true);
     try {
-      const rows = await parseHoldingsFile(importFile);
+      const { holdings, transactions } = await parseFile(importFile);
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('no user');
-      await supabase.from('holdings').upsert(
-        rows.map(r => ({ user_id: user.id, ticker: r.ticker, units: r.units, avg_price: r.avg_price, name: r.name })),
-        { onConflict: 'user_id,ticker' }
-      );
+
+      // Upsert holdings (positions)
+      if (holdings.length > 0) {
+        await supabase.from('holdings').upsert(
+          holdings.map(r => ({ user_id: user.id, ticker: r.ticker, units: r.units, avg_price: r.avg_price, name: r.name })),
+          { onConflict: 'user_id,ticker' }
+        );
+      }
+
+      // Insert transactions — skip duplicates via external_id unique index
+      let importedTxns = 0;
+      if (transactions.length > 0) {
+        const rows = transactions.map(tx => ({
+          user_id: user.id,
+          external_id: tx.external_id,
+          ticker: tx.ticker,
+          type: tx.type,
+          units: tx.units ?? null,
+          price: tx.price ?? null,
+          amount: tx.amount,
+          executed_at: tx.executed_at,
+        }));
+        const { data: inserted } = await supabase
+          .from('transactions')
+          .upsert(rows, { onConflict: 'user_id,external_id', ignoreDuplicates: true })
+          .select('id');
+        importedTxns = inserted?.length ?? 0;
+      }
+
       setImporting(false);
       closeImport();
-      setImportToast(true);
-      setTimeout(() => setImportToast(false), 3000);
+      setImportToast({ holdings: holdings.length, transactions: importedTxns });
+      setTimeout(() => setImportToast(null), 4000);
     } catch {
       setImporting(false);
       setImportError(t.impParseError);
@@ -488,7 +564,9 @@ export default function ProfilePage() {
           </span>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.impToastTitle}</div>
-            <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.impToastSub}</div>
+            <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>
+              {importToast.holdings} {lang === 'pt' ? 'posições' : 'positions'} · {importToast.transactions} {lang === 'pt' ? 'transações importadas' : 'transactions imported'}
+            </div>
           </div>
         </div>
       )}
