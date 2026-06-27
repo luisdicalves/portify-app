@@ -105,19 +105,9 @@ function parseHoldingsCsv(text: string): ParseResult {
   return { holdings: rowsToHoldings(header, rows), transactions: [] };
 }
 
-async function loadXlsx() {
-  // Try webpack bundle first, fall back to CDN
-  try {
-    return await import('xlsx');
-  } catch {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return await import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs' as any);
-  }
-}
-
 async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
-  const XLSX = await loadXlsx();
-  const wb = (XLSX as any).read(buffer, { type: 'array' });
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(buffer, { type: 'array' });
 
   // ── XTB format detection ──────────────────────────────────────────
   const cashSheet = wb.SheetNames.find(n => n.toUpperCase().includes('CASH OPERATION'));
