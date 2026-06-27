@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchYahooQuote } from '@/lib/marketData';
+import { getCached } from '@/lib/cache';
+
+const QUOTE_TTL_SECONDS = 45;
 
 // XTB-style suffix (.US, .FR, .NL, ...) -> Finnhub exchange suffix.
 // US tickers have no suffix on Finnhub; others use the exchange's MIC-derived suffix.
@@ -59,13 +62,15 @@ export async function GET(req: NextRequest) {
   const apiKey = process.env.FINNHUB_API_KEY;
 
   try {
-    const finnhub = apiKey ? await fetchFinnhubQuote(ticker, apiKey) : null;
-    if (finnhub) return NextResponse.json(finnhub);
+    const quote = await getCached(`quote:${ticker}`, QUOTE_TTL_SECONDS, async () => {
+      const finnhub = apiKey ? await fetchFinnhubQuote(ticker, apiKey) : null;
+      if (finnhub) return finnhub;
 
-    // Free Finnhub doesn't cover most non-US exchanges — fall back to Yahoo Finance.
-    const yahoo = await fetchYahooQuote(ticker);
-    if (yahoo) return NextResponse.json(yahoo);
+      // Free Finnhub doesn't cover most non-US exchanges — fall back to Yahoo Finance.
+      return fetchYahooQuote(ticker);
+    });
 
+    if (quote) return NextResponse.json(quote);
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   } catch {
     return NextResponse.json({ error: 'fetch_failed' }, { status: 502 });

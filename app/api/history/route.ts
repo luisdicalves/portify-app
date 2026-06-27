@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchYahooHistory } from '@/lib/marketData';
+import { getCached } from '@/lib/cache';
+
+// Daily candles only change once a day — safe to cache for hours.
+const HISTORY_TTL_SECONDS = 6 * 60 * 60;
 
 // XTB-style suffix (.US, .FR, .NL, ...) -> Twelve Data exchange name, used to
 // disambiguate tickers that exist on multiple exchanges. US needs no exchange param.
@@ -48,13 +52,15 @@ export async function GET(req: NextRequest) {
   const outputsize = req.nextUrl.searchParams.get('outputsize') ?? '30';
 
   try {
-    const points = apiKey ? await fetchTwelveDataHistory(ticker, outputsize, apiKey) : null;
+    const points = await getCached(`history:${ticker}:${outputsize}`, HISTORY_TTL_SECONDS, async () => {
+      const twelveData = apiKey ? await fetchTwelveDataHistory(ticker, outputsize, apiKey) : null;
+      if (twelveData) return twelveData;
+
+      // Free Twelve Data doesn't cover most non-US exchanges — fall back to Yahoo Finance.
+      return fetchYahooHistory(ticker, parseInt(outputsize, 10));
+    });
+
     if (points) return NextResponse.json({ points });
-
-    // Free Twelve Data doesn't cover most non-US exchanges — fall back to Yahoo Finance.
-    const yahooPoints = await fetchYahooHistory(ticker, parseInt(outputsize, 10));
-    if (yahooPoints) return NextResponse.json({ points: yahooPoints });
-
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   } catch {
     return NextResponse.json({ error: 'fetch_failed' }, { status: 502 });
