@@ -7,6 +7,7 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
 import Switch from '@/components/ui/Switch';
+import TradeDateDialog from '@/components/ui/TradeDateDialog';
 
 const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
 const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
@@ -100,7 +101,11 @@ export default function ProfilePage() {
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [exportPeriodOpen, setExportPeriodOpen] = useState(false);
-  const [exportPeriod, setExportPeriod] = useState<'allTime' | 'thisMonth' | 'thisYear' | 'last12'>('allTime');
+  const [exportPeriod, setExportPeriod] = useState<'allTime' | 'thisYear' | 'last12' | 'custom'>('allTime');
+  const [exportStart, setExportStart] = useState('');
+  const [exportEnd, setExportEnd] = useState('');
+  const [exportRangeTarget, setExportRangeTarget] = useState<'start' | 'end' | null>(null);
+  const [exportToast, setExportToast] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -163,9 +168,9 @@ export default function ProfilePage() {
 
   const PERIODS = [
     { id: 'allTime' as const, label: t.periodAllTime },
-    { id: 'thisMonth' as const, label: t.periodThisMonth },
     { id: 'thisYear' as const, label: t.periodThisYear },
     { id: 'last12' as const, label: t.periodLast12 },
+    { id: 'custom' as const, label: t.periodCustom },
   ];
 
   async function downloadExport() {
@@ -185,6 +190,8 @@ export default function ProfilePage() {
       URL.revokeObjectURL(url);
     }
     setExportOpen(false);
+    setExportToast(true);
+    setTimeout(() => setExportToast(false), 3000);
   }
 
   return (
@@ -272,7 +279,7 @@ export default function ProfilePage() {
           <SectionLabel label={t.portfolioSection} />
           <Card>
             <SettingsRow icon="upload_file" label={t.importCsv} value={t.importAction} onPress={() => setImportOpen(true)} />
-            <SettingsRow icon="upload_file" label={t.exportData} onPress={() => setExportOpen(true)} />
+            <SettingsRow icon="file_save" label={t.exportData} onPress={() => setExportOpen(true)} />
             <SettingsRow icon="link" label={t.linkBroker} border={false} />
           </Card>
         </div>
@@ -373,11 +380,47 @@ export default function ProfilePage() {
               </div>
             )}
 
+            {exportPeriod === 'custom' && (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 18 }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.exportStartLabel}</div>
+                  <div onClick={() => setExportRangeTarget('start')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 10px', cursor: 'pointer' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)', flex: 'none' }}>calendar_month</span>
+                    <span style={{ flex: 1, minWidth: 0, padding: '12px 0', fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: exportStart ? 'var(--on-surface)' : 'var(--outline)' }}>
+                      {exportStart ? new Date(exportStart).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB') : t.regDobPh}
+                    </span>
+                  </div>
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.exportEndLabel}</div>
+                  <div onClick={() => setExportRangeTarget('end')} style={{ display: 'flex', alignItems: 'center', gap: 6, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 10px', cursor: 'pointer' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--primary)', flex: 'none' }}>calendar_month</span>
+                    <span style={{ flex: 1, minWidth: 0, padding: '12px 0', fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: exportEnd ? 'var(--on-surface)' : 'var(--outline)' }}>
+                      {exportEnd ? new Date(exportEnd).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB') : t.regDobPh}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <button onClick={downloadExport} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 21 }}>download</span>{t.download}
             </button>
           </div>
         </div>
+      )}
+
+      {exportRangeTarget && (
+        <TradeDateDialog
+          value={exportRangeTarget === 'start' ? exportStart : exportEnd}
+          lang={lang}
+          confirmLabel={t.confirm}
+          onClose={() => setExportRangeTarget(null)}
+          onConfirm={iso => {
+            if (exportRangeTarget === 'start') setExportStart(iso); else setExportEnd(iso);
+            setExportRangeTarget(null);
+          }}
+        />
       )}
 
       {importToast && (
@@ -388,6 +431,18 @@ export default function ProfilePage() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.impToastTitle}</div>
             <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.impToastSub}</div>
+          </div>
+        </div>
+      )}
+
+      {exportToast && (
+        <div style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', gap: 12, background: 'var(--inverse-surface)', borderRadius: 'var(--radius-md)', padding: '13px 16px', boxShadow: 'var(--shadow)', zIndex: 110 }}>
+          <span style={{ width: 34, height: 34, flex: 'none', borderRadius: 'var(--radius-full)', background: 'var(--gain-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: '#fff' }}>file_save</span>
+          </span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.exportToastTitle}</div>
+            <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.exportToastSub}</div>
           </div>
         </div>
       )}
