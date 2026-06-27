@@ -10,12 +10,13 @@ import { useDict } from '@/lib/dict';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-async function fetchCurrentPrice(ticker: string): Promise<number | null> {
+async function fetchQuote(ticker: string): Promise<{ price: number; change: number } | null> {
   try {
     const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
     if (!res.ok) return null;
     const data = await res.json();
-    return typeof data.price === 'number' ? data.price : null;
+    if (typeof data.price !== 'number') return null;
+    return { price: data.price, change: typeof data.change === 'number' ? data.change : 0 };
   } catch {
     return null;
   }
@@ -26,6 +27,8 @@ type Asset = {
   letter: string;
   units: number;
   value: number;
+  cost: number;
+  dayChange: number;
   gainPct: number;
   gain: boolean;
 };
@@ -57,16 +60,19 @@ export default function PortfolioPage() {
       .select('ticker, units, avg_price')
       .eq('user_id', user.id);
 
-    const prices = await Promise.all((holdings ?? []).map(h => fetchCurrentPrice(h.ticker)));
+    const quotes = await Promise.all((holdings ?? []).map(h => fetchQuote(h.ticker)));
 
     const mapped: Asset[] = (holdings ?? []).map((h, i) => {
-      const price = prices[i] ?? h.avg_price;
+      const quote = quotes[i];
+      const price = quote?.price ?? h.avg_price;
       const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
       return {
         ticker: h.ticker,
         letter: h.ticker.charAt(0),
         units: h.units,
         value: h.units * price,
+        cost: h.units * h.avg_price,
+        dayChange: h.units * (quote?.change ?? 0),
         gainPct,
         gain: gainPct >= 0,
       };
@@ -113,6 +119,12 @@ export default function PortfolioPage() {
   useEffect(() => { fetchHoldings(); fetchTransactions(); }, []);
 
   const totalValue = assets.reduce((sum, a) => sum + a.value, 0);
+  const totalInvested = assets.reduce((sum, a) => sum + a.cost, 0);
+  const totalReturn = totalValue - totalInvested;
+  const dayChangeValue = assets.reduce((sum, a) => sum + a.dayChange, 0);
+  const dayChangeBase = totalValue - dayChangeValue;
+  const dayChangePct = dayChangeBase > 0 ? (dayChangeValue / dayChangeBase) * 100 : 0;
+  const dayGain = dayChangeValue >= 0;
 
   function selectTab(id: typeof TABS[number]['id']) {
     if (id === 'dividends') { router.push('/activity'); return; }
@@ -129,10 +141,29 @@ export default function PortfolioPage() {
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 16px 100px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Total value */}
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Valor estimado</div>
-          <div style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{eur.format(totalValue)} €</div>
+        {/* Cartão de Portfólio */}
+        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.patPortfolioSummary}</div>
+          <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', color: '#fff' }}>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>{t.totalValue}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+              <span style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{eur.format(totalValue)} €</span>
+            </div>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.18)', padding: '4px 10px', borderRadius: 'var(--radius-full)', fontSize: 13, fontWeight: 600, marginTop: 10 }}>
+              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{dayGain ? 'trending_up' : 'trending_down'}</span>
+              {dayGain ? '+' : ''}{dayChangePct.toFixed(2)}% · {t.dayChange}
+            </span>
+            <div style={{ display: 'flex', gap: 'var(--space-5)', marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>{t.investedLabel}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{eur.format(totalInvested)} €</div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>{t.returnLabel}</div>
+                <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{totalReturn >= 0 ? '+' : ''}{eur.format(totalReturn)} €</div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Posições / Dividendos / Histórico */}

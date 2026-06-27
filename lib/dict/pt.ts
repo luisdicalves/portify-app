@@ -62,6 +62,10 @@ export const pt = {
   // Dashboard
   greeting: 'Olá, Ricardo',
   totalValue: 'Valor Total do Portfólio',
+  patPortfolioSummary: 'Resumo do Portfólio',
+  dayChange: 'Hoje',
+  investedLabel: 'Investido',
+  returnLabel: 'Retorno',
   dailyPerf: 'Performance Diária',
   allocation: 'Alocação por Setor',
   tech: 'Tecnologia',
