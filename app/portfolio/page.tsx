@@ -142,26 +142,23 @@ export default function PortfolioPage() {
       {/* Content */}
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 16px 100px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {/* Cartão de Portfólio */}
-        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-5)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.patPortfolioSummary}</div>
-          <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-4)', color: '#fff' }}>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>{t.totalValue}</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-              <span style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{eur.format(totalValue)} €</span>
+        <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 'var(--space-6)', color: '#fff' }}>
+          <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>{t.totalValue}</div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 34, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{eur.format(totalValue)} €</span>
+          </div>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.18)', padding: '5px 12px', borderRadius: 'var(--radius-full)', fontSize: 14, fontWeight: 600, marginTop: 14 }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 16 }}>{dayGain ? 'trending_up' : 'trending_down'}</span>
+            {dayGain ? '+' : ''}{dayChangePct.toFixed(2)}% · {t.dayChange}
+          </span>
+          <div style={{ display: 'flex', gap: 'var(--space-6)', marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
+            <div>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>{t.investedLabel}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{eur.format(totalInvested)} €</div>
             </div>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, background: 'rgba(255,255,255,0.18)', padding: '4px 10px', borderRadius: 'var(--radius-full)', fontSize: 13, fontWeight: 600, marginTop: 10 }}>
-              <span className="material-symbols-outlined" style={{ fontSize: 15 }}>{dayGain ? 'trending_up' : 'trending_down'}</span>
-              {dayGain ? '+' : ''}{dayChangePct.toFixed(2)}% · {t.dayChange}
-            </span>
-            <div style={{ display: 'flex', gap: 'var(--space-5)', marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
-              <div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>{t.investedLabel}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{eur.format(totalInvested)} €</div>
-              </div>
-              <div>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>{t.returnLabel}</div>
-                <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{totalReturn >= 0 ? '+' : ''}{eur.format(totalReturn)} €</div>
-              </div>
+            <div>
+              <div style={{ fontSize: 13, opacity: 0.8 }}>{t.returnLabel}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{totalReturn >= 0 ? '+' : ''}{eur.format(totalReturn)} €</div>
             </div>
           </div>
         </div>
