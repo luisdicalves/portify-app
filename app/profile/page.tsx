@@ -91,9 +91,45 @@ function parseHoldingsCsv(text: string): ParsedHolding[] {
 }
 
 async function parseHoldingsXlsx(buffer: ArrayBuffer): Promise<ParsedHolding[]> {
-  // Dynamically import xlsx (SheetJS) to avoid SSR issues
   const XLSX = await import('xlsx');
   const wb = XLSX.read(buffer, { type: 'array' });
+
+  // ── XTB format detection ──────────────────────────────────────────
+  const cashSheet = wb.SheetNames.find(n => n.toUpperCase().includes('CASH OPERATION'));
+  if (cashSheet) {
+    const ws = wb.Sheets[cashSheet];
+    const data = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1 });
+    const headerIdx = data.findIndex(row => String(row[0]).trim() === 'ID' && String(row[1]).trim() === 'Type');
+    if (headerIdx === -1) throw new Error('xtb_no_header');
+    const holdings = new Map<string, { units: number; totalCost: number }>();
+    for (const row of data.slice(headerIdx + 1)) {
+      const type = String(row[1] ?? '').toLowerCase();
+      if (!type.includes('stock')) continue;
+      const comment = String(row[3] ?? '');
+      const symbol = String(row[4] ?? '').trim();
+      if (!symbol) continue;
+      const volumeMatch = comment.match(/OPEN (?:BUY|SELL) ([0-9.]+)/);
+      const priceMatch = comment.match(/@ ([0-9.]+)/);
+      if (!volumeMatch || !priceMatch) continue;
+      const volume = parseFloat(volumeMatch[1]);
+      const price = parseFloat(priceMatch[1]);
+      if (isNaN(volume) || isNaN(price)) continue;
+      const isSale = type.includes('sale') || type.includes('sell');
+      const h = holdings.get(symbol) ?? { units: 0, totalCost: 0 };
+      if (isSale) { h.units -= volume; }
+      else { h.units += volume; h.totalCost += volume * price; }
+      holdings.set(symbol, h);
+    }
+    return Array.from(holdings.entries())
+      .filter(([, h]) => h.units > 0.0001)
+      .map(([ticker, h]) => ({
+        ticker,
+        units: Math.round(h.units * 10000) / 10000,
+        avg_price: Math.round((h.totalCost / h.units) * 100) / 100,
+      }));
+  }
+
+  // ── Generic format: first sheet with header row ───────────────────
   const ws = wb.Sheets[wb.SheetNames[0]];
   const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1 }) as string[][];
   if (data.length < 2) throw new Error('empty');
