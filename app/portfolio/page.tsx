@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
-import Fab from '@/components/ui/Fab';
 import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
@@ -118,7 +117,7 @@ export default function PortfolioPage() {
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
         <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>Portfólio</span>
-        <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)' }}>search</span>
+        <span onClick={() => router.push('/portfolio/add')} className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>search</span>
       </div>
 
       {/* Content */}
@@ -187,10 +186,6 @@ export default function PortfolioPage() {
           </div>
         )}
       </div>
-
-      <Fab actions={[
-        { icon: 'add', label: 'Adicionar', onClick: () => router.push('/portfolio/add'), color: 'var(--gain)' },
-      ]} />
 
       <BottomNav />
     </div>
