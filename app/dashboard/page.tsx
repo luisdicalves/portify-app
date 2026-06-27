@@ -6,25 +6,140 @@ import BottomNav from '@/components/ui/BottomNav';
 import { createClient } from '@/lib/supabase/client';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
+const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
+
+const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximumFractionDigits: 1 });
+
+type Holding = { ticker: string; units: number; avg_price: number };
+type Quote = { price: number; changePercent: number; companyName: string | null };
+type HistoryPoint = { date: string; close: number };
+
+async function fetchQuote(ticker: string): Promise<Quote | null> {
+  try {
+    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (typeof data.price !== 'number') return null;
+    return { price: data.price, changePercent: data.changePercent ?? 0, companyName: data.companyName ?? null };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchHistory(ticker: string, outputsize: number): Promise<HistoryPoint[] | null> {
+  try {
+    const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=${outputsize}`);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return Array.isArray(data.points) && data.points.length > 1 ? data.points : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildLinePath(values: number[]) {
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+  const w = 320, h = 96, pad = 8;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * w;
+    const y = h - pad - ((v - min) / span) * (h - pad * 2);
+    return [x, y];
+  });
+  const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
+  const area = `${line} L${w},${h} L0,${h} Z`;
+  return { line, area };
+}
 
 export default function DashboardPage() {
   const router = useRouter();
   const [tf, setTf] = useState(4);
   const [fullName, setFullName] = useState('');
+  const [holdings, setHoldings] = useState<Holding[]>([]);
+  const [quotes, setQuotes] = useState<Record<string, Quote>>({});
+  const [chartValues, setChartValues] = useState<number[] | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('first_name, last_name')
-        .eq('id', user.id)
-        .single();
+      if (!user) { setLoading(false); return; }
+
+      const [{ data: profile }, { data: holdingsData }] = await Promise.all([
+        supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
+        supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
+      ]);
       if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
+
+      const hs = holdingsData ?? [];
+      setHoldings(hs);
+
+      const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
+      const quoteMap: Record<string, Quote> = {};
+      hs.forEach((h, i) => { if (quoteResults[i]) quoteMap[h.ticker] = quoteResults[i]!; });
+      setQuotes(quoteMap);
+      setLoading(false);
     })();
   }, []);
+
+  useEffect(() => {
+    if (holdings.length === 0) { setChartValues(null); return; }
+    (async () => {
+      const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
+      const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
+
+      const backbone = histories
+        .filter((h): h is HistoryPoint[] => h !== null)
+        .sort((a, b) => b.length - a.length)[0];
+      if (!backbone) { setChartValues(null); return; }
+
+      const seriesMaps = histories.map(h => {
+        const map = new Map<string, number>();
+        h?.forEach(p => map.set(p.date, p.close));
+        return map;
+      });
+
+      const lastKnown = new Map<string, number>();
+      const values = backbone.map(({ date }) => {
+        let total = 0;
+        holdings.forEach((h, i) => {
+          const map = seriesMaps[i];
+          const closeToday = map.get(date);
+          const close = closeToday ?? lastKnown.get(h.ticker) ?? h.avg_price;
+          if (closeToday != null) lastKnown.set(h.ticker, closeToday);
+          total += h.units * close;
+        });
+        return total;
+      });
+      setChartValues(values.length > 1 ? values : null);
+    })();
+  }, [holdings, tf]);
+
+  const totalValue = holdings.reduce((sum, h) => sum + h.units * (quotes[h.ticker]?.price ?? h.avg_price), 0);
+  const totalInvested = holdings.reduce((sum, h) => sum + h.units * h.avg_price, 0);
+  const totalReturnPct = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+  const dayChangeValue = holdings.reduce((sum, h) => {
+    const q = quotes[h.ticker];
+    if (!q) return sum;
+    const price = q.price;
+    const changeAbs = price - price / (1 + q.changePercent / 100);
+    return sum + h.units * changeAbs;
+  }, 0);
+  const dayChangeBase = totalValue - dayChangeValue;
+  const dayChangePct = dayChangeBase > 0 ? (dayChangeValue / dayChangeBase) * 100 : 0;
+
+  const movers = holdings
+    .filter(h => quotes[h.ticker] !== undefined)
+    .map(h => ({ ticker: h.ticker, companyName: quotes[h.ticker].companyName ?? h.ticker, changePercent: quotes[h.ticker].changePercent }))
+    .sort((a, b) => b.changePercent - a.changePercent);
+  const topGainer = movers[0];
+  const topLoser = movers.length > 1 ? movers[movers.length - 1] : null;
+
+  const chartColor = chartValues && chartValues.length > 1 && chartValues[chartValues.length - 1] >= chartValues[0] ? 'var(--gain)' : 'var(--loss)';
+  const { line, area } = chartValues && chartValues.length > 1 ? buildLinePath(chartValues) : { line: '', area: '' };
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -47,8 +162,12 @@ export default function DashboardPage() {
         <div onClick={() => router.push('/dashboard/net-worth')} style={{ cursor: 'pointer' }}>
           <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Valor total do portfólio</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
-            <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>€ 142.580,42</span>
-            <span style={{ color: 'var(--gain)', fontSize: 13, fontWeight: 600 }}>+2,45%</span>
+            <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{loading ? '—' : `€ ${eur.format(totalValue)}`}</span>
+            {!loading && holdings.length > 0 && (
+              <span style={{ color: dayChangePct >= 0 ? 'var(--gain)' : 'var(--loss)', fontSize: 13, fontWeight: 600 }}>
+                {dayChangePct >= 0 ? '+' : ''}{dayChangePct.toFixed(2)}%
+              </span>
+            )}
           </div>
         </div>
 
@@ -66,16 +185,22 @@ export default function DashboardPage() {
             ))}
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
-          <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
-            <defs>
-              <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path d="M0,76 Q40,70 70,72 T140,44 T210,54 T270,16 T320,28 L320,96 L0,96 Z" fill="url(#pHomeG)" />
-            <path d="M0,76 Q40,70 70,72 T140,44 T210,54 T270,16 T320,28" fill="none" stroke="var(--primary)" strokeWidth="2.5" strokeLinecap="round" />
-          </svg>
+            {chartValues && chartValues.length > 1 ? (
+              <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
+                <defs>
+                  <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartColor} stopOpacity="0.28" />
+                    <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path d={area} fill="url(#pHomeG)" />
+                <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
+                {loading ? 'A carregar...' : 'Sem dados históricos suficientes.'}
+              </div>
+            )}
           </div>
         </div>
 
@@ -84,12 +209,14 @@ export default function DashboardPage() {
           <div onClick={() => router.push('/dashboard/net-worth')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>savings</span>
             <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Património líquido</div>
-            <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>131.4k €</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? '—' : `${eurCompact.format(totalValue)} €`}</div>
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>trending_up</span>
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>trending_up</span>
             <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Retorno total</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+12,4%</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+              {loading ? '—' : `${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
+            </div>
           </div>
         </div>
 
@@ -97,31 +224,42 @@ export default function DashboardPage() {
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Destaques do dia</div>
 
-          <div onClick={() => router.push('/portfolio/NVDA')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--gain-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px', marginBottom: 9 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: 'var(--gain)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>arrow_upward</span>
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>NVDA</div>
-                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>NVIDIA Corp</div>
-              </div>
-            </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+4,28%</span>
-          </div>
+          {loading && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>A carregar...</div>}
+          {!loading && holdings.length === 0 && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Sem posições registadas.</div>}
 
-          <div onClick={() => router.push('/portfolio/TSLA')} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: 'var(--loss)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>arrow_downward</span>
+          {!loading && topGainer && (
+            <div onClick={() => router.push(`/portfolio/${topGainer.ticker}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topGainer.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px', marginBottom: topLoser ? 9 : 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: topGainer.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>{topGainer.changePercent >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{topGainer.ticker}</div>
+                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{topGainer.companyName}</div>
+                </div>
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 700 }}>TSLA</div>
-                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Tesla, Inc.</div>
-              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: topGainer.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+                {topGainer.changePercent >= 0 ? '+' : ''}{topGainer.changePercent.toFixed(2)}%
+              </span>
             </div>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>-1,92%</span>
-          </div>
+          )}
+
+          {!loading && topLoser && (
+            <div onClick={() => router.push(`/portfolio/${topLoser.ticker}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topLoser.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: topLoser.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>{topLoser.changePercent >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>
+                </div>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{topLoser.ticker}</div>
+                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{topLoser.companyName}</div>
+                </div>
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 600, color: topLoser.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+                {topLoser.changePercent >= 0 ? '+' : ''}{topLoser.changePercent.toFixed(2)}%
+              </span>
+            </div>
+          )}
         </div>
 
       </div>
