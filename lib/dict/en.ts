@@ -80,6 +80,7 @@ export const en: typeof pt = {
   avgPrice: 'Avg. Price',
   detailStats: 'Statistics',
   detailAbout: 'About',
+  detailAboutName: 'Name',
   detailAboutSector: 'Sector',
   detailAboutExchange: 'Exchange',
   detailNoInfo: 'No information available.',

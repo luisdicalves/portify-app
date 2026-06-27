@@ -217,13 +217,6 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
           );
         })()}
 
-        {holding && (
-          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', justifyContent: 'space-between' }}>
-            <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.units} · {t.avgPrice}</span>
-            <b style={{ fontSize: 13, fontVariantNumeric: 'tabular-nums' }}>{holding.units} · {eur.format(holding.avg_price)} €</b>
-          </div>
-        )}
-
         {quote && (
           <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 12 }}>{t.detailStats}</div>
@@ -240,9 +233,13 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
           <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 8 }}>{t.detailAbout}</div>
-          {quote?.industry || quote?.exchange ? (
+          {quote?.companyName || quote?.industry || quote?.exchange ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {quote.companyName && <div style={{ fontSize: 14, fontWeight: 700 }}>{quote.companyName}</div>}
+              {quote.companyName && (
+                <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>{t.detailAboutName}</span><b style={{ color: 'var(--on-surface)' }}>{quote.companyName}</b>
+                </div>
+              )}
               {quote.industry && (
                 <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', display: 'flex', justifyContent: 'space-between' }}>
                   <span>{t.detailAboutSector}</span><b style={{ color: 'var(--on-surface)' }}>{quote.industry}</b>
