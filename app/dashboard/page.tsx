@@ -234,8 +234,8 @@ export default function DashboardPage() {
                   <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>{topGainer.changePercent >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{topGainer.ticker}</div>
-                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{topGainer.companyName}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{topGainer.companyName}</div>
+                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{topGainer.ticker}</div>
                 </div>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: topGainer.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
@@ -251,8 +251,8 @@ export default function DashboardPage() {
                   <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>{topLoser.changePercent >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>
                 </div>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>{topLoser.ticker}</div>
-                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{topLoser.companyName}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>{topLoser.companyName}</div>
+                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{topLoser.ticker}</div>
                 </div>
               </div>
               <span style={{ fontSize: 13, fontWeight: 600, color: topLoser.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
