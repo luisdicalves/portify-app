@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
 import RiskReport from '@/components/ui/RiskReport';
@@ -57,6 +57,7 @@ function buildLinePath(values: number[]) {
 
 export default function AssetDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { lang } = useApp();
   const t = useDict(lang);
   const ticker = params.id.toUpperCase();
@@ -137,6 +138,11 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     setError('');
     setSheet(mode);
   }
+
+  useEffect(() => {
+    const action = searchParams.get('action');
+    if (action === 'buy' || action === 'sell') openSheet(action);
+  }, [searchParams]);
 
   function closeSheet() {
     setSheet(null);
