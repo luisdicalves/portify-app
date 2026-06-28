@@ -4,7 +4,7 @@
 
 const FINNHUB_SUFFIX_MAP: Record<string, string> = { US: '' };
 
-function toFinnhubSymbol(ticker: string): string {
+export function toFinnhubSymbol(ticker: string): string {
   const [base, suffix] = ticker.split('.');
   if (!suffix) return base;
   const mapped = FINNHUB_SUFFIX_MAP[suffix.toUpperCase()];
@@ -50,7 +50,7 @@ export type RiskReport = {
   footer: { tags: string[]; source: string; nextEarnings: string | null };
 };
 
-function band(value: number | null | undefined, thresholds: [number, number][]): number {
+export function band(value: number | null | undefined, thresholds: [number, number][]): number {
   if (value == null || Number.isNaN(value)) return 50;
   for (const [limit, score] of thresholds) {
     if (value <= limit) return score;
