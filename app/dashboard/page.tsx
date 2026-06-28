@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
@@ -196,9 +197,11 @@ export default function DashboardPage() {
                 <path d={area} fill="url(#pHomeG)" />
                 <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
               </svg>
+            ) : loading ? (
+              <SkeletonChart height={88} />
             ) : (
               <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
-                {loading ? 'A carregar...' : 'Sem dados históricos suficientes.'}
+                Sem dados históricos suficientes.
               </div>
             )}
           </div>
@@ -209,13 +212,13 @@ export default function DashboardPage() {
           <div onClick={() => router.push('/dashboard/net-worth')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>savings</span>
             <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Património líquido</div>
-            <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? '—' : `${eurCompact.format(totalValue)} €`}</div>
+            <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? <Skeleton width={70} height={16} /> : `${eurCompact.format(totalValue)} €`}</div>
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>trending_up</span>
             <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Retorno total</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? '—' : `${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
+              {loading ? <Skeleton width={50} height={16} /> : `${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
             </div>
           </div>
         </div>
@@ -224,7 +227,7 @@ export default function DashboardPage() {
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Destaques do dia</div>
 
-          {loading && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>A carregar...</div>}
+          {loading && <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}><Skeleton height={52} radius="var(--radius-md)" /><Skeleton height={52} radius="var(--radius-md)" /></div>}
           {!loading && holdings.length === 0 && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Sem posições registadas.</div>}
 
           {!loading && topGainer && (

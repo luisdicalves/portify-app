@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
 import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
+import { SkeletonRow } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
@@ -189,7 +190,7 @@ export default function PortfolioPage() {
         {/* Posições tab */}
         {tab === 'positions' && (
           <>
-            {loading && <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>A carregar...</div>}
+            {loading && <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>}
             {!loading && assets.length === 0 && (
               <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>Sem posições registadas.</div>
             )}
