@@ -150,7 +150,7 @@ export default function PerformancePage() {
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px 10px' }}>
         <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer' }}>arrow_back_ios_new</span>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>Performance</span>
+        <span style={{ fontSize: 18, fontWeight: 700 }}>Retorno Total</span>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
