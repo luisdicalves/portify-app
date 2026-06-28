@@ -12,10 +12,6 @@ import { SelectList, SelectOption } from '@/components/ui/SelectList';
 
 const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
 const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
-const SECTOR_LABELS: Record<string, string> = {
-  tech: 'Tecnologia', health: 'Saúde', finance: 'Finanças', energy: 'Energia',
-  consumer: 'Consumo', industry: 'Indústria', realestate: 'Imobiliário', materials: 'Materiais', comms: 'Comunicações',
-};
 const FREQ_LABELS: Record<string, string> = { weekly: 'Semanal', monthly: 'Mensal', quarterly: 'Trimestral', annual: 'Anual' };
 
 // Same options as the onboarding pages (app/auth/risk, app/auth/objective) —
@@ -89,6 +85,7 @@ type Plan = {
   amount: number;
   frequency: string;
   horizon_years: number;
+  goal_amount: number;
 };
 
 function SectionLabel({ label }: { label: string }) {
@@ -285,7 +282,7 @@ export default function ProfilePage() {
       if (!user) return;
       const [{ data: p }, { data: pl }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name, user_handle, risk_profile, investment_goal, preferred_sectors, investor_since').eq('id', user.id).single(),
-        supabase.from('investment_plans').select('amount, frequency, horizon_years').eq('user_id', user.id).maybeSingle(),
+        supabase.from('investment_plans').select('amount, frequency, horizon_years, goal_amount').eq('user_id', user.id).maybeSingle(),
       ]);
       if (p) setProfile(p);
       if (pl) setPlan(pl);
@@ -296,8 +293,9 @@ export default function ProfilePage() {
   const initials = [profile?.first_name?.[0], profile?.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?';
   const riskLabel = profile?.risk_profile ? RISK_LABELS[profile.risk_profile] ?? profile.risk_profile : '—';
   const goalLabel = profile?.investment_goal ? GOAL_LABELS[profile.investment_goal] ?? profile.investment_goal : '—';
-  const sectorsLabel = profile?.preferred_sectors?.length
-    ? profile.preferred_sectors.map(s => SECTOR_LABELS[s] ?? s).join(', ')
+  const sectorsCount = profile?.preferred_sectors?.length ?? 0;
+  const sectorsLabel = sectorsCount > 0
+    ? `${sectorsCount} ${sectorsCount === 1 ? 'setor' : 'setores'}`
     : '—';
   const planLabel = plan ? `${plan.amount} €/${FREQ_LABELS[plan.frequency] ?? plan.frequency}` : '—';
 
@@ -366,7 +364,7 @@ export default function ProfilePage() {
   }
 
   function openPlanSheet() {
-    setPlanGoal('100000');
+    setPlanGoal(plan ? String(plan.goal_amount) : '100000');
     setPlanAmt(plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : 1);
     setPlanPeriod(plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : 1);
     setPlanHorizon(plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2);
@@ -381,10 +379,11 @@ export default function ProfilePage() {
       const amount = PLAN_AMOUNT_VALUES[planAmt];
       const frequency = PLAN_FREQUENCIES[planPeriod];
       const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
+      const goal_amount = parseFloat(planGoal) || 0;
       await supabase.from('investment_plans').upsert({
-        user_id: user.id, amount, frequency, horizon_years, goal_amount: parseFloat(planGoal) || 0,
+        user_id: user.id, amount, frequency, horizon_years, goal_amount,
       });
-      setPlan({ amount, frequency, horizon_years });
+      setPlan({ amount, frequency, horizon_years, goal_amount });
     }
     setSavingField(false);
     setPlanSheetOpen(false);
