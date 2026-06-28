@@ -124,6 +124,7 @@ export default function PortfolioPage() {
     setTxns(prev => prev.filter(tx => tx.id !== id));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
   useEffect(() => { fetchHoldings(); fetchTransactions(); }, []);
 
   const totalValue = assets.reduce((sum, a) => sum + a.value, 0);
