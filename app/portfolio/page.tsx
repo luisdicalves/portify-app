@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import Fab from '@/components/ui/Fab';
 import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
@@ -48,6 +49,7 @@ export default function PortfolioPage() {
   const [tab, setTab] = useState<typeof TABS[number]['id']>('positions');
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [openTxnId, setOpenTxnId] = useState<string | null>(null);
+  const [sellPickerOpen, setSellPickerOpen] = useState(false);
 
   async function fetchHoldings() {
     setLoading(true);
@@ -221,6 +223,35 @@ export default function PortfolioPage() {
           </div>
         )}
       </div>
+
+      <Fab actions={[
+        { icon: 'add', label: 'Comprar', color: 'var(--gain)', onClick: () => router.push('/portfolio/add') },
+        {
+          icon: 'remove', label: 'Vender', color: 'var(--loss)',
+          onClick: () => { if (assets.length > 0) setSellPickerOpen(true); },
+        },
+      ]} />
+
+      {sellPickerOpen && (
+        <div onClick={() => setSellPickerOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', zIndex: 30 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: '20px 20px 0 0', padding: '20px 16px 34px', display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '70%', overflow: 'auto' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Vender ativo</div>
+            {assets.map(a => (
+              <div key={a.ticker} onClick={() => { setSellPickerOpen(false); router.push(`/portfolio/${a.ticker}?action=sell`); }}
+                style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--surface-container)' }}>
+                <div style={{ width: 36, height: 36, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
+                  {a.letter}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 15, fontWeight: 700 }}>{a.ticker}</div>
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} ações</div>
+                </div>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{eur.format(a.value)} €</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <BottomNav />
     </div>
