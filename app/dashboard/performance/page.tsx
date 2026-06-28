@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
@@ -158,13 +159,13 @@ export default function PerformancePage() {
           <div style={{ flex: 1, background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Retorno total</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: totalReturn >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? '—' : `${totalReturn >= 0 ? '+' : ''}${eur.format(totalReturn)} €`}
+              {loading ? <Skeleton width={80} height={22} /> : `${totalReturn >= 0 ? '+' : ''}${eur.format(totalReturn)} €`}
             </div>
           </div>
           <div style={{ flex: 1, background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Anualizado</div>
             <div style={{ fontSize: 22, fontWeight: 700, color: annualizedPct >= 0 ? 'var(--on-surface)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? '—' : `${annualizedPct >= 0 ? '+' : ''}${annualizedPct.toFixed(1)}%`}
+              {loading ? <Skeleton width={50} height={22} /> : `${annualizedPct >= 0 ? '+' : ''}${annualizedPct.toFixed(1)}%`}
             </div>
           </div>
         </div>
@@ -192,15 +193,17 @@ export default function PerformancePage() {
               <path d={area} fill="url(#pPerfG)" />
               <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
             </svg>
+          ) : loading ? (
+            <SkeletonChart height={110} />
           ) : (
             <div style={{ height: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
-              {loading ? 'A carregar...' : 'Sem dados históricos suficientes.'}
+              Sem dados históricos suficientes.
             </div>
           )}
         </div>
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          {loading && <div style={{ padding: 14, fontSize: 13, color: 'var(--on-surface-variant)' }}>A carregar...</div>}
+          {loading && <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 9 }}><Skeleton height={20} /><Skeleton height={20} /></div>}
           {!loading && !best && <div style={{ padding: 14, fontSize: 13, color: 'var(--on-surface-variant)' }}>Sem posições registadas.</div>}
           {!loading && best && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px', borderBottom: worst ? '1px solid var(--hairline)' : 'none' }}>
