@@ -48,6 +48,7 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<typeof TABS[number]['id']>('positions');
   const [txns, setTxns] = useState<Transaction[]>([]);
+  const [dividends, setDividends] = useState<{ ticker: string; letter: string; amount: number; executed_at: string }[]>([]);
   const [openTxnId, setOpenTxnId] = useState<string | null>(null);
   const [sellPickerOpen, setSellPickerOpen] = useState(false);
 
@@ -110,6 +111,11 @@ export default function PortfolioPage() {
       };
     });
     setTxns(mapped);
+
+    const divs = (data ?? [])
+      .filter(row => row.type === 'dividend')
+      .map(row => ({ ticker: row.ticker, letter: row.ticker.charAt(0), amount: row.amount, executed_at: row.executed_at }));
+    setDividends(divs);
   }
 
   async function deleteTransaction(id: string) {
@@ -128,10 +134,11 @@ export default function PortfolioPage() {
   const dayChangePct = dayChangeBase > 0 ? (dayChangeValue / dayChangeBase) * 100 : 0;
   const dayGain = dayChangeValue >= 0;
 
-  function selectTab(id: typeof TABS[number]['id']) {
-    if (id === 'dividends') { router.push('/activity'); return; }
-    setTab(id);
-  }
+  const totalDividends = dividends.reduce((sum, d) => sum + d.amount, 0);
+  const dividends12mo = dividends
+    .filter(d => Date.now() - new Date(d.executed_at).getTime() < 365 * 86400000)
+    .reduce((sum, d) => sum + d.amount, 0);
+  const dividendYieldPct = totalValue > 0 ? (dividends12mo / totalValue) * 100 : 0;
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -168,7 +175,7 @@ export default function PortfolioPage() {
         {/* Posições / Dividendos / Histórico */}
         <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 4 }}>
           {TABS.map(tb => (
-            <button key={tb.id} onClick={() => selectTab(tb.id)} style={{
+            <button key={tb.id} onClick={() => setTab(tb.id)} style={{
               flex: 1, padding: '8px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
               fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
               background: tab === tb.id ? 'var(--surface-lowest)' : 'transparent',
@@ -202,6 +209,53 @@ export default function PortfolioPage() {
               </div>
             ))}
           </>
+        )}
+
+        {/* Dividendos tab */}
+        {tab === 'dividends' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 16, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 11, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recebido (12 meses)</div>
+                <div style={{ fontSize: 26, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+{eur.format(dividends12mo)} €</div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>Yield</div>
+                <div style={{ fontSize: 18, fontWeight: 700 }}>{dividendYieldPct.toFixed(1)}%</div>
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>Próximos</div>
+              <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
+                Sem dados de dividendos futuros disponíveis.
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>Recebidos</div>
+              {dividends.length === 0 ? (
+                <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
+                  Sem dividendos recebidos.
+                </div>
+              ) : (
+                <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                  {dividends.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderBottom: i < dividends.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{d.letter}</div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700 }}>{d.ticker}</div>
+                        <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>
+                          {new Date(d.executed_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+{eur.format(d.amount)} €</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Histórico tab */}
