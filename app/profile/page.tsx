@@ -8,6 +8,7 @@ import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
 import Switch from '@/components/ui/Switch';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
+import { SelectList, SelectOption } from '@/components/ui/SelectList';
 
 const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
 const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
@@ -16,6 +17,55 @@ const SECTOR_LABELS: Record<string, string> = {
   consumer: 'Consumo', industry: 'Indústria', realestate: 'Imobiliário', materials: 'Materiais', comms: 'Comunicações',
 };
 const FREQ_LABELS: Record<string, string> = { weekly: 'Semanal', monthly: 'Mensal', quarterly: 'Trimestral', annual: 'Anual' };
+
+// Same options as the onboarding pages (app/auth/risk, app/auth/objective) —
+// duplicated here so the profile page can edit them in a bottom sheet instead
+// of re-running the onboarding flow.
+const RISK_OPTIONS: SelectOption[] = [
+  { id: 'conservative', label: 'Conservador', desc: 'Prefiro proteger o capital.', icon: 'shield' },
+  { id: 'moderate', label: 'Moderado', desc: 'Equilíbrio entre risco e retorno.', icon: 'balance' },
+  { id: 'aggressive', label: 'Agressivo', desc: 'Aceito volatilidade por mais retorno.', icon: 'local_fire_department' },
+];
+
+const OBJECTIVE_OPTIONS: SelectOption[] = [
+  { id: 'short', label: 'Curto prazo', desc: 'Comprar e vender no curto prazo.', icon: 'speed' },
+  { id: 'long', label: 'Longo prazo', desc: 'Manter posições durante anos.', icon: 'calendar_month' },
+  { id: 'income', label: 'Rendimento', desc: 'Gerar rendimento com dividendos.', icon: 'payments' },
+];
+
+const SECTOR_OPTIONS = [
+  { id: 'tech', label: 'Tecnologia', icon: 'computer' },
+  { id: 'health', label: 'Saúde', icon: 'health_and_safety' },
+  { id: 'finance', label: 'Finanças', icon: 'account_balance' },
+  { id: 'energy', label: 'Energia', icon: 'bolt' },
+  { id: 'consumer', label: 'Consumo', icon: 'shopping_bag' },
+  { id: 'industry', label: 'Indústria', icon: 'factory' },
+  { id: 'realestate', label: 'Imobiliário', icon: 'apartment' },
+  { id: 'materials', label: 'Materiais', icon: 'diamond' },
+  { id: 'comms', label: 'Comunicações', icon: 'cell_tower' },
+];
+
+const PLAN_AMOUNTS = ['100 €', '250 €', '300 €', '500 €', '1.000 €'];
+const PLAN_PERIODS = ['Semanal', 'Mensal', 'Trimestral', 'Anual'];
+const PLAN_HORIZONS = ['< 2 anos', '2 – 5 anos', '5 – 10 anos', '> 10 anos'];
+const PLAN_AMOUNT_VALUES = [100, 250, 300, 500, 1000];
+const PLAN_FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'annual'] as const;
+const PLAN_HORIZON_YEARS = [1, 3, 7, 15];
+
+function PlanChip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
+  return (
+    <div onClick={onClick} style={{
+      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      padding: '10px 16px', borderRadius: 'var(--radius-full)', cursor: 'pointer',
+      fontSize: 14, fontWeight: 600, transition: 'all .15s', border: '1px solid',
+      background: on ? 'var(--primary-container)' : 'var(--surface-low)',
+      color: on ? 'var(--on-primary-container)' : 'var(--on-surface)',
+      borderColor: on ? 'var(--primary-strong)' : 'var(--card-border)',
+    }}>
+      {label}
+    </div>
+  );
+}
 
 function horizonLabel(years: number | null | undefined) {
   if (years == null) return '—';
@@ -215,6 +265,19 @@ export default function ProfilePage() {
   const [exportRangeTarget, setExportRangeTarget] = useState<'start' | 'end' | null>(null);
   const [exportToast, setExportToast] = useState(false);
 
+  const [riskSheetOpen, setRiskSheetOpen] = useState(false);
+  const [riskSelected, setRiskSelected] = useState(1);
+  const [objectiveSheetOpen, setObjectiveSheetOpen] = useState(false);
+  const [objectiveSelected, setObjectiveSelected] = useState(1);
+  const [sectorsSheetOpen, setSectorsSheetOpen] = useState(false);
+  const [sectorsSelected, setSectorsSelected] = useState<Set<string>>(new Set());
+  const [planSheetOpen, setPlanSheetOpen] = useState(false);
+  const [planGoal, setPlanGoal] = useState('100000');
+  const [planAmt, setPlanAmt] = useState(1);
+  const [planPeriod, setPlanPeriod] = useState(1);
+  const [planHorizon, setPlanHorizon] = useState(2);
+  const [savingField, setSavingField] = useState(false);
+
   useEffect(() => {
     (async () => {
       const supabase = createClient();
@@ -237,6 +300,95 @@ export default function ProfilePage() {
     ? profile.preferred_sectors.map(s => SECTOR_LABELS[s] ?? s).join(', ')
     : '—';
   const planLabel = plan ? `${plan.amount} €/${FREQ_LABELS[plan.frequency] ?? plan.frequency}` : '—';
+
+  function openRiskSheet() {
+    const idx = RISK_OPTIONS.findIndex(o => o.id === profile?.risk_profile);
+    setRiskSelected(idx >= 0 ? idx : 1);
+    setRiskSheetOpen(true);
+  }
+
+  async function saveRisk() {
+    setSavingField(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const riskId = RISK_OPTIONS[riskSelected].id;
+      await supabase.from('profiles').update({ risk_profile: riskId }).eq('id', user.id);
+      setProfile(p => p ? { ...p, risk_profile: riskId } : p);
+    }
+    setSavingField(false);
+    setRiskSheetOpen(false);
+  }
+
+  function openObjectiveSheet() {
+    const idx = OBJECTIVE_OPTIONS.findIndex(o => o.id === profile?.investment_goal);
+    setObjectiveSelected(idx >= 0 ? idx : 1);
+    setObjectiveSheetOpen(true);
+  }
+
+  async function saveObjective() {
+    setSavingField(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const goalId = OBJECTIVE_OPTIONS[objectiveSelected].id;
+      await supabase.from('profiles').update({ investment_goal: goalId }).eq('id', user.id);
+      setProfile(p => p ? { ...p, investment_goal: goalId } : p);
+    }
+    setSavingField(false);
+    setObjectiveSheetOpen(false);
+  }
+
+  function openSectorsSheet() {
+    setSectorsSelected(new Set(profile?.preferred_sectors ?? []));
+    setSectorsSheetOpen(true);
+  }
+
+  function toggleSector(id: string) {
+    setSectorsSelected(s => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  async function saveSectors() {
+    setSavingField(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const sectors = Array.from(sectorsSelected);
+      await supabase.from('profiles').update({ preferred_sectors: sectors }).eq('id', user.id);
+      setProfile(p => p ? { ...p, preferred_sectors: sectors } : p);
+    }
+    setSavingField(false);
+    setSectorsSheetOpen(false);
+  }
+
+  function openPlanSheet() {
+    setPlanGoal('100000');
+    setPlanAmt(plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : 1);
+    setPlanPeriod(plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : 1);
+    setPlanHorizon(plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2);
+    setPlanSheetOpen(true);
+  }
+
+  async function savePlan() {
+    setSavingField(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const amount = PLAN_AMOUNT_VALUES[planAmt];
+      const frequency = PLAN_FREQUENCIES[planPeriod];
+      const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
+      await supabase.from('investment_plans').upsert({
+        user_id: user.id, amount, frequency, horizon_years, goal_amount: parseFloat(planGoal) || 0,
+      });
+      setPlan({ amount, frequency, horizon_years });
+    }
+    setSavingField(false);
+    setPlanSheetOpen(false);
+  }
 
   async function signOut() {
     const supabase = createClient();
@@ -370,10 +522,10 @@ export default function ProfilePage() {
         <div>
           <SectionLabel label={t.investorProfileSection} />
           <Card>
-            <SettingsRow icon="local_fire_department" label={t.riskProfileLabel} value={riskLabel} onPress={() => router.push('/auth/risk')} />
-            <SettingsRow icon="schedule" label={t.horizonLabel} value={horizonLabel(plan?.horizon_years)} onPress={() => router.push('/auth/plan-set')} />
-            <SettingsRow icon="target" label={t.objective} value={goalLabel} onPress={() => router.push('/auth/objective')} />
-            <SettingsRow icon="sell" label={t.sectorsLabel} value={sectorsLabel} onPress={() => router.push('/auth/sectors')} border={false} />
+            <SettingsRow icon="local_fire_department" label={t.riskProfileLabel} value={riskLabel} onPress={openRiskSheet} />
+            <SettingsRow icon="schedule" label={t.horizonLabel} value={horizonLabel(plan?.horizon_years)} onPress={openPlanSheet} />
+            <SettingsRow icon="target" label={t.objective} value={goalLabel} onPress={openObjectiveSheet} />
+            <SettingsRow icon="sell" label={t.sectorsLabel} value={sectorsLabel} onPress={openSectorsSheet} border={false} />
           </Card>
         </div>
 
@@ -381,7 +533,7 @@ export default function ProfilePage() {
         <div>
           <SectionLabel label={t.investmentPlanSection} />
           <Card>
-            <SettingsRow icon="account_balance_wallet" label={t.activePlan} value={planLabel} onPress={() => router.push('/auth/plan-set')} border={false} />
+            <SettingsRow icon="account_balance_wallet" label={t.activePlan} value={planLabel} onPress={openPlanSheet} border={false} />
           </Card>
         </div>
 
@@ -421,7 +573,7 @@ export default function ProfilePage() {
           <SectionLabel label={t.accountSection} />
           <Card>
             <SettingsRow icon="lock" label={t.security} onPress={() => router.push('/profile/security')} />
-            <SettingsRow icon="settings" label={t.settingsLabel} onPress={() => {}} border={false} />
+            <SettingsRow icon="settings" label={t.settingsLabel} onPress={() => router.push('/profile/settings')} border={false} />
           </Card>
         </div>
 
@@ -553,6 +705,124 @@ export default function ProfilePage() {
             setExportRangeTarget(null);
           }}
         />
+      )}
+
+      {riskSheetOpen && (
+        <div onClick={() => setRiskSheetOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: '85%', overflow: 'auto', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.riskProfileLabel}</span>
+              <span onClick={() => setRiskSheetOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>Define quanto risco está disposto a aceitar.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <SelectList options={RISK_OPTIONS} selected={riskSelected} onSelect={setRiskSelected} />
+            </div>
+            <button onClick={saveRisk} disabled={savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+              {t.confirm}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {objectiveSheetOpen && (
+        <div onClick={() => setObjectiveSheetOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: '85%', overflow: 'auto', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.objective}</span>
+              <span onClick={() => setObjectiveSheetOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>O que procura ao negociar.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <SelectList options={OBJECTIVE_OPTIONS} selected={objectiveSelected} onSelect={setObjectiveSelected} />
+            </div>
+            <button onClick={saveObjective} disabled={savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+              {t.confirm}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {sectorsSheetOpen && (
+        <div onClick={() => setSectorsSheetOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: '85%', overflow: 'auto', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.sectorsLabel}</span>
+              <span onClick={() => setSectorsSheetOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>Escolha as áreas que quer acompanhar.</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {SECTOR_OPTIONS.map(s => {
+                const on = sectorsSelected.has(s.id);
+                return (
+                  <button key={s.id} onClick={() => toggleSector(s.id)} style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 7, padding: '9px 14px',
+                    background: on ? 'var(--primary-strong)' : 'var(--surface-low)',
+                    border: `1px solid ${on ? 'var(--primary-strong)' : 'var(--card-border)'}`,
+                    borderRadius: 'var(--radius-full)', cursor: 'pointer', transition: 'all .15s',
+                    fontSize: 14, fontWeight: 600, color: on ? '#fff' : 'var(--on-surface)', fontFamily: 'inherit',
+                  }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 18, color: on ? '#fff' : 'var(--on-surface-variant)' }}>{s.icon}</span>
+                    {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            <button onClick={saveSectors} disabled={sectorsSelected.size === 0 || savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: sectorsSelected.size === 0 || savingField ? 0.5 : 1 }}>
+              {t.confirm}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {planSheetOpen && (
+        <div onClick={() => setPlanSheetOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: '85%', overflow: 'auto', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.activePlan}</span>
+              <span onClick={() => setPlanSheetOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>Podes alterar estes valores em qualquer altura.</div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 9 }}>Objetivo financeiro</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 16px' }}>
+                <span style={{ fontSize: 18, color: 'var(--outline)' }}>€</span>
+                <input value={planGoal} onChange={e => setPlanGoal(e.target.value)}
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '15px 0', fontSize: 20, fontWeight: 700, color: 'var(--on-surface)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' }} />
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 9 }}>Montante por período</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {PLAN_AMOUNTS.map((a, i) => <PlanChip key={i} label={a} on={planAmt === i} onClick={() => setPlanAmt(i)} />)}
+              </div>
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 9 }}>Periodicidade</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {PLAN_PERIODS.map((p, i) => <PlanChip key={i} label={p} on={planPeriod === i} onClick={() => setPlanPeriod(i)} />)}
+              </div>
+            </div>
+
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 9 }}>Horizonte temporal</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                {PLAN_HORIZONS.map((h, i) => <PlanChip key={i} label={h} on={planHorizon === i} onClick={() => setPlanHorizon(i)} />)}
+              </div>
+            </div>
+
+            <button onClick={savePlan} disabled={savingField} style={{ width: '100%', marginTop: 20, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+              {t.confirm}
+            </button>
+          </div>
+        </div>
       )}
 
       {importToast && (
