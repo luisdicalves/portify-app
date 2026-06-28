@@ -1,9 +1,28 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 
 export default function SplashPage() {
   const router = useRouter();
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        router.replace('/auth/pin');
+      } else {
+        setChecking(false);
+      }
+    })();
+  }, [router]);
+
+  if (checking) {
+    return <div className="phone-shell" />;
+  }
 
   return (
     <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
