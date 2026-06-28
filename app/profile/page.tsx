@@ -27,6 +27,7 @@ const OBJECTIVE_OPTIONS: SelectOption[] = [
   { id: 'short', label: 'Curto prazo', desc: 'Comprar e vender no curto prazo.', icon: 'speed' },
   { id: 'long', label: 'Longo prazo', desc: 'Manter posições durante anos.', icon: 'calendar_month' },
   { id: 'income', label: 'Rendimento', desc: 'Gerar rendimento com dividendos.', icon: 'payments' },
+  { id: 'retirement', label: 'Reforma', desc: 'Construir um capital para a reforma.', icon: 'beach_access' },
 ];
 
 const SECTOR_OPTIONS = [
