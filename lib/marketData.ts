@@ -100,3 +100,109 @@ export async function fetchYahooHistory(ticker: string, outputsize: number) {
 
   return points.length > 1 ? points : null;
 }
+
+// XTB-style suffix (.US, .FR, .NL, ...) -> Finnhub exchange suffix.
+// US tickers have no suffix on Finnhub; others use the exchange's MIC-derived suffix.
+const FINNHUB_QUOTE_SUFFIX_MAP: Record<string, string> = {
+  US: '',
+  FR: '.PA',
+  NL: '.AS',
+  DE: '.DE',
+  PT: '.LS',
+  ES: '.MC',
+  IT: '.MI',
+  UK: '.L',
+  GB: '.L',
+  BE: '.BR',
+  CH: '.SW',
+};
+
+export function toFinnhubQuoteSymbol(ticker: string): string {
+  const [base, suffix] = ticker.split('.');
+  if (!suffix) return base;
+  const mapped = FINNHUB_QUOTE_SUFFIX_MAP[suffix.toUpperCase()];
+  return mapped === undefined ? ticker : `${base}${mapped}`;
+}
+
+export async function fetchFinnhubQuote(ticker: string, apiKey: string) {
+  const symbol = toFinnhubQuoteSymbol(ticker);
+  const [quoteRes, profileRes] = await Promise.all([
+    fetch(`https://finnhub.io/api/v1/quote?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`),
+    fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`),
+  ]);
+  if (!quoteRes.ok) return null;
+  const quote = await quoteRes.json();
+  const profile = profileRes.ok ? await profileRes.json() : {};
+
+  // Finnhub returns all-zero quote when the symbol isn't found / not covered by the plan.
+  if (quote.c === 0 && quote.h === 0 && quote.l === 0) return null;
+
+  return {
+    symbol,
+    price: quote.c,
+    change: quote.d,
+    changePercent: quote.dp,
+    open: quote.o,
+    high: quote.h,
+    low: quote.l,
+    prevClose: quote.pc,
+    companyName: profile.name ?? null,
+    industry: profile.finnhubIndustry ?? null,
+    exchange: profile.exchange ?? null,
+  };
+}
+
+// Tries Finnhub first (free tier only really covers US tickers); falls back to
+// the unofficial Yahoo endpoint for everything else.
+export async function getQuote(ticker: string, finnhubApiKey: string | undefined) {
+  const finnhub = finnhubApiKey ? await fetchFinnhubQuote(ticker, finnhubApiKey) : null;
+  if (finnhub) return finnhub;
+  return fetchYahooQuote(ticker);
+}
+
+// XTB-style suffix (.US, .FR, .NL, ...) -> Twelve Data exchange name, used to
+// disambiguate tickers that exist on multiple exchanges. US needs no exchange param.
+const TWELVEDATA_EXCHANGE_MAP: Record<string, string> = {
+  FR: 'Euronext',
+  NL: 'Euronext',
+  BE: 'Euronext',
+  PT: 'Euronext Lisbon',
+  DE: 'XETRA',
+  ES: 'BME',
+  IT: 'Borsa Italiana',
+  UK: 'LSE',
+  GB: 'LSE',
+  CH: 'SIX',
+};
+
+export function toTwelveDataParams(ticker: string): { symbol: string; exchange?: string } {
+  const [base, suffix] = ticker.split('.');
+  if (!suffix || suffix.toUpperCase() === 'US') return { symbol: base };
+  const exchange = TWELVEDATA_EXCHANGE_MAP[suffix.toUpperCase()];
+  return exchange ? { symbol: base, exchange } : { symbol: base };
+}
+
+export async function fetchTwelveDataHistory(ticker: string, outputsize: string, apiKey: string) {
+  const { symbol, exchange } = toTwelveDataParams(ticker);
+  const params = new URLSearchParams({ symbol, interval: '1day', outputsize, apikey: apiKey });
+  if (exchange) params.set('exchange', exchange);
+
+  const res = await fetch(`https://api.twelvedata.com/time_series?${params.toString()}`);
+  const data = await res.json();
+  if (data.status === 'error' || !Array.isArray(data.values)) return null;
+
+  const points = data.values
+    .map((v: { datetime: string; close: string }) => ({ date: v.datetime, close: parseFloat(v.close) }))
+    .filter((p: { close: number }) => !Number.isNaN(p.close))
+    .reverse(); // Twelve Data returns most-recent-first; chart wants chronological order.
+
+  return points.length > 1 ? points : null;
+}
+
+// Tries Twelve Data first (free tier only really covers US tickers); falls back
+// to the unofficial Yahoo endpoint for everything else.
+export async function getHistory(ticker: string, outputsize: string, twelveDataApiKey: string | undefined) {
+  const twelveData = twelveDataApiKey ? await fetchTwelveDataHistory(ticker, outputsize, twelveDataApiKey) : null;
+  if (twelveData) return twelveData;
+  return fetchYahooHistory(ticker, parseInt(outputsize, 10));
+}
