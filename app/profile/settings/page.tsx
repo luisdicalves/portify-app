@@ -374,7 +374,7 @@ export default function SettingsPage() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.impToastTitle}</div>
             <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>
-              {importToast.holdings} {lang === 'pt' ? 'posições' : 'positions'} · {importToast.transactions} {lang === 'pt' ? 'transações importadas' : 'transactions imported'}
+              {importToast.holdings} {t.positionsUnit} · {importToast.transactions} {t.transactionsImportedUnit}
             </div>
           </div>
         </div>

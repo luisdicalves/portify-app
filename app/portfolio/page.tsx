@@ -35,11 +35,7 @@ type Asset = {
   gain: boolean;
 };
 
-const TABS = [
-  { id: 'positions', label: 'Posições' },
-  { id: 'dividends', label: 'Dividendos' },
-  { id: 'history', label: 'Histórico' },
-] as const;
+const TAB_IDS = ['positions', 'dividends', 'history'] as const;
 
 export default function PortfolioPage() {
   const router = useRouter();
@@ -47,7 +43,7 @@ export default function PortfolioPage() {
   const t = useDict(lang);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<typeof TABS[number]['id']>('positions');
+  const [tab, setTab] = useState<typeof TAB_IDS[number]>('positions');
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [dividends, setDividends] = useState<{ ticker: string; letter: string; amount: number; executed_at: string }[]>([]);
   const [openTxnId, setOpenTxnId] = useState<string | null>(null);
@@ -145,7 +141,7 @@ export default function PortfolioPage() {
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 18px 12px', borderBottom: '1px solid var(--card-border)' }}>
-        <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>Portfólio</span>
+        <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)' }}>{t.navPort}</span>
         <span onClick={() => router.push('/portfolio/add')} className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>search</span>
       </div>
 
@@ -175,14 +171,14 @@ export default function PortfolioPage() {
 
         {/* Posições / Dividendos / Histórico */}
         <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 4 }}>
-          {TABS.map(tb => (
-            <button key={tb.id} onClick={() => setTab(tb.id)} style={{
+          {TAB_IDS.map(id => (
+            <button key={id} onClick={() => setTab(id)} style={{
               flex: 1, padding: '8px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
               fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              background: tab === tb.id ? 'var(--surface-lowest)' : 'transparent',
-              color: tab === tb.id ? 'var(--primary)' : 'var(--on-surface-variant)',
-              boxShadow: tab === tb.id ? '0 1px 3px rgba(0,0,0,0.14)' : 'none',
-            }}>{tb.label}</button>
+              background: tab === id ? 'var(--surface-lowest)' : 'transparent',
+              color: tab === id ? 'var(--primary)' : 'var(--on-surface-variant)',
+              boxShadow: tab === id ? '0 1px 3px rgba(0,0,0,0.14)' : 'none',
+            }}>{t[id]}</button>
           ))}
         </div>
 
@@ -191,7 +187,7 @@ export default function PortfolioPage() {
           <>
             {loading && <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>}
             {!loading && assets.length === 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>Sem posições registadas.</div>
+              <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>{t.noPositions}</div>
             )}
             {assets.map(a => (
               <div key={a.ticker} onClick={() => router.push(`/portfolio/${a.ticker}`)} style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -200,7 +196,7 @@ export default function PortfolioPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 16, fontWeight: 700 }}>{a.ticker}</div>
-                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} ações</div>
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} {t.sharesUnit}</div>
                 </div>
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eur.format(a.value)} €</div>
@@ -217,27 +213,27 @@ export default function PortfolioPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 16, color: '#fff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 11, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Recebido (12 meses)</div>
+                <div style={{ fontSize: 11, opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{t.dividendsReceived12mo}</div>
                 <div style={{ fontSize: 26, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>+{eur.format(dividends12mo)} €</div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 11, opacity: 0.8 }}>Yield</div>
+                <div style={{ fontSize: 11, opacity: 0.8 }}>{t.yieldLabel}</div>
                 <div style={{ fontSize: 18, fontWeight: 700 }}>{dividendYieldPct.toFixed(1)}%</div>
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>Próximos</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>{t.upcoming}</div>
               <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
-                Sem dados de dividendos futuros disponíveis.
+                {t.noUpcomingDividends}
               </div>
             </div>
 
             <div>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>Recebidos</div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>{t.received}</div>
               {dividends.length === 0 ? (
                 <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
-                  Sem dividendos recebidos.
+                  {t.noDividendsReceived}
                 </div>
               ) : (
                 <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
@@ -280,9 +276,9 @@ export default function PortfolioPage() {
       </div>
 
       <Fab actions={[
-        { icon: 'add', label: 'Comprar', color: 'var(--gain)', onClick: () => router.push('/portfolio/add') },
+        { icon: 'add', label: t.buy, color: 'var(--gain)', onClick: () => router.push('/portfolio/add') },
         {
-          icon: 'remove', label: 'Vender', color: 'var(--loss)',
+          icon: 'remove', label: t.sell, color: 'var(--loss)',
           onClick: () => { if (assets.length > 0) setSellPickerOpen(true); },
         },
       ]} />
@@ -290,7 +286,7 @@ export default function PortfolioPage() {
       {sellPickerOpen && (
         <div onClick={() => setSellPickerOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', zIndex: 30 }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: '20px 20px 0 0', padding: '20px 16px 34px', display: 'flex', flexDirection: 'column', gap: 10, maxHeight: '70%', overflow: 'auto' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>Vender ativo</div>
+            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>{t.sellAssetTitle}</div>
             {assets.map(a => (
               <div key={a.ticker} onClick={() => { setSellPickerOpen(false); router.push(`/portfolio/${a.ticker}?action=sell`); }}
                 style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 'var(--radius-md)', background: 'var(--surface-container)' }}>
@@ -299,7 +295,7 @@ export default function PortfolioPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 15, fontWeight: 700 }}>{a.ticker}</div>
-                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} ações</div>
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} {t.sharesUnit}</div>
                 </div>
                 <span style={{ fontSize: 14, fontWeight: 600 }}>{eur.format(a.value)} €</span>
               </div>
