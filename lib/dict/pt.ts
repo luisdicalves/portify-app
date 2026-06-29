@@ -60,6 +60,7 @@ export const pt = {
   navProfile: 'Perfil',
   navTx: 'Movim.',
   // Dashboard
+  welcomeBack: 'Bem-vindo de volta',
   greeting: 'Olá, Ricardo',
   totalValue: 'Valor Total do Portfólio',
   patPortfolioSummary: 'Resumo do Portfólio',
@@ -117,6 +118,15 @@ export const pt = {
   bsConfirm: 'Confirmar compra',
   bsSellConfirm: 'Confirmar venda',
   bsError: 'Indica o número de ações e o preço médio.',
+  noPositions: 'Sem posições registadas.',
+  sharesUnit: 'ações',
+  dividendsReceived12mo: 'Recebido (12 meses)',
+  yieldLabel: 'Yield',
+  upcoming: 'Próximos',
+  noUpcomingDividends: 'Sem dados de dividendos futuros disponíveis.',
+  received: 'Recebidos',
+  noDividendsReceived: 'Sem dividendos recebidos.',
+  sellAssetTitle: 'Vender ativo',
   // Profile
   investorSince: 'Investidor desde 2018',
   risk: 'Risco',
@@ -213,4 +223,30 @@ export const pt = {
   deleteAccountButton: 'Eliminar conta permanentemente',
   deleteAccountDeleting: 'A eliminar...',
   deleteAccountError: 'Não foi possível eliminar a conta. Tenta novamente.',
+  // Net worth page
+  netWorthTitle: 'Património líquido',
+  totalAssets: 'Total ativos',
+  liabilities: 'Passivos',
+  distribution: 'Distribuição',
+  investments: 'Investimentos',
+  netWorthDisclaimer: 'Liquidez, imobiliário e crédito ainda não são geridos na app — o património líquido reflete só o portefólio de investimentos.',
+  // Security page
+  faceIdLabel: 'Face ID',
+  twoFactorAuth: 'Autenticação de dois fatores',
+  changePin: 'Alterar PIN',
+  changePassword: 'Alterar palavra-passe',
+  activeSessions: 'Sessões ativas',
+  oneDevice: '1 dispositivo',
+  // Add asset page
+  addAssetTitle: 'Adicionar ativo',
+  searchAssetPh: 'Pesquisar ativo...',
+  // Settings page — import toast
+  positionsUnit: 'posições',
+  transactionsImportedUnit: 'transações importadas',
+  // Dashboard
+  timeframes: ['1S', '1M', '3M', '6M', '1A', 'Max'] as readonly string[],
+  noHistoricalData: 'Sem dados históricos suficientes.',
+  netWorthCardLabel: 'Património líquido',
+  totalReturn: 'Retorno total',
+  todayHighlights: 'Destaques do dia',
 };

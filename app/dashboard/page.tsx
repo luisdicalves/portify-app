@@ -6,8 +6,9 @@ import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath } from '@/lib/portfolioMetrics';
+import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 
-const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -42,6 +43,8 @@ async function fetchHistory(ticker: string, outputsize: number): Promise<History
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { lang } = useApp();
+  const t = useDict(lang);
   const [tf, setTf] = useState(4);
   const [fullName, setFullName] = useState('');
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -111,7 +114,7 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
           <span className="material-symbols-outlined icf" style={{ fontSize: 30, color: 'var(--primary)' }}>account_circle</span>
           <div style={{ lineHeight: 1.15 }}>
-            <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Bem-vindo de volta</div>
+            <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{t.welcomeBack}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.01em' }}>{fullName || '...'}</div>
           </div>
         </div>
@@ -123,7 +126,7 @@ export default function DashboardPage() {
 
         {/* Portfolio value */}
         <div onClick={() => router.push('/dashboard/net-worth')} style={{ cursor: 'pointer' }}>
-          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>Valor total do portfólio</div>
+          <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.totalValue}</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
             <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{loading ? '—' : `€ ${eur.format(totalValue)}`}</span>
             {!loading && holdings.length > 0 && (
@@ -137,14 +140,14 @@ export default function DashboardPage() {
         {/* Performance chart */}
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
           <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 3, marginBottom: 12 }}>
-            {TIMEFRAMES.map((t, i) => (
-              <button key={t} onClick={() => setTf(i)} style={{
+            {t.timeframes.map((label, i) => (
+              <button key={label} onClick={() => setTf(i)} style={{
                 flex: 1, padding: '6px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                 background: tf === i ? 'var(--surface-lowest)' : 'transparent',
                 color: tf === i ? 'var(--primary)' : 'var(--on-surface-variant)',
                 boxShadow: tf === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              }}>{t}</button>
+              }}>{label}</button>
             ))}
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
@@ -163,7 +166,7 @@ export default function DashboardPage() {
               <SkeletonChart height={88} />
             ) : (
               <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
-                Sem dados históricos suficientes.
+                {t.noHistoricalData}
               </div>
             )}
           </div>
@@ -173,12 +176,12 @@ export default function DashboardPage() {
         <div style={{ display: 'flex', gap: 12 }}>
           <div onClick={() => router.push('/dashboard/net-worth')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>savings</span>
-            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Património líquido</div>
+            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.netWorthCardLabel}</div>
             <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? <Skeleton width={70} height={16} /> : `${eurCompact.format(totalValue)} €`}</div>
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>trending_up</span>
-            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>Retorno total</div>
+            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.totalReturn}</div>
             <div style={{ fontSize: 16, fontWeight: 700, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
               {loading ? <Skeleton width={50} height={16} /> : `${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
             </div>
@@ -187,10 +190,10 @@ export default function DashboardPage() {
 
         {/* Daily performance */}
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>Destaques do dia</div>
+          <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{t.todayHighlights}</div>
 
           {loading && <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}><Skeleton height={52} radius="var(--radius-md)" /><Skeleton height={52} radius="var(--radius-md)" /></div>}
-          {!loading && holdings.length === 0 && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Sem posições registadas.</div>}
+          {!loading && holdings.length === 0 && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.noPositions}</div>}
 
           {!loading && topGainer && (
             <div onClick={() => router.push(`/portfolio/${topGainer.ticker}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topGainer.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px', marginBottom: topLoser ? 9 : 0 }}>

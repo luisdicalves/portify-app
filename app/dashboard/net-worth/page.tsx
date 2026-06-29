@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { createClient } from '@/lib/supabase/client';
+import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -22,6 +24,8 @@ async function fetchPrice(ticker: string): Promise<number | null> {
 
 export default function NetWorthPage() {
   const router = useRouter();
+  const { lang } = useApp();
+  const t = useDict(lang);
   const [totalValue, setTotalValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -48,32 +52,32 @@ export default function NetWorthPage() {
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 16px 10px' }}>
         <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer' }}>arrow_back_ios_new</span>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>Património líquido</span>
+        <span style={{ fontSize: 18, fontWeight: 700 }}>{t.netWorthTitle}</span>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '8px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div style={{ background: 'var(--primary-strong)', borderRadius: 'var(--radius-lg)', padding: 18, color: '#fff' }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>Património líquido</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', opacity: 0.8 }}>{t.netWorthTitle}</div>
           <div style={{ fontSize: 30, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em', marginTop: 4 }}>
             {loading ? '—' : `€ ${eur.format(totalValue)}`}
           </div>
           <div style={{ display: 'flex', gap: 24, marginTop: 16, paddingTop: 14, borderTop: '1px solid rgba(255,255,255,0.2)' }}>
             <div>
-              <div style={{ fontSize: 11, opacity: 0.8 }}>Total ativos</div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>{t.totalAssets}</div>
               <div style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? '—' : `+${eur.format(totalValue)} €`}</div>
             </div>
             <div>
-              <div style={{ fontSize: 11, opacity: 0.8 }}>Passivos</div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>{t.liabilities}</div>
               <div style={{ fontSize: 15, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>€ 0,00</div>
             </div>
           </div>
         </div>
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 14 }}>Distribuição</div>
+          <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', marginBottom: 14 }}>{t.distribution}</div>
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 5 }}>
-              <span>Investimentos</span>
+              <span>{t.investments}</span>
               <b style={{ fontVariantNumeric: 'tabular-nums' }}>{loading ? '—' : `${eur.format(totalValue)} €`}</b>
             </div>
             <div style={{ height: 8, borderRadius: 'var(--radius-full)', background: 'var(--surface-container)' }}>
@@ -81,7 +85,7 @@ export default function NetWorthPage() {
             </div>
           </div>
           <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 12 }}>
-            Liquidez, imobiliário e crédito ainda não são geridos na app — o património líquido reflete só o portefólio de investimentos.
+            {t.netWorthDisclaimer}
           </div>
         </div>
       </div>
