@@ -223,6 +223,8 @@ export const pt = {
   deleteAccountButton: 'Eliminar conta permanentemente',
   deleteAccountDeleting: 'A eliminar...',
   deleteAccountError: 'Não foi possível eliminar a conta. Tenta novamente.',
+  deleteAccountToastTitle: 'Conta eliminada',
+  deleteAccountToastSub: 'A tua conta e todos os dados foram removidos.',
   // Net worth page
   netWorthTitle: 'Património líquido',
   totalAssets: 'Total ativos',

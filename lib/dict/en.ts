@@ -217,6 +217,8 @@ export const en: typeof pt = {
   deleteAccountButton: 'Permanently delete account',
   deleteAccountDeleting: 'Deleting...',
   deleteAccountError: "Couldn't delete the account. Please try again.",
+  deleteAccountToastTitle: 'Account deleted',
+  deleteAccountToastSub: 'Your account and all data have been removed.',
   // Net worth page
   netWorthTitle: 'Net Worth',
   totalAssets: 'Total assets',

@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [deleteToast, setDeleteToast] = useState(false);
 
   async function deleteAccount() {
     if (deleteConfirmText !== t.deleteAccountConfirmWord) return;
@@ -54,9 +55,11 @@ export default function SettingsPage() {
     try {
       const res = await fetch('/api/account/delete', { method: 'POST' });
       if (!res.ok) throw new Error('delete_failed');
+      setDeleteOpen(false);
+      setDeleteToast(true);
       const supabase = createClient();
       await supabase.auth.signOut();
-      router.push('/');
+      setTimeout(() => router.push('/'), 1500);
     } catch {
       setDeleting(false);
       setDeleteError(t.deleteAccountError);
@@ -388,6 +391,18 @@ export default function SettingsPage() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.exportToastTitle}</div>
             <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.exportToastSub}</div>
+          </div>
+        </div>
+      )}
+
+      {deleteToast && (
+        <div style={{ position: 'absolute', top: 14, left: 14, right: 14, display: 'flex', alignItems: 'center', gap: 12, background: 'var(--inverse-surface)', borderRadius: 'var(--radius-md)', padding: '13px 16px', boxShadow: 'var(--shadow)', zIndex: 110 }}>
+          <span style={{ width: 34, height: 34, flex: 'none', borderRadius: 'var(--radius-full)', background: 'var(--gain-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: '#fff' }}>check</span>
+          </span>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.deleteAccountToastTitle}</div>
+            <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.deleteAccountToastSub}</div>
           </div>
         </div>
       )}
