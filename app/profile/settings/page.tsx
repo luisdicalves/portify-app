@@ -38,6 +38,31 @@ export default function SettingsPage() {
   const { theme, toggleTheme, lang, setLang } = useApp();
   const t = useDict(lang);
 
+  const [priceAlerts, setPriceAlerts] = useState(true);
+  const [marketNews, setMarketNews] = useState(true);
+  const [weeklySummary, setWeeklySummary] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  async function deleteAccount() {
+    if (deleteConfirmText !== t.deleteAccountConfirmWord) return;
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      const res = await fetch('/api/account/delete', { method: 'POST' });
+      if (!res.ok) throw new Error('delete_failed');
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push('/');
+    } catch {
+      setDeleting(false);
+      setDeleteError(t.deleteAccountError);
+    }
+  }
+
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
@@ -171,6 +196,48 @@ export default function SettingsPage() {
             <SettingsRow icon="upload_file" label={t.importCsv} value={t.importAction} onPress={() => setImportOpen(true)} />
             <SettingsRow icon="file_save" label={t.exportData} onPress={() => setExportOpen(true)} />
             <SettingsRow icon="link" label={t.linkBroker} border={false} />
+          </Card>
+        </div>
+
+        {/* Notifications */}
+        <div>
+          <SectionLabel label={t.notificationsSection} />
+          <Card>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: '1px solid var(--hairline)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>price_change</span>
+                {t.notifPriceAlerts}
+              </span>
+              <Switch checked={priceAlerts} onChange={() => setPriceAlerts(v => !v)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: '1px solid var(--hairline)' }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>newspaper</span>
+                {t.notifMarketNews}
+              </span>
+              <Switch checked={marketNews} onChange={() => setMarketNews(v => !v)} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>calendar_view_week</span>
+                {t.notifWeeklySummary}
+              </span>
+              <Switch checked={weeklySummary} onChange={() => setWeeklySummary(v => !v)} />
+            </div>
+          </Card>
+        </div>
+
+        {/* Danger zone */}
+        <div>
+          <SectionLabel label={t.dangerZoneSection} />
+          <Card>
+            <div onClick={() => setDeleteOpen(true)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600, color: 'var(--loss)' }}>
+                <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--loss)' }}>delete_forever</span>
+                {t.deleteAccount}
+              </span>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>chevron_right</span>
+            </div>
           </Card>
         </div>
 
@@ -321,6 +388,45 @@ export default function SettingsPage() {
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.exportToastTitle}</div>
             <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>{t.exportToastSub}</div>
+          </div>
+        </div>
+      )}
+
+      {deleteOpen && (
+        <div onClick={() => !deleting && setDeleteOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+              <span style={{ fontSize: 20, fontWeight: 700, color: 'var(--loss)' }}>{t.deleteAccountTitle}</span>
+              <span onClick={() => !deleting && setDeleteOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>{t.deleteAccountWarning}</div>
+
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 8 }}>{t.deleteAccountConfirmLabel}</div>
+              <input
+                value={deleteConfirmText}
+                onChange={e => setDeleteConfirmText(e.target.value)}
+                placeholder={t.deleteAccountConfirmPh}
+                style={{ width: '100%', background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '14px 16px', fontSize: 15, fontWeight: 600, color: 'var(--on-surface)', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            {deleteError && (
+              <div style={{ fontSize: 13, color: 'var(--loss)', marginBottom: 12 }}>{deleteError}</div>
+            )}
+
+            <button
+              onClick={deleteAccount}
+              disabled={deleteConfirmText !== t.deleteAccountConfirmWord || deleting}
+              style={{
+                width: '100%', background: 'var(--loss)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15,
+                fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                opacity: deleteConfirmText !== t.deleteAccountConfirmWord || deleting ? 0.5 : 1,
+              }}
+            >
+              {deleting ? t.deleteAccountDeleting : t.deleteAccountButton}
+            </button>
           </div>
         </div>
       )}
