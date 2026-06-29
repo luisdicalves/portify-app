@@ -5,6 +5,10 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
+import {
+  calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath,
+  calcWeightedAvgDaysHeld, calcAnnualizedReturn,
+} from '@/lib/portfolioMetrics';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
@@ -38,21 +42,6 @@ async function fetchHistory(ticker: string, outputsize: number): Promise<History
   }
 }
 
-function buildLinePath(values: number[]) {
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const w = 320, h = 120, pad = 8;
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * w;
-    const y = h - pad - ((v - min) / span) * (h - pad * 2);
-    return [x, y];
-  });
-  const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x},${y}`).join(' ');
-  const area = `${line} L${w},${h} L0,${h} Z`;
-  return { line, area };
-}
-
 export default function PerformancePage() {
   const router = useRouter();
   const [tf, setTf] = useState(4);
@@ -77,13 +66,7 @@ export default function PerformancePage() {
       setHoldings(hs);
 
       if (buys && buys.length > 0) {
-        const now = Date.now();
-        const totalAmount = buys.reduce((s, b) => s + Math.abs(b.amount), 0);
-        const weightedDays = buys.reduce((s, b) => {
-          const days = (now - new Date(b.executed_at).getTime()) / 86400000;
-          return s + Math.abs(b.amount) * days;
-        }, 0);
-        setAvgDaysHeld(Math.max(30, totalAmount > 0 ? weightedDays / totalAmount : 365));
+        setAvgDaysHeld(calcWeightedAvgDaysHeld(buys));
       }
 
       const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
@@ -99,39 +82,15 @@ export default function PerformancePage() {
     (async () => {
       const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
       const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
-
-      const backbone = histories
-        .filter((h): h is HistoryPoint[] => h !== null)
-        .sort((a, b) => b.length - a.length)[0];
-      if (!backbone) { setChartValues(null); return; }
-
-      const seriesMaps = histories.map(h => {
-        const map = new Map<string, number>();
-        h?.forEach(p => map.set(p.date, p.close));
-        return map;
-      });
-
-      const lastKnown = new Map<string, number>();
-      const values = backbone.map(({ date }) => {
-        let total = 0;
-        holdings.forEach((h, i) => {
-          const map = seriesMaps[i];
-          const closeToday = map.get(date);
-          const close = closeToday ?? lastKnown.get(h.ticker) ?? h.avg_price;
-          if (closeToday != null) lastKnown.set(h.ticker, closeToday);
-          total += h.units * close;
-        });
-        return total;
-      });
-      setChartValues(values.length > 1 ? values : null);
+      setChartValues(buildPortfolioSeries(holdings, histories));
     })();
   }, [holdings, tf]);
 
-  const totalValue = holdings.reduce((sum, h) => sum + h.units * (quotes[h.ticker]?.price ?? h.avg_price), 0);
-  const totalInvested = holdings.reduce((sum, h) => sum + h.units * h.avg_price, 0);
+  const totalValue = calcTotalValue(holdings, ticker => quotes[ticker]?.price);
+  const totalInvested = calcTotalInvested(holdings);
   const totalReturn = totalValue - totalInvested;
   const totalReturnPct = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
-  const annualizedPct = totalInvested > 0 ? (Math.pow(1 + totalReturnPct / 100, 365 / avgDaysHeld) - 1) * 100 : 0;
+  const annualizedPct = totalInvested > 0 ? calcAnnualizedReturn(totalReturnPct, avgDaysHeld) : 0;
 
   const movers = holdings
     .filter(h => quotes[h.ticker] !== undefined)
@@ -145,7 +104,7 @@ export default function PerformancePage() {
   const worst = movers.length > 1 ? movers[movers.length - 1] : null;
 
   const chartColor = chartValues && chartValues.length > 1 && chartValues[chartValues.length - 1] >= chartValues[0] ? 'var(--gain)' : 'var(--loss)';
-  const { line, area } = chartValues && chartValues.length > 1 ? buildLinePath(chartValues) : { line: '', area: '' };
+  const { line, area } = chartValues && chartValues.length > 1 ? buildLinePath(chartValues, { height: 120 }) : { line: '', area: '' };
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
