@@ -136,7 +136,6 @@ export default function PortfolioPage() {
   const dayChangePct = dayChangeBase > 0 ? (dayChangeValue / dayChangeBase) * 100 : 0;
   const dayGain = dayChangeValue >= 0;
 
-  const totalDividends = dividends.reduce((sum, d) => sum + d.amount, 0);
   const dividends12mo = dividends
     .filter(d => Date.now() - new Date(d.executed_at).getTime() < 365 * 86400000)
     .reduce((sum, d) => sum + d.amount, 0);
