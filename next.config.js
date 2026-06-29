@@ -3,9 +3,12 @@
 // framework-injected <script> tags just from the x-nonce request header, so
 // every script got blocked and the app rendered a blank page in production.
 // 'unsafe-inline' is required here until that's revisited with a verified fix.
+// Next.js dev mode relies on eval() for react-refresh/HMR, so the CSP needs
+// 'unsafe-eval' only in development — production builds don't need it.
+const isDev = process.env.NODE_ENV !== 'production';
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https:",
