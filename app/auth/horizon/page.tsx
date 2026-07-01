@@ -79,7 +79,7 @@ export default function HorizonPage() {
 
       <div style={{ padding: '12px 20px 34px' }}>
         {error && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center', marginBottom: 8 }}>{error}</div>}
-        <button onClick={handleContinue} disabled={saving || !isValid} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: isValid ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: saving || !isValid ? 0.5 : 1 }}>
+        <button onClick={handleContinue} disabled={!isValid} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: isValid ? 'pointer' : 'not-allowed', fontFamily: 'inherit', opacity: !isValid ? 0.5 : 1 }}>
           Continuar
         </button>
       </div>
