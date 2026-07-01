@@ -45,7 +45,11 @@ export default function PlanSetPage() {
   const [mode, setMode]       = useState<Mode>('calc_goal');
   const [amtIdx, setAmtIdx]   = useState(2);   // 250 €
   const [freqIdx, setFreqIdx] = useState(1);   // Mensal
-  const [years, setYears]     = useState(10);
+  const [years, setYears]     = useState(() => {
+    if (typeof window === 'undefined') return 10;
+    const h = parseInt(sessionStorage.getItem('onb_horizon') ?? '', 10);
+    return !isNaN(h) && h >= 1 && h <= 50 ? h : 10;
+  });
   const [goal, setGoal]       = useState('');
   const [profile, setProfile] = useState<UserProfile | null>(null);
 

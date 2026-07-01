@@ -42,11 +42,13 @@ export default function ExperiencePage() {
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
       <StepHeader step={2} total={9} back={() => router.back()} title="Experiência a investir" sub="Ajudamos a personalizar as tuas recomendações." />
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />
-        <div style={{ flex: 1 }} />
-        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>}
-        <button onClick={handleContinue} disabled={selected === null || saving} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected === null ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected === null || saving ? 0.5 : 1 }}>
+      </div>
+
+      <div style={{ padding: '12px 20px 34px' }}>
+        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center', marginBottom: 8 }}>{saveError}</div>}
+        <button onClick={handleContinue} disabled={selected === null || saving} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected === null ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected === null || saving ? 0.5 : 1 }}>
           Continuar
         </button>
       </div>
