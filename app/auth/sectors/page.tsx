@@ -35,7 +35,7 @@ export default function SectorsPage() {
     if (user) {
       await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', user.id);
     }
-    router.push('/auth/plan-set');
+    router.push('/auth/plan-ask');
   }
 
   return (
