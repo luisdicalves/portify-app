@@ -27,6 +27,7 @@ export default function RiskPage() {
     if (user) {
       await supabase.from('profiles').update({ risk_profile: OPTIONS[selected].id }).eq('id', user.id);
     }
+    sessionStorage.setItem('onb_risk_profile', OPTIONS[selected].id);
     router.push('/auth/reaction');
   }
 
