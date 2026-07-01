@@ -11,7 +11,7 @@ const ASSETS = [
 
 export default function AssetsPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set(['stocks', 'etfs']));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const toggle = (id: string) => setSelected(s => {
     const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
@@ -19,7 +19,7 @@ export default function AssetsPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={1} total={5} back={() => router.back()} title="O que pretende gerir?" sub="Escolha os tipos de ativo para o seu portfólio." />
+      <StepHeader step={1} total={9} back={() => router.back()} title="O que pretende gerir?" sub="Escolha os tipos de ativo para o seu portfólio." />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '14px 20px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         {ASSETS.map(a => {
@@ -52,8 +52,10 @@ export default function AssetsPage() {
 
         <div style={{ flex: 1 }} />
 
-        <button onClick={() => router.push('/auth/experience')}
-          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <button
+          disabled={selected.size === 0}
+          onClick={() => router.push('/auth/experience')}
+          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected.size === 0 ? 0.5 : 1 }}>
           Continuar
         </button>
       </div>

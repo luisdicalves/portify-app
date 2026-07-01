@@ -19,7 +19,7 @@ const SECTORS = [
 
 export default function SectorsPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set(['tech']));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   const toggle = (id: string) => setSelected(s => {

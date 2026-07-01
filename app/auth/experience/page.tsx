@@ -16,10 +16,11 @@ const OPTIONS = [
 
 export default function ExperiencePage() {
   const router = useRouter();
-  const [selected, setSelected] = useState(1);
+  const [selected, setSelected] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function handleContinue() {
+    if (selected === null) return;
     setSaving(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -31,12 +32,12 @@ export default function ExperiencePage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={1} total={9} back={() => router.back()} title="Experiência a investir" sub="Ajudamos a personalizar as tuas recomendações." />
+      <StepHeader step={2} total={9} back={() => router.back()} title="Experiência a investir" sub="Ajudamos a personalizar as tuas recomendações." />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />
         <div style={{ flex: 1 }} />
-        <button onClick={handleContinue} disabled={saving} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
+        <button onClick={handleContinue} disabled={selected === null || saving} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected === null ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected === null || saving ? 0.5 : 1 }}>
           Continuar
         </button>
       </div>
