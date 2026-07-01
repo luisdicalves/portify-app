@@ -2,7 +2,7 @@
 
 export type SelectOption = { id: string; label: string; desc: string; icon: string };
 
-export function SelectList({ options, selected, onSelect }: { options: SelectOption[]; selected: number; onSelect: (i: number) => void }) {
+export function SelectList({ options, selected, onSelect }: { options: SelectOption[]; selected: number | null; onSelect: (i: number) => void }) {
   return (
     <>
       {options.map((o, i) => {
