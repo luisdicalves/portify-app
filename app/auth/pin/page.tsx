@@ -28,6 +28,18 @@ export default function PinPage() {
     const supabase = createClient();
     const { data: ok } = await supabase.rpc('verify_pin', { p_pin: value });
     if (ok) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: plan } = await supabase
+          .from('investment_plans')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (!plan) {
+          router.push('/auth/assets');
+          return;
+        }
+      }
       router.push('/dashboard');
       return;
     }
