@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { calcPlan, calcFV, type UserProfile } from '@/lib/planCalculator';
 
 // ── Labels ────────────────────────────────────────────────────────
 const RISK_LABELS: Record<string, string> = {
@@ -51,37 +52,18 @@ const FREQ_LABELS: Record<string, string> = {
   quarterly: 'Trimestral',
   annual:    'Anual',
 };
-const RATE_BY_RISK: Record<string, number> = {
-  very_conservative: 0.035,
-  conservative:      0.050,
-  moderate:          0.070,
-  aggressive:        0.090,
-  very_aggressive:   0.110,
-};
 
 function fmt(n: number) {
   return n.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 }
-function calcFV(pmt: number, rAnnual: number, years: number) {
-  if (rAnnual === 0) return pmt * 12 * years;
-  const r = rAnnual / 12;
-  const n = years * 12;
-  return pmt * ((Math.pow(1 + r, n) - 1) / r);
-}
 
 // ── Tipos ─────────────────────────────────────────────────────────
-interface Profile {
+type Profile = UserProfile & {
   first_name: string;
   last_name: string;
   user_handle: string;
-  experience_level: string;
-  risk_profile: string;
-  investment_goal: string;
-  market_reaction: string;
-  financial_status: string;
-  liquidity_need: string;
   preferred_sectors: string[];
-}
+};
 interface Plan {
   amount: number;
   frequency: string;
@@ -130,15 +112,16 @@ export default function SummaryPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan]       = useState<Plan | null>(null);
+  const [loaded, setLoaded]   = useState(false);
   const [saving, setSaving]   = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [toast, setToast]     = useState(false);
 
-  // Carregar dados do Supabase (perfil) + sessionStorage (plano)
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) { setLoaded(true); return; }
 
       const { data: p } = await supabase
         .from('profiles')
@@ -148,53 +131,73 @@ export default function SummaryPage() {
 
       if (p) setProfile(p as Profile);
 
-      // Plano vem do sessionStorage (ainda não foi gravado)
       const stored = sessionStorage.getItem('onb_plan');
       if (stored) {
         try { setPlan(JSON.parse(stored)); } catch { /* ignore */ }
       }
+
+      setLoaded(true);
     })();
   }, []);
 
-  // ── Projecção ──────────────────────────────────────────────────
-  const rate = profile ? (RATE_BY_RISK[profile.risk_profile] ?? 0.07) : 0.07;
-  const projectedFV = plan
-    ? calcFV(plan.amount, rate, plan.horizon_years)
-    : 0;
-  // Intervalo optimista/pessimista ±1%
-  const fvLow  = plan ? calcFV(plan.amount, Math.max(0, rate - 0.01), plan.horizon_years) : 0;
-  const fvHigh = plan ? calcFV(plan.amount, rate + 0.01, plan.horizon_years) : 0;
+  // Redirecionar se plano não existe após carregar (sessionStorage perdido)
+  useEffect(() => {
+    if (loaded && !plan) router.replace('/auth/plan-set');
+  }, [loaded, plan, router]);
+
+  // ── Projecção via calcPlan ─────────────────────────────────────
+  const planResult = (profile && plan)
+    ? calcPlan({ ...profile, horizon_years: plan.horizon_years })
+    : null;
+  const rate      = planResult?.rate      ?? 0.07;
+  const rateLow   = planResult?.rateLow   ?? Math.max(0, rate - 0.01);
+  const rateHigh  = planResult?.rateHigh  ?? rate + 0.01;
+  const fvLow     = plan ? calcFV(plan.amount, rateLow,  plan.horizon_years) : 0;
+  const fvHigh    = plan ? calcFV(plan.amount, rateHigh, plan.horizon_years) : 0;
+  const conflicts = planResult?.conflicts ?? [];
 
   // ── Gravação final ─────────────────────────────────────────────
   async function handleFinalize() {
     if (!plan || saving) return;
     setSaving(true);
+    setSaveError(null);
 
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Sessão expirada.');
 
-    // Gravar plano na DB
-    await supabase.from('investment_plans').upsert({
-      user_id:       user.id,
-      amount:        plan.amount,
-      frequency:     plan.frequency,
-      horizon_years: plan.horizon_years,
-      goal_amount:   plan.goal_amount,
-    });
+      const { error: planError } = await supabase.from('investment_plans').upsert({
+        user_id:       user.id,
+        amount:        plan.amount,
+        frequency:     plan.frequency,
+        horizon_years: plan.horizon_years,
+        goal_amount:   plan.goal_amount,
+      });
+      if (planError) throw planError;
 
-    // Limpar sessionStorage
-    sessionStorage.removeItem('onb_plan');
-    sessionStorage.removeItem('onb_risk_profile');
+      if (planResult) {
+        await supabase.from('profiles').update({
+          risk_score:        planResult.riskScore,
+          allocated_stock:   planResult.allocation.stock,
+          allocated_etf:     planResult.allocation.etf,
+          allocated_bond_etf: planResult.allocation.bond_etf,
+          estimated_rate:    planResult.rate,
+        }).eq('id', user.id);
+      }
 
-    setSaving(false);
+      sessionStorage.removeItem('onb_plan');
+      sessionStorage.removeItem('onb_risk_profile');
 
-    // Mostrar toast e navegar após 1.8s
-    setToast(true);
-    setTimeout(() => router.push('/dashboard'), 1800);
+      setToast(true);
+      setTimeout(() => router.push('/dashboard'), 1800);
+    } catch {
+      setSaveError('Erro ao guardar. Verifica a ligação e tenta novamente.');
+      setSaving(false);
+    }
   }
 
-  if (!profile || !plan) {
+  if (!loaded || !profile || !plan) {
     return (
       <div className="phone-shell" style={{ alignItems: 'center', justifyContent: 'center' }}>
         <span className="material-symbols-outlined" style={{ fontSize: 32, color: 'var(--on-surface-variant)', animation: 'spin 1s linear infinite' }}>progress_activity</span>
@@ -227,9 +230,42 @@ export default function SummaryPage() {
             {fmt(fvLow)} – {fmt(fvHigh)}
           </div>
           <div style={{ fontSize: 13, color: 'var(--on-surface-variant)', marginTop: 6 }}>
-            Com {fmt(plan.amount)}/{FREQ_LABELS[plan.frequency]?.toLowerCase()} durante {plan.horizon_years} anos · {(rate * 100).toFixed(1)}% a.a.
+            Com {fmt(plan.amount)}/{FREQ_LABELS[plan.frequency]?.toLowerCase()} durante {plan.horizon_years} anos · {(rateLow * 100).toFixed(1)}%–{(rateHigh * 100).toFixed(1)}% a.a.
           </div>
+          {planResult && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, background: 'var(--primary-container)', borderRadius: 'var(--radius-full)', padding: '4px 14px' }}>
+              <span className="material-symbols-outlined icf" style={{ fontSize: 14, color: 'var(--primary-strong)' }}>psychology</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-strong)' }}>Score {planResult.riskScore}</span>
+              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>· {RISK_LABELS[profile.risk_profile]}</span>
+            </div>
+          )}
+          {planResult && (
+            <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gain)' }}>
+              {[
+                { label: 'Ações',     value: planResult.allocation.stock,    color: 'var(--primary-strong)' },
+                { label: 'ETFs',      value: planResult.allocation.etf,      color: 'var(--gain)' },
+                { label: 'Bond ETFs', value: planResult.allocation.bond_etf, color: 'var(--on-surface-variant)' },
+              ].filter(a => a.value > 0).map(a => (
+                <div key={a.label} style={{ flex: 1, textAlign: 'center' }}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: a.color }}>{Math.round(a.value * 100)}%</div>
+                  <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{a.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {/* Conflitos / alertas */}
+        {conflicts.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {conflicts.map((c, i) => (
+              <div key={i} style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>warning</span>
+                <span style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{c}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Secção: Perfil de investidor */}
         <div>
@@ -237,12 +273,12 @@ export default function SummaryPage() {
             Perfil de investidor
           </div>
           <div style={{ background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: '0 16px' }}>
-            <Row icon="school"              label="Experiência"         value={EXP_LABELS[profile.experience_level] ?? '—'} />
+            <Row icon="school"               label="Experiência"        value={EXP_LABELS[profile.experience_level] ?? '—'} />
             <Row icon="local_fire_department" label="Perfil de risco"   value={RISK_LABELS[profile.risk_profile] ?? '—'} />
-            <Row icon="flag"               label="Objetivo"             value={GOAL_LABELS[profile.investment_goal] ?? '—'} />
-            <Row icon="trending_down"      label="Reação a queda"       value={REACTION_LABELS[profile.market_reaction] ?? '—'} />
-            <Row icon="savings"            label="Situação financeira"  value={FINANCIAL_LABELS[profile.financial_status] ?? '—'} />
-            <Row icon="lock"               label="Acesso ao dinheiro"   value={LIQUIDITY_LABELS[profile.liquidity_need] ?? '—'} last />
+            <Row icon="flag"                 label="Objetivo"           value={GOAL_LABELS[profile.investment_goal] ?? '—'} />
+            <Row icon="trending_down"        label="Reação a queda"     value={REACTION_LABELS[profile.market_reaction] ?? '—'} />
+            <Row icon="savings"              label="Situação financeira" value={FINANCIAL_LABELS[profile.financial_status] ?? '—'} />
+            <Row icon="lock"                 label="Acesso ao dinheiro" value={LIQUIDITY_LABELS[profile.liquidity_need] ?? '—'} last />
           </div>
         </div>
 
@@ -252,9 +288,9 @@ export default function SummaryPage() {
             Plano de investimento
           </div>
           <div style={{ background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: '0 16px' }}>
-            <Row icon="payments"        label="Montante"        value={`${fmt(plan.amount)}/${FREQ_LABELS[plan.frequency]?.toLowerCase()}`} />
-            <Row icon="calendar_month"  label="Horizonte"       value={`${plan.horizon_years} anos`} />
-            <Row icon="target"          label="Objetivo"        value={fmt(plan.goal_amount)} last />
+            <Row icon="payments"       label="Montante"  value={`${fmt(plan.amount)}/${FREQ_LABELS[plan.frequency]?.toLowerCase()}`} />
+            <Row icon="calendar_month" label="Horizonte" value={`${plan.horizon_years} anos`} />
+            <Row icon="target"         label="Objetivo"  value={fmt(plan.goal_amount)} last />
           </div>
         </div>
 
@@ -276,6 +312,11 @@ export default function SummaryPage() {
           </span>
         </div>
 
+        {/* Erro de gravação */}
+        {saveError && (
+          <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>
+        )}
+
         {/* Botões */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button
@@ -294,7 +335,6 @@ export default function SummaryPage() {
         </div>
       </div>
 
-      {/* Toast */}
       <Toast visible={toast} />
     </div>
   );

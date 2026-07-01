@@ -17,21 +17,29 @@ export default function FinancialPage() {
   const router = useRouter();
   const [selected, setSelected] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   async function handleContinue() {
     if (selected === null) return;
     setSaving(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from('profiles').update({ financial_status: OPTIONS[selected].id }).eq('id', user.id);
+    setSaveError(null);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase.from('profiles').update({ financial_status: OPTIONS[selected].id }).eq('id', user.id);
+        if (error) throw error;
+      }
+      router.push('/auth/liquidity');
+    } catch {
+      setSaveError('Erro ao guardar. Tenta novamente.');
+      setSaving(false);
     }
-    router.push('/auth/liquidity');
   }
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={6} total={9} back={() => router.back()} title="Situação financeira" sub="Como descreves a tua situação financeira atual?" />
+      <StepHeader step={7} total={9} back={() => router.back()} title="Situação financeira" sub="Como descreves a tua situação financeira atual?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />
@@ -45,6 +53,7 @@ export default function FinancialPage() {
         </div>
 
         <div style={{ flex: 1 }} />
+        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>}
         <button onClick={handleContinue} disabled={selected === null || saving} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected === null ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected === null || saving ? 0.5 : 1 }}>
           Continuar
         </button>

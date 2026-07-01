@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
+import { createClient } from '@/lib/supabase/client';
 
 const ASSETS = [
   { id: 'stocks', icon: 'show_chart',  iconBg: 'var(--primary-strong)', label: 'Ações', desc: 'Apple, Tesla, Nvidia e outras cotadas.' },
@@ -12,10 +13,29 @@ const ASSETS = [
 export default function AssetsPage() {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggle = (id: string) => setSelected(s => {
     const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
   });
+
+  async function handleContinue() {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase.from('profiles').update({ preferred_assets: Array.from(selected) }).eq('id', user.id);
+        if (error) throw error;
+      }
+      router.push('/auth/experience');
+    } catch {
+      setSaveError('Erro ao guardar. Tenta novamente.');
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -52,10 +72,11 @@ export default function AssetsPage() {
 
         <div style={{ flex: 1 }} />
 
+        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>}
         <button
-          disabled={selected.size === 0}
-          onClick={() => router.push('/auth/experience')}
-          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected.size === 0 ? 0.5 : 1 }}>
+          disabled={selected.size === 0 || saving}
+          onClick={handleContinue}
+          style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected.size === 0 ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected.size === 0 || saving ? 0.5 : 1 }}>
           Continuar
         </button>
       </div>

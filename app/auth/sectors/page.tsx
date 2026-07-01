@@ -21,6 +21,7 @@ export default function SectorsPage() {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggle = (id: string) => setSelected(s => {
     const n = new Set(s);
@@ -30,17 +31,24 @@ export default function SectorsPage() {
 
   async function handleContinue() {
     setSaving(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', user.id);
+    setSaveError(null);
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error } = await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', user.id);
+        if (error) throw error;
+      }
+      router.push('/auth/plan-ask');
+    } catch {
+      setSaveError('Erro ao guardar. Tenta novamente.');
+      setSaving(false);
     }
-    router.push('/auth/plan-ask');
   }
 
   return (
     <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
-      <StepHeader step={8} total={9} back={() => router.back()} title="Setores de interesse" sub="Escolhe as áreas que queres acompanhar." />
+      <StepHeader step={9} total={9} back={() => router.back()} title="Setores de interesse" sub="Escolhe as áreas que queres acompanhar." />
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 0' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
@@ -65,7 +73,8 @@ export default function SectorsPage() {
         </div>
       </div>
 
-      <div style={{ padding: '24px 24px 48px' }}>
+      <div style={{ padding: '24px 24px 48px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>}
         <button
           disabled={selected.size === 0 || saving}
           onClick={handleContinue}
