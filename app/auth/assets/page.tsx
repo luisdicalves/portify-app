@@ -14,7 +14,6 @@ export default function AssetsPage() {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggle = (id: string) => setSelected(s => {
     const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n;
@@ -22,19 +21,15 @@ export default function AssetsPage() {
 
   async function handleContinue() {
     setSaving(true);
-    setSaveError(null);
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { error } = await supabase.from('profiles').update({ preferred_assets: Array.from(selected) }).eq('id', user.id);
-        if (error) throw error;
+        // best-effort — coluna preferred_assets pode ainda não existir se a migration não foi corrida
+        await supabase.from('profiles').update({ preferred_assets: Array.from(selected) }).eq('id', user.id);
       }
-      router.push('/auth/experience');
-    } catch {
-      setSaveError('Erro ao guardar. Tenta novamente.');
-      setSaving(false);
-    }
+    } catch { /* ignorar — campo não afecta o motor de cálculo */ }
+    router.push('/auth/experience');
   }
 
   return (
@@ -72,7 +67,6 @@ export default function AssetsPage() {
 
         <div style={{ flex: 1 }} />
 
-        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>}
         <button
           disabled={selected.size === 0 || saving}
           onClick={handleContinue}
