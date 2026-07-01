@@ -233,6 +233,13 @@ export default function SummaryPage() {
             Com {fmt(plan.amount)}/{FREQ_LABELS[plan.frequency]?.toLowerCase()} durante {plan.horizon_years} anos · {(rateLow * 100).toFixed(1)}%–{(rateHigh * 100).toFixed(1)}% a.a.
           </div>
           {planResult && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, background: 'var(--primary-container)', borderRadius: 'var(--radius-full)', padding: '4px 14px' }}>
+              <span className="material-symbols-outlined icf" style={{ fontSize: 14, color: 'var(--primary-strong)' }}>psychology</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-strong)' }}>Score {planResult.riskScore}</span>
+              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>· {RISK_LABELS[profile.risk_profile]}</span>
+            </div>
+          )}
+          {planResult && (
             <div style={{ display: 'flex', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gain)' }}>
               {[
                 { label: 'Ações',     value: planResult.allocation.stock,    color: 'var(--primary-strong)' },

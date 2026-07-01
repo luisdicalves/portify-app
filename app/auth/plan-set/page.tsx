@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { StepHeader } from '@/components/ui/StepHeader';
 import { calcPlan, calcFV, calcPMT, calcYears, type UserProfile } from '@/lib/planCalculator';
 import { createClient } from '@/lib/supabase/client';
 
@@ -43,12 +42,11 @@ export default function PlanSetPage() {
   const router = useRouter();
 
   type Mode = 'calc_goal' | 'calc_years' | 'calc_amount';
-  const [mode, setMode]     = useState<Mode>('calc_goal');
-  const [amtIdx, setAmtIdx] = useState(2);   // 250 €
-  const [freqIdx, setFreqIdx] = useState(1); // Mensal
-  const [years, setYears]   = useState(10);
-  const [goal, setGoal]     = useState('');
-
+  const [mode, setMode]       = useState<Mode>('calc_goal');
+  const [amtIdx, setAmtIdx]   = useState(2);   // 250 €
+  const [freqIdx, setFreqIdx] = useState(1);   // Mensal
+  const [years, setYears]     = useState(10);
+  const [goal, setGoal]       = useState('');
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -66,7 +64,7 @@ export default function PlanSetPage() {
   }, []);
 
   // ── Cálculo dinâmico ──────────────────────────────────────────
-  const plan = profile ? calcPlan({ ...profile, horizon_years: years }) : null;
+  const plan      = profile ? calcPlan({ ...profile, horizon_years: years }) : null;
   const rate      = plan?.rate      ?? 0.07;
   const rateLow   = plan?.rateLow   ?? 0.06;
   const rateHigh  = plan?.rateHigh  ?? 0.08;
@@ -75,12 +73,14 @@ export default function PlanSetPage() {
   const monthlyAmt = AMOUNT_VALUES[amtIdx];
   const goalNum    = parseInt(goal.replace(/\D/g, ''), 10) || 0;
 
-  // Projecções para cada modo
-  const projectedGoal    = calcFV(monthlyAmt, rate, years);
-  const projectedYears   = goalNum > 0 ? calcYears(goalNum, monthlyAmt, rate) : null;
-  const requiredMonthly  = goalNum > 0 ? calcPMT(goalNum, rate, years) : null;
+  // calcYears pode devolver Infinity se PMT < juros mensais gerados
+  const rawYears       = goalNum > 0 ? calcYears(goalNum, monthlyAmt, rate) : null;
+  const yearsInfeasible = rawYears !== null && (!isFinite(rawYears) || rawYears > 50);
+  const projectedYears  = yearsInfeasible ? null : rawYears;
 
-  // Valor final guardado no sessionStorage
+  const projectedGoal   = calcFV(monthlyAmt, rate, years);
+  const requiredMonthly = goalNum > 0 ? calcPMT(goalNum, rate, years) : null;
+
   const finalGoal = mode === 'calc_goal' ? projectedGoal
     : mode === 'calc_years' && goalNum > 0 ? goalNum
     : mode === 'calc_amount' && goalNum > 0 ? goalNum
@@ -98,9 +98,19 @@ export default function PlanSetPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={9} total={9} back={() => router.back()} title="Define o teu plano" sub="Podes alterar estes valores a qualquer momento." />
 
-      <div style={{ flex: 1, overflow: 'auto', padding: '16px 20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header simples — não é um passo do onboarding */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px 4px' }}>
+        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--on-surface)', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-full)' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
+        </button>
+        <div>
+          <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em' }}>Define o teu plano</div>
+          <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Podes alterar estes valores a qualquer momento.</div>
+        </div>
+      </div>
+
+      <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px 24px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
         {/* Modo de cálculo */}
         <div style={{ display: 'flex', background: 'var(--surface-low)', borderRadius: 'var(--radius-lg)', padding: 4, gap: 2 }}>
@@ -196,13 +206,24 @@ export default function PlanSetPage() {
               </div>
             </>
           )}
-          {mode === 'calc_years' && projectedYears !== null && goalNum > 0 && (
+          {mode === 'calc_years' && goalNum > 0 && (
             <>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gain-strong)', marginBottom: 4 }}>Prazo estimado</div>
-              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>{projectedYears} anos</div>
-              <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
-                Para atingir {fmt(goalNum)} com {fmt(monthlyAmt)}/mês · {(rate * 100).toFixed(1)}% a.a.
-              </div>
+              {yearsInfeasible ? (
+                <>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--on-surface-variant)', letterSpacing: '-0.02em' }}>Mais de 50 anos</div>
+                  <div style={{ fontSize: 12, color: 'var(--loss)', marginTop: 6 }}>
+                    Com {fmt(monthlyAmt)}/mês não é possível atingir {fmt(goalNum)} num prazo razoável. Aumenta o montante ou reduz o objetivo.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>{projectedYears} anos</div>
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
+                    Para atingir {fmt(goalNum)} com {fmt(monthlyAmt)}/mês · {(rate * 100).toFixed(1)}% a.a.
+                  </div>
+                </>
+              )}
             </>
           )}
           {mode === 'calc_amount' && requiredMonthly !== null && goalNum > 0 && (
@@ -222,8 +243,8 @@ export default function PlanSetPage() {
           {plan && (
             <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gain)', display: 'flex', gap: 8 }}>
               {[
-                { label: 'Ações', value: alloc.stock, color: 'var(--primary-strong)' },
-                { label: 'ETFs',  value: alloc.etf,   color: 'var(--gain)' },
+                { label: 'Ações',     value: alloc.stock,    color: 'var(--primary-strong)' },
+                { label: 'ETFs',      value: alloc.etf,      color: 'var(--gain)' },
                 { label: 'Bond ETFs', value: alloc.bond_etf, color: 'var(--on-surface-variant)' },
               ].filter(a => a.value > 0).map(a => (
                 <div key={a.label} style={{ flex: 1, textAlign: 'center' }}>
