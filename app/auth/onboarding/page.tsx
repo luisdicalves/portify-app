@@ -17,7 +17,7 @@ export default function OnboardingPage() {
     <div className="phone-shell" style={{ justifyContent: 'space-between' }}>
       {/* Skip */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '4px 20px 0' }}>
-        <button onClick={() => router.push('/auth/login')} style={{
+        <button onClick={() => router.push('/auth/register')} style={{
           background: 'transparent', border: 'none', cursor: 'pointer',
           fontFamily: 'inherit', fontSize: 14, fontWeight: 600,
           color: 'var(--on-surface-variant)', padding: 6,
@@ -59,7 +59,7 @@ export default function OnboardingPage() {
           ))}
         </div>
         <button
-          onClick={() => isLast ? router.push('/auth/login') : setStep(s => s + 1)}
+          onClick={() => isLast ? router.push('/auth/register') : setStep(s => s + 1)}
           style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}
         >
           {isLast ? t.start : t.next}
