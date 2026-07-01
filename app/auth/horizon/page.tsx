@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
-import { createClient } from '@/lib/supabase/client';
 
 function getWarning(years: number): { text: string; color: string } | null {
   if (years < 2) return { text: 'Com menos de 2 anos, recomendamos perfis muito conservadores para evitar perdas.', color: 'var(--loss)' };
@@ -15,7 +14,6 @@ function getWarning(years: number): { text: string; color: string } | null {
 export default function HorizonPage() {
   const router = useRouter();
   const [years, setYears] = useState('');
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const parsed = parseInt(years, 10);
@@ -29,20 +27,9 @@ export default function HorizonPage() {
 
   async function handleContinue() {
     if (!isValid) { setError('Introduz um valor entre 1 e 50 anos.'); return; }
-    setSaving(true);
     setError('');
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { error: dbError } = await supabase.from('investment_plans').upsert({ user_id: user.id, horizon_years: parsed });
-        if (dbError) throw dbError;
-      }
-      router.push('/auth/risk');
-    } catch {
-      setError('Erro ao guardar. Tenta novamente.');
-      setSaving(false);
-    }
+    sessionStorage.setItem('onb_horizon', String(parsed));
+    router.push('/auth/risk');
   }
 
   return (
