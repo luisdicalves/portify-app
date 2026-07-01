@@ -67,7 +67,7 @@ export default function HorizonPage() {
               max={50}
               value={years}
               onChange={e => handleChange(e.target.value)}
-              placeholder="10"
+              placeholder="—"
               style={{
                 width: 120,
                 fontSize: 56,

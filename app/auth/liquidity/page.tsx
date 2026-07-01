@@ -18,12 +18,13 @@ const CRITICAL_WARNING = 'Se podes precisar deste dinheiro a qualquer momento, c
 
 export default function LiquidityPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState(2);
+  const [selected, setSelected] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const isCritical = OPTIONS[selected].id === 'critical';
+  const isCritical = selected !== null && OPTIONS[selected].id === 'critical';
 
   async function handleContinue() {
+    if (selected === null) return;
     setSaving(true);
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -56,7 +57,7 @@ export default function LiquidityPage() {
         )}
 
         <div style={{ flex: 1 }} />
-        <button onClick={handleContinue} disabled={saving} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: saving ? 0.7 : 1 }}>
+        <button onClick={handleContinue} disabled={selected === null || saving} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected === null ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected === null || saving ? 0.5 : 1 }}>
           {isCritical ? 'Continuar mesmo assim' : 'Continuar'}
         </button>
       </div>

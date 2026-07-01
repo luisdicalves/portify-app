@@ -19,7 +19,7 @@ const SECTORS = [
 
 export default function SectorsPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set(['tech']));
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
   const toggle = (id: string) => setSelected(s => {
@@ -35,7 +35,7 @@ export default function SectorsPage() {
     if (user) {
       await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', user.id);
     }
-    router.push('/auth/plan-set');
+    router.push('/auth/plan-ask');
   }
 
   return (
