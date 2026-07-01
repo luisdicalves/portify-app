@@ -148,13 +148,14 @@ export default function SummaryPage() {
   }, []);
 
   async function handleFinalize() {
-    if (!plan || saving) return;
+    if (!plan || !result || saving) return;
     setSaving(true);
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    // Gravar plano de investimento
     await supabase.from('investment_plans').upsert({
       user_id:       user.id,
       amount:        plan.amount,
@@ -163,7 +164,17 @@ export default function SummaryPage() {
       goal_amount:   plan.goal_amount,
     });
 
+    // Gravar riskScore, alocação e taxa calculados dinamicamente
+    await supabase.from('profiles').update({
+      risk_score:          result.riskScore,
+      allocated_stock:     result.allocation.stock,
+      allocated_etf:       result.allocation.etf,
+      allocated_bond_etf:  result.allocation.bond_etf,
+      estimated_rate:      result.rate,
+    }).eq('id', user.id);
+
     sessionStorage.removeItem('onb_plan');
+    sessionStorage.removeItem('onb_profile');
 
     setSaving(false);
     setToast(true);
