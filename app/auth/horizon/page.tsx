@@ -33,7 +33,6 @@ export default function HorizonPage() {
 
   function handleChange(val: string) {
     setError('');
-    // só deixa passar dígitos
     if (val === '' || /^\d{1,2}$/.test(val)) setYears(val);
   }
 
@@ -43,17 +42,24 @@ export default function HorizonPage() {
       return;
     }
     setSaving(true);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from('investment_plans').upsert({ user_id: user.id, horizon_years: parsed });
+    setError('');
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { error: dbError } = await supabase.from('investment_plans').upsert({ user_id: user.id, horizon_years: parsed });
+        if (dbError) throw dbError;
+      }
+      router.push('/auth/risk');
+    } catch {
+      setError('Erro ao guardar. Tenta novamente.');
+      setSaving(false);
     }
-    router.push('/auth/risk');
   }
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={3} total={9} back={() => router.back()} title="Horizonte de investimento" sub="Durante quantos anos planeias investir?" />
+      <StepHeader step={4} total={9} back={() => router.back()} title="Horizonte de investimento" sub="Durante quantos anos planeias investir?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '24px 20px 20px', display: 'flex', flexDirection: 'column', gap: 20 }}>
 
@@ -122,7 +128,6 @@ export default function HorizonPage() {
           </div>
         )}
 
-        {/* Erro */}
         {error && (
           <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{error}</div>
         )}
