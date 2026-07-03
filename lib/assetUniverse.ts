@@ -186,7 +186,7 @@ async function fetchCandidates(apiKey: string): Promise<RawTicker[]> {
       UNIVERSE_TTL,
       () => fetchExchangeTickers(exchange, apiKey),
     );
-    allTickers.push(...tickers);
+    allTickers.push(...(tickers ?? []));
     await sleep(300); // pequeno delay entre exchanges
   }
 
@@ -403,7 +403,7 @@ async function buildUniverse(): Promise<CandidateAsset[]> {
  * Cached 7 dias. Na primeira chamada ou após expirar, corre o pipeline completo.
  */
 export async function getUniverse(): Promise<CandidateAsset[]> {
-  return getCached('universe:v1', UNIVERSE_TTL, buildUniverse);
+  return (await getCached('universe:v1', UNIVERSE_TTL, buildUniverse)) ?? [];
 }
 
 /**
