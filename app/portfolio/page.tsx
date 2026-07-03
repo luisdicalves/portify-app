@@ -89,22 +89,32 @@ export default function PortfolioPage() {
 
     const { data } = await supabase
       .from('transactions')
-      .select('id, ticker, type, units, price, amount, executed_at')
+      .select('id, ticker, type, units, price, amount, executed_at, notes')
       .eq('user_id', user.id)
       .order('executed_at', { ascending: false });
 
+    const POSITIVE_TYPES = new Set(['dividend', 'deposit', 'interest']);
+    const LABEL_BY_TYPE: Record<string, string> = {
+      deposit: 'Depósito',
+      interest: 'Juros',
+      withholding_tax: 'WHT',
+      interest_tax: 'Imposto',
+    };
+
     const mapped: Transaction[] = (data ?? []).map(row => {
-      const gain = row.type === 'buy' ? false : row.amount >= 0;
+      const gain = row.type === 'buy' ? false : POSITIVE_TYPES.has(row.type) || row.amount >= 0;
+      const hasTicker = row.ticker != null && row.ticker !== '';
       return {
         id: row.id,
-        sym: row.ticker,
-        avatar: row.ticker.charAt(0),
+        sym: hasTicker ? row.ticker : LABEL_BY_TYPE[row.type] ?? row.type,
+        avatar: hasTicker ? row.ticker.charAt(0) : '',
         type: row.type as Transaction['type'],
         dateText: new Date(row.executed_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
         total: `${gain ? '+' : '-'}${eur.format(Math.abs(row.amount))} €`,
         totalColor: gain ? 'var(--gain)' : 'var(--on-surface)',
         units: row.units != null ? String(row.units) : undefined,
         unitVal: row.price != null ? `${eur.format(row.price)} €` : undefined,
+        note: row.notes ?? undefined,
       };
     });
     setTxns(mapped);
@@ -268,7 +278,12 @@ export default function PortfolioPage() {
                 expanded={openTxnId === tx.id}
                 onToggle={() => setOpenTxnId(id => id === tx.id ? null : tx.id)}
                 onDelete={() => deleteTransaction(tx.id)}
-                labels={{ buy: t.txcBuy, sell: t.txcSell, dividend: t.txcDiv, units: t.txcUnits, unitVal: t.txcUnitVal, delete: t.txcDelete }}
+                labels={{
+                  buy: t.txcBuy, sell: t.txcSell, dividend: t.txcDiv,
+                  deposit: t.txcDeposit, interest: t.txcInterest,
+                  withholdingTax: t.txcWht, interestTax: t.txcInterestTax,
+                  units: t.txcUnits, unitVal: t.txcUnitVal, delete: t.txcDelete,
+                }}
               />
             ))}
           </div>

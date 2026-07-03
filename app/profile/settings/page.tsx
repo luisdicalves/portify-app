@@ -110,12 +110,13 @@ export default function SettingsPage() {
         const rows = transactions.map(tx => ({
           user_id: user.id,
           external_id: tx.external_id,
-          ticker: tx.ticker,
+          ticker: tx.ticker ?? null,
           type: tx.type,
           units: tx.units ?? null,
           price: tx.price ?? null,
           amount: tx.amount,
           executed_at: tx.executed_at,
+          notes: tx.notes ?? null,
         }));
         const { data: inserted } = await supabase
           .from('transactions')
