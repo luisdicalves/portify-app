@@ -41,8 +41,9 @@ export default function PerformancePage() {
       const hs = holdingsData ?? [];
       setHoldings(hs);
 
-      if (buys && buys.length > 0) {
-        setAvgDaysHeld(calcWeightedAvgDaysHeld(buys));
+      const validBuys = (buys ?? []).filter((b): b is typeof b & { executed_at: string } => b.executed_at != null);
+      if (validBuys.length > 0) {
+        setAvgDaysHeld(calcWeightedAvgDaysHeld(validBuys));
       }
 
       const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));

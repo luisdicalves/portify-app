@@ -40,9 +40,9 @@ export default function DashboardPage() {
       const [{ data: profile }, { data: holdingsData }, { data: plan }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
         supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
-        supabase.from('investment_plans').select('monthly_amount').eq('user_id', user.id).maybeSingle(),
+        supabase.from('investment_plans').select('amount').eq('user_id', user.id).maybeSingle(),
       ]);
-      if (plan) setMonthlyPlan((plan as { monthly_amount?: number }).monthly_amount ?? null);
+      if (plan) setMonthlyPlan(plan.amount ?? null);
       if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
 
       const hs = holdingsData ?? [];
