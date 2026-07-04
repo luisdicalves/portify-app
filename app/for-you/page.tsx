@@ -192,9 +192,16 @@ export default function ForYouPage() {
   const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/recommendations')
+    const storedETag = sessionStorage.getItem('rec-etag');
+    const headers: Record<string, string> = {};
+    if (storedETag) headers['If-None-Match'] = storedETag;
+
+    fetch('/api/recommendations', { headers })
       .then(async r => {
         if (r.status === 401) { router.replace('/auth/login'); return; }
+        if (r.status === 304) { setLoading(false); return; } // profile unchanged
+        const etag = r.headers.get('etag');
+        if (etag) sessionStorage.setItem('rec-etag', etag);
         const data = await r.json();
         if (data.error) setError(data.error as string);
         else setResult(data as RecommendationResult);
