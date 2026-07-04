@@ -190,6 +190,7 @@ export default function ProfilePage() {
       const riskId = RISK_OPTIONS[riskSelected].id;
       await supabase.from('profiles').update({ risk_profile: riskId }).eq('id', user.id);
       setProfile(p => p ? { ...p, risk_profile: riskId } : p);
+      sessionStorage.removeItem('rec-etag');
     }
     setSavingField(false);
     setRiskSheetOpen(false);
@@ -209,6 +210,7 @@ export default function ProfilePage() {
       const goalId = OBJECTIVE_OPTIONS[objectiveSelected].id;
       await supabase.from('profiles').update({ investment_goal: goalId }).eq('id', user.id);
       setProfile(p => p ? { ...p, investment_goal: goalId } : p);
+      sessionStorage.removeItem('rec-etag');
     }
     setSavingField(false);
     setObjectiveSheetOpen(false);
@@ -235,6 +237,7 @@ export default function ProfilePage() {
       const sectors = Array.from(sectorsSelected);
       await supabase.from('profiles').update({ preferred_sectors: sectors }).eq('id', user.id);
       setProfile(p => p ? { ...p, preferred_sectors: sectors } : p);
+      sessionStorage.removeItem('rec-etag');
     }
     setSavingField(false);
     setSectorsSheetOpen(false);

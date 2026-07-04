@@ -8,13 +8,28 @@ import { fetchRiskReport } from '@/lib/riskScore';
 import { calcQualityScoreFromReport } from '@/lib/qualityScore';
 import { checkRateLimit } from '@/lib/rateLimiter';
 
-const REC_CACHE_SECONDS = 24 * 60 * 60; // 24h
-// 2 calls per hour per user — recommendations are cached 24h on the client,
-// so legitimate use never approaches this limit; only scripts/loops do.
-const RATE_LIMIT_MAX   = 2;
+// 2 calls per hour per user — the Finnhub calls are cached server-side;
+// this prevents burst abuse of the rate limiter.
+const RATE_LIMIT_MAX    = 2;
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
 
-export async function GET() {
+// Stable hash of the inputs that determine the recommendation output.
+// When profile or holdings change the ETag changes → browser re-fetches.
+function makeETag(
+  profile: Record<string, unknown>,
+  holdingsSig: string,
+  horizonYears: number,
+  monthlyAmount: number,
+): string {
+  const raw = JSON.stringify({ profile, holdingsSig, horizonYears, monthlyAmount });
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) {
+    h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0;
+  }
+  return `"rec-${(h >>> 0).toString(16)}"`;
+}
+
+export async function GET(req: Request) {
   const user = await getAuthedUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
@@ -168,8 +183,28 @@ export async function GET() {
       maxPerSector:     2,
     });
 
+    // ETag changes whenever profile or holdings change → browser re-fetches automatically.
+    // no-store for the actual payload so stale data never accumulates;
+    // the Finnhub data is already cached server-side in lib/cache.ts.
+    const holdingsSig = holdings.map(h => `${h.ticker}:${h.units}`).sort().join(',');
+    const etag = makeETag(
+      { risk_profile: userProfile.risk_profile, investment_goal: userProfile.investment_goal,
+        experience_level: userProfile.experience_level, market_reaction: userProfile.market_reaction,
+        preferred_sectors: preferredSectors.slice().sort().join(',') },
+      holdingsSig,
+      horizonYears,
+      monthlyAmount,
+    );
+
+    if (req.headers.get('if-none-match') === etag) {
+      return new Response(null, { status: 304, headers: { ETag: etag } });
+    }
+
     return NextResponse.json(result, {
-      headers: { 'Cache-Control': `private, max-age=${REC_CACHE_SECONDS}` },
+      headers: {
+        'Cache-Control': 'private, no-store',
+        ETag: etag,
+      },
     });
   } catch (err) {
     console.error('[/api/recommendations]', err);
