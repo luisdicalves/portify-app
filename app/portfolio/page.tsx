@@ -7,6 +7,8 @@ import Fab from '@/components/ui/Fab';
 import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
+import { getHoldings } from '@/lib/db/holdings';
+import { getTransactions, deleteTransaction as dbDeleteTransaction } from '@/lib/db/transactions';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
@@ -52,14 +54,10 @@ export default function PortfolioPage() {
     const u = await getUser();
     if (!u) { setLoading(false); return; }
 
-    const { data: holdings } = await getClient()
-      .from('holdings')
-      .select('ticker, units, avg_price')
-      .eq('user_id', u.id);
+    const holdings = await getHoldings(getClient(), u.id);
+    const quotes = await Promise.all(holdings.map(h => fetchQuote(h.ticker)));
 
-    const quotes = await Promise.all((holdings ?? []).map(h => fetchQuote(h.ticker)));
-
-    const mapped: Asset[] = (holdings ?? []).map((h, i) => {
+    const mapped: Asset[] = holdings.map((h, i) => {
       const quote = quotes[i];
       const price = quote?.price ?? h.avg_price;
       const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
@@ -83,11 +81,7 @@ export default function PortfolioPage() {
     const u = await getUser();
     if (!u) return;
 
-    const { data } = await getClient()
-      .from('transactions')
-      .select('id, ticker, type, units, price, amount, executed_at, notes')
-      .eq('user_id', u.id)
-      .order('executed_at', { ascending: false });
+    const { data } = await getTransactions(getClient(), u.id);
 
     const POSITIVE_TYPES = new Set(['dividend', 'deposit', 'interest']);
     const LABEL_BY_TYPE: Record<string, string> = {
@@ -124,7 +118,7 @@ export default function PortfolioPage() {
   }
 
   async function deleteTransaction(id: string) {
-    await getClient().from('transactions').delete().eq('id', id);
+    await dbDeleteTransaction(getClient(), id);
     setTxns(prev => prev.filter(tx => tx.id !== id));
   }
 
@@ -132,10 +126,7 @@ export default function PortfolioPage() {
     const u = await getUser();
     if (!u) return;
     const { data } = await getClient()
-      .from('profiles')
-      .select('uninvested_cash, free_funds_annual_rate_pct')
-      .eq('id', u.id)
-      .single();
+      .from('profiles').select('uninvested_cash, free_funds_annual_rate_pct').eq('id', u.id).single();
     if (data) setCashSettings({ uninvestedCash: data.uninvested_cash ?? 0, freeFundsAnnualRatePct: data.free_funds_annual_rate_pct ?? 0 });
   }
 

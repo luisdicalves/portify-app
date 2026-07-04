@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { createClient } from '@/lib/supabase/client';
+import { getHoldings } from '@/lib/db/holdings';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote } from '@/lib/marketApi';
@@ -26,12 +27,7 @@ export default function NetWorthPage() {
     if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: holdings } = await supabase
-        .from('holdings')
-        .select('ticker, units, avg_price')
-        .eq('user_id', user.id);
-
-      const hs: Holding[] = holdings ?? [];
+      const hs = await getHoldings(supabase, user.id);
       const quotes = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
       const value = hs.reduce((sum, h, i) => sum + h.units * (quotes[i]?.price ?? h.avg_price), 0);
       setTotalValue(value);
