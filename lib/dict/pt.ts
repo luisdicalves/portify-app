@@ -260,6 +260,15 @@ export const pt = {
   netWorthCardLabel: 'Património líquido',
   totalReturn: 'Retorno total',
   todayHighlights: 'Destaques do dia',
+  // Perfil — riskScore
+  riskScoreLabel: 'Pontuação de risco',
+  riskScoreVeryConservative: 'Muito conservador',
+  riskScoreConservative: 'Conservador',
+  riskScoreModerate: 'Moderado',
+  riskScoreAggressive: 'Agressivo',
+  riskScoreVeryAggressive: 'Muito agressivo',
+  riskScoreDesc: 'Calculado com base no teu perfil completo de investidor.',
+  allocationLabel: 'Alocação sugerida',
   // Para Si (for-you)
   forYouTitle: 'Para Si',
   recLoading: 'A gerar recomendações...',

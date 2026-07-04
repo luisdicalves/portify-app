@@ -7,6 +7,8 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
 import { SelectList, SelectOption } from '@/components/ui/SelectList';
+import { calcPlan } from '@/lib/planCalculator';
+import type { UserProfile } from '@/lib/planCalculator';
 
 const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
 const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
@@ -76,6 +78,10 @@ type Profile = {
   user_handle: string | null;
   risk_profile: string | null;
   investment_goal: string | null;
+  experience_level: string | null;
+  market_reaction: string | null;
+  financial_status: string | null;
+  liquidity_need: string | null;
   preferred_sectors: string[] | null;
   investor_since: number | null;
 };
@@ -136,13 +142,29 @@ export default function ProfilePage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const [{ data: p }, { data: pl }] = await Promise.all([
-        supabase.from('profiles').select('first_name, last_name, user_handle, risk_profile, investment_goal, preferred_sectors, investor_since').eq('id', user.id).single(),
+        supabase.from('profiles').select('first_name, last_name, user_handle, risk_profile, investment_goal, experience_level, market_reaction, financial_status, liquidity_need, preferred_sectors, investor_since').eq('id', user.id).single(),
         supabase.from('investment_plans').select('amount, frequency, horizon_years, goal_amount').eq('user_id', user.id).maybeSingle(),
       ]);
       if (p) setProfile(p);
       if (pl) setPlan(pl);
     })();
   }, []);
+
+  // Calcular riskScore e alocação sempre que o perfil ou plano mudar
+  const planResult = (() => {
+    if (!profile?.risk_profile || !profile?.investment_goal) return null;
+    try {
+      return calcPlan({
+        risk_profile:     profile.risk_profile     as UserProfile['risk_profile'],
+        investment_goal:  profile.investment_goal   as UserProfile['investment_goal'],
+        experience_level: (profile.experience_level ?? 'beginner') as UserProfile['experience_level'],
+        market_reaction:  (profile.market_reaction  ?? 'hold')     as UserProfile['market_reaction'],
+        financial_status: (profile.financial_status ?? 'stable')   as UserProfile['financial_status'],
+        liquidity_need:   (profile.liquidity_need   ?? 'unlikely') as UserProfile['liquidity_need'],
+        horizon_years:    plan?.horizon_years ?? 10,
+      });
+    } catch { return null; }
+  })();
 
   const fullName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '...';
   const initials = [profile?.first_name?.[0], profile?.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?';
@@ -289,6 +311,47 @@ export default function ProfilePage() {
             <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--gain)' }}>{goalLabel}</span>
           </div>
         </div>
+
+        {/* Risk score meter */}
+        {planResult && (
+          <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: '16px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--on-surface)' }}>{t.riskScoreLabel}</span>
+              <span style={{ fontSize: 22, fontWeight: 800, color: 'var(--primary)', fontVariantNumeric: 'tabular-nums' }}>{planResult.riskScore}<span style={{ fontSize: 13, fontWeight: 500, color: 'var(--on-surface-variant)' }}>/100</span></span>
+            </div>
+            {/* Gradient bar */}
+            <div style={{ position: 'relative', height: 8, borderRadius: 99, background: 'linear-gradient(to right, #22C55E, #F59E0B, #EF4444)', overflow: 'visible' }}>
+              <div style={{
+                position: 'absolute', top: '50%', transform: 'translate(-50%, -50%)',
+                left: `${planResult.riskScore}%`,
+                width: 16, height: 16, borderRadius: '50%',
+                background: '#fff', border: '3px solid var(--primary)',
+                boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
+              }} />
+            </div>
+            {/* Labels */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--on-surface-variant)', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+              <span>{t.riskScoreVeryConservative}</span>
+              <span>{t.riskScoreVeryAggressive}</span>
+            </div>
+            {/* Alocação sugerida */}
+            <div style={{ borderTop: '1px solid var(--hairline)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.allocationLabel}</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                {[
+                  { label: 'Ações', value: planResult.allocation.stock, color: 'var(--primary)' },
+                  { label: 'ETFs', value: planResult.allocation.etf, color: 'var(--gain)' },
+                  { label: 'Obrig.', value: planResult.allocation.bond_etf, color: '#F59E0B' },
+                ].map(({ label, value, color }) => (
+                  <div key={label} style={{ flex: 1, background: 'var(--surface-low)', borderRadius: 'var(--radius-md)', padding: '8px 6px', textAlign: 'center' }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color }}>{Math.round(value * 100)}%</div>
+                    <div style={{ fontSize: 10, color: 'var(--on-surface-variant)', marginTop: 1 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Investor profile */}
         <div>
