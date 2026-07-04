@@ -209,6 +209,65 @@ export function qualityScoreFromMetrics(metrics: StockMetrics): number {
 // Labels para UI
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────────────────────
+// qualityScore v2 — personalizado por RiskReport + UserProfile
+// ─────────────────────────────────────────────────────────────────────────────
+
+import type { RiskReport } from '@/lib/riskScore';
+import type { UserProfile } from '@/lib/planCalculator';
+
+/**
+ * Calcula um qualityScore personalizado (0–100) a partir do RiskReport completo
+ * e do perfil do utilizador.
+ *
+ * score base = report.score
+ * − 5 por cada risco activo identificado
+ * + 3 por cada catalisador activo
+ * + ajuste por objetivo (wealth_growth → growth, income → health, retirement → valuation)
+ * + ajuste comportamental por market_reaction
+ */
+export function calcQualityScoreFromReport(
+  report: RiskReport,
+  profile: UserProfile,
+): number {
+  let score = report.score;
+
+  // Penalização por riscos activos
+  const activeRisks = report.risks.filter(r => !r.toLowerCase().includes('sem sinais') && !r.toLowerCase().includes('no signs'));
+  score -= activeRisks.length * 5;
+
+  // Bonus por catalisadores activos
+  const activeCatalysts = report.catalysts.filter(c => !c.toLowerCase().includes('sem catalisadores') && !c.toLowerCase().includes('no catalysts'));
+  score += activeCatalysts.length * 3;
+
+  // Ajuste por objetivo de investimento
+  const { pillars } = report;
+  switch (profile.investment_goal) {
+    case 'wealth_growth':
+      score += (pillars.growth.score - 50) * 0.10;
+      break;
+    case 'income':
+    case 'retirement':
+      score += (pillars.health.score - 50) * 0.10;
+      break;
+    case 'legacy':
+    case 'short_purchase':
+      score += (pillars.valuation.score - 50) * 0.10;
+      break;
+  }
+
+  // Ajuste comportamental por market_reaction
+  const reactionAdjust: Partial<Record<UserProfile['market_reaction'], number>> = {
+    sell_all:  -8,
+    sell_some: -3,
+    hold:       0,
+    buy_more:   3,
+  };
+  score += reactionAdjust[profile.market_reaction] ?? 0;
+
+  return Math.round(Math.min(100, Math.max(0, score)));
+}
+
 export function qualityLabel(score: number): { label: string; color: string } {
   if (score >= 75) return { label: 'Excelente',  color: 'var(--gain)'             };
   if (score >= 55) return { label: 'Bom',        color: 'var(--gain)'             };

@@ -4,6 +4,8 @@ import { getAuthedUser } from '@/lib/apiAuth';
 import { getUniverse, filterUniverseForUser, type AssetClass } from '@/lib/assetUniverse';
 import { recommend } from '@/lib/recommendationEngine';
 import type { UserProfile } from '@/lib/planCalculator';
+import { fetchRiskReport } from '@/lib/riskScore';
+import { calcQualityScoreFromReport } from '@/lib/qualityScore';
 
 const REC_CACHE_SECONDS = 24 * 60 * 60; // 24h
 
@@ -99,8 +101,21 @@ export async function GET() {
       riskProfile:           userProfile.risk_profile,
     });
 
+    // ── qualityScore personalizado para stocks (RiskReport cached 24h) ────────
+    const enriched = await Promise.all(
+      filtered.map(async asset => {
+        if (asset.assetClass !== 'stock') return asset;
+        const report = await fetchRiskReport(asset.ticker, 'pt');
+        if (!report) return asset;
+        return {
+          ...asset,
+          qualityScore: calcQualityScoreFromReport(report, userProfile),
+        };
+      })
+    );
+
     const result = recommend({
-      universe:         filtered,
+      universe:         enriched,
       profile:          userProfile,
       preferredSectors,
       monthlyAmount,
