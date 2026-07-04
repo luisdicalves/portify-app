@@ -5,18 +5,7 @@ import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
-
-const SECTORS = [
-  { id: 'tech',       label: 'Tecnologia',   icon: 'computer' },
-  { id: 'health',     label: 'Saúde',        icon: 'health_and_safety' },
-  { id: 'finance',    label: 'Finanças',     icon: 'account_balance' },
-  { id: 'energy',     label: 'Energia',      icon: 'bolt' },
-  { id: 'consumer',   label: 'Consumo',      icon: 'shopping_bag' },
-  { id: 'industry',   label: 'Indústria',    icon: 'factory' },
-  { id: 'realestate', label: 'Imobiliário',  icon: 'apartment' },
-  { id: 'materials',  label: 'Materiais',    icon: 'diamond' },
-  { id: 'comms',      label: 'Comunicações', icon: 'cell_tower' },
-];
+import { SECTOR_OPTIONS as SECTORS } from '@/lib/profileOptions';
 
 export default function SectorsPage() {
   const router = useRouter();
