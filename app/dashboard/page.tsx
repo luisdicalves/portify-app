@@ -9,6 +9,7 @@ import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath 
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
+import { type Holding } from '@/lib/portfolioMetrics';
 import { useUser } from '@/lib/hooks/useUser';
 
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
@@ -16,7 +17,6 @@ const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximumFractionDigits: 1 });
 
-type Holding = { ticker: string; units: number; avg_price: number };
 type UpcomingDividend = { ticker: string; expectedDate: string; netAmount: number; confidence: 'high' | 'low' };
 
 export default function DashboardPage() {
@@ -41,9 +41,9 @@ export default function DashboardPage() {
       const [{ data: profile }, { data: holdingsData }, { data: plan }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
         supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
-        supabase.from('investment_plans').select('monthly_amount').eq('user_id', user.id).maybeSingle(),
+        supabase.from('investment_plans').select('amount').eq('user_id', user.id).maybeSingle(),
       ]);
-      if (plan) setMonthlyPlan((plan as { monthly_amount?: number }).monthly_amount ?? null);
+      if (plan) setMonthlyPlan(plan.amount ?? null);
       if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
 
       const hs = holdingsData ?? [];

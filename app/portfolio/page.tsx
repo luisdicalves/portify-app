@@ -97,12 +97,14 @@ export default function PortfolioPage() {
     const mapped: Transaction[] = (data ?? []).map(row => {
       const gain = row.type === 'buy' ? false : POSITIVE_TYPES.has(row.type) || row.amount >= 0;
       const hasTicker = row.ticker != null && row.ticker !== '';
+      const ticker = row.ticker ?? '';
+      const executedAt = row.executed_at ?? new Date().toISOString();
       return {
         id: row.id,
-        sym: hasTicker ? row.ticker : LABEL_BY_TYPE[row.type] ?? row.type,
-        avatar: hasTicker ? row.ticker.charAt(0) : '',
+        sym: hasTicker ? ticker : LABEL_BY_TYPE[row.type] ?? row.type,
+        avatar: hasTicker ? ticker.charAt(0) : '',
         type: row.type as Transaction['type'],
-        dateText: new Date(row.executed_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        dateText: new Date(executedAt).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
         total: `${gain ? '+' : '-'}${eur.format(Math.abs(row.amount))} €`,
         totalColor: gain ? 'var(--gain)' : 'var(--on-surface)',
         units: row.units != null ? String(row.units) : undefined,
@@ -113,8 +115,8 @@ export default function PortfolioPage() {
     setTxns(mapped);
 
     const divs = (data ?? [])
-      .filter(row => row.type === 'dividend')
-      .map(row => ({ ticker: row.ticker, letter: row.ticker.charAt(0), amount: row.amount, executed_at: row.executed_at }));
+      .filter(row => row.type === 'dividend' && row.ticker != null)
+      .map(row => ({ ticker: row.ticker!, letter: row.ticker!.charAt(0), amount: row.amount, executed_at: row.executed_at ?? new Date().toISOString() }));
     setDividends(divs);
   }
 

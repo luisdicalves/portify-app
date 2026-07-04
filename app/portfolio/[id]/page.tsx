@@ -118,6 +118,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   }
 
   async function confirmTrade() {
+    if (!sheet) return;
     const unitsNum = parseFloat(shares.replace(',', '.'));
     const priceNum = parseFloat(avgPrice.replace(',', '.'));
     if (!unitsNum || unitsNum <= 0 || !priceNum || priceNum <= 0) { setError(t.bsError); return; }

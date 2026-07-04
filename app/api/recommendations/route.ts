@@ -49,10 +49,7 @@ export async function GET(req: Request) {
   // ── Perfil ────────────────────────────────────────────────────────────────
   const { data: profileRaw, error: profileErr } = await supabase
     .from('profiles')
-    .select(
-      'risk_profile, investment_goal, experience_level, market_reaction, ' +
-      'financial_status, liquidity_need, preferred_assets, preferred_sectors, risk_score'
-    )
+    .select('risk_profile, investment_goal, experience_level, market_reaction, financial_status, liquidity_need, preferred_sectors, risk_score')
     .eq('id', user.id)
     .single();
 
@@ -60,34 +57,22 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'profile_not_found' }, { status: 404 });
   }
 
-  const profile = (profileRaw as unknown) as {
-    risk_profile:     string | null;
-    investment_goal:  string | null;
-    experience_level: string | null;
-    market_reaction:  string | null;
-    financial_status: string | null;
-    liquidity_need:   string | null;
-    preferred_assets:  unknown;
-    preferred_sectors: unknown;
-    risk_score:        number | null;
-  };
-
-  if (!profile.risk_profile || !profile.investment_goal) {
+  if (!profileRaw.risk_profile || !profileRaw.investment_goal) {
     return NextResponse.json({ error: 'incomplete_profile' }, { status: 422 });
   }
 
   // ── Plano de investimento ─────────────────────────────────────────────────
   const { data: plan } = await supabase
     .from('investment_plans')
-    .select('horizon_years, monthly_amount, goal_amount')
+    .select('horizon_years, amount, goal_amount')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  const horizonYears:   number = (plan as { horizon_years?: number } | null)?.horizon_years   ?? 10;
-  const monthlyAmount:  number = (plan as { monthly_amount?: number } | null)?.monthly_amount  ?? 250;
-  const goalAmount:     number | undefined = (plan as { goal_amount?: number } | null)?.goal_amount ?? undefined;
+  const horizonYears:  number           = plan?.horizon_years ?? 10;
+  const monthlyAmount: number           = plan?.amount        ?? 250;
+  const goalAmount:    number | undefined = plan?.goal_amount ?? undefined;
 
   // ── Holdings ──────────────────────────────────────────────────────────────
   const { data: holdingsRaw } = await supabase
@@ -95,31 +80,23 @@ export async function GET(req: Request) {
     .select('ticker, units, avg_price')
     .eq('user_id', user.id);
 
-  const holdings = ((holdingsRaw ?? []) as { ticker: string; units: number; avg_price: number }[])
+  const holdings = (holdingsRaw ?? [])
     .map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
 
   // ── UserProfile ───────────────────────────────────────────────────────────
   const userProfile = {
-    risk_profile:     (profile.risk_profile  ?? 'moderate')      as UserProfile['risk_profile'],
-    investment_goal:  (profile.investment_goal ?? 'wealth_growth') as UserProfile['investment_goal'],
-    experience_level: (profile.experience_level ?? 'beginner')    as UserProfile['experience_level'],
-    market_reaction:  (profile.market_reaction  ?? 'hold')        as UserProfile['market_reaction'],
-    financial_status: (profile.financial_status ?? 'stable')      as UserProfile['financial_status'],
-    liquidity_need:   (profile.liquidity_need   ?? 'unlikely')    as UserProfile['liquidity_need'],
+    risk_profile:     (profileRaw.risk_profile  ?? 'moderate')      as UserProfile['risk_profile'],
+    investment_goal:  (profileRaw.investment_goal ?? 'wealth_growth') as UserProfile['investment_goal'],
+    experience_level: (profileRaw.experience_level ?? 'beginner')    as UserProfile['experience_level'],
+    market_reaction:  (profileRaw.market_reaction  ?? 'hold')        as UserProfile['market_reaction'],
+    financial_status: (profileRaw.financial_status ?? 'stable')      as UserProfile['financial_status'],
+    liquidity_need:   (profileRaw.liquidity_need   ?? 'unlikely')    as UserProfile['liquidity_need'],
     horizon_years:    horizonYears,
   } satisfies UserProfile;
 
-  // ── Asset classes preferidas ──────────────────────────────────────────────
-  const rawAssets: string[] = Array.isArray(profile.preferred_assets)
-    ? (profile.preferred_assets as string[])
-    : ['stock', 'etf', 'bond_etf'];
+  const assetClasses: AssetClass[] = ['stock', 'etf', 'bond_etf'];
 
-  const assetClasses: AssetClass[] = rawAssets
-    .filter((a): a is AssetClass => ['stock', 'etf', 'bond_etf'].includes(a));
-
-  const preferredSectors: string[] = Array.isArray(profile.preferred_sectors)
-    ? (profile.preferred_sectors as string[])
-    : [];
+  const preferredSectors: string[] = profileRaw.preferred_sectors ?? [];
 
   try {
     const universe = await getUniverse();

@@ -115,8 +115,11 @@ export default function SettingsPage() {
     if (Number.isNaN(value) || value < 0) return;
     setSavingCash(true);
     const supabase = createClient();
-    const column = cashSheetField === 'cash' ? 'uninvested_cash' : 'free_funds_annual_rate_pct';
-    await supabase.from('profiles').update({ [column]: value }).eq('id', user.id);
+    if (cashSheetField === 'cash') {
+      await supabase.from('profiles').update({ uninvested_cash: value }).eq('id', user.id);
+    } else {
+      await supabase.from('profiles').update({ free_funds_annual_rate_pct: value }).eq('id', user.id);
+    }
     if (cashSheetField === 'cash') setUninvestedCash(value); else setFreeFundsRate(value);
     setSavingCash(false);
     setCashSheetField(null);

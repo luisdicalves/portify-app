@@ -21,8 +21,10 @@ export async function GET() {
       .eq('type', 'dividend'),
   ]);
 
-  const holdings = (holdingsRaw ?? []) as { ticker: string; units: number }[];
-  const history  = (txRaw ?? []) as { ticker: string; amount: number; executed_at: string }[];
+  const holdings = (holdingsRaw ?? []).map(h => ({ ticker: h.ticker, units: h.units }));
+  const history = (txRaw ?? [])
+    .filter((t): t is typeof t & { ticker: string; executed_at: string } => t.ticker != null && t.executed_at != null)
+    .map(t => ({ ticker: t.ticker, amount: t.amount, executed_at: t.executed_at }));
 
   const forecast = buildCashFlowForecast(holdings, history, 0, 0, { horizonMonths: 3 });
 

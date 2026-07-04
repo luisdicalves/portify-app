@@ -91,7 +91,7 @@ type Plan = {
   amount: number;
   frequency: string;
   horizon_years: number;
-  goal_amount: number;
+  goal_amount: number | null;
 };
 
 function SectionLabel({ label }: { label: string }) {
@@ -239,7 +239,7 @@ export default function ProfilePage() {
   }
 
   function openPlanSheet() {
-    setPlanGoal(plan ? String(plan.goal_amount) : '100000');
+    setPlanGoal(plan?.goal_amount != null ? String(plan.goal_amount) : '100000');
     setPlanAmt(plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : 1);
     setPlanPeriod(plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : 1);
     setPlanHorizon(plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2);
