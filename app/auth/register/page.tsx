@@ -188,7 +188,7 @@ export default function RegisterPage() {
           </div>
 
           {/* Terms */}
-          <div onClick={() => setTerms(v => !v)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginTop: 2 }}>
+          <div data-testid="terms-checkbox" onClick={() => setTerms(v => !v)} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer', marginTop: 2 }}>
             <span style={{
               width: 22, height: 22, flex: 'none', borderRadius: 6, marginTop: 1,
               background: terms ? 'var(--primary-strong)' : 'transparent',

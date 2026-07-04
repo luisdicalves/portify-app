@@ -84,7 +84,11 @@ export async function mockSupabase(page: Page) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
   );
 
-  // ── RPC (set_pin, verify_pin) ─────────────────────────────────────────────
+  // ── RPC (is_username_available, set_pin, verify_pin) ─────────────────────
+
+  await page.route(`${supabaseUrl}/rest/v1/rpc/is_username_available`, route =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: 'true' }),
+  );
 
   await page.route(`${supabaseUrl}/rest/v1/rpc/set_pin`, route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: 'null' }),

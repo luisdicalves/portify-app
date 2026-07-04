@@ -27,10 +27,15 @@ test.describe('Onboarding flow', () => {
 
     await page.getByPlaceholder('Ricardo').fill('Teste');
     await page.getByPlaceholder('Ferreira').fill('E2E');
+    // DOB: fill raw digits; DatePicker's handleTextChange strips non-digits
+    await page.getByPlaceholder('DD / MM / AAAA').fill('01011990');
     await page.getByPlaceholder('o_teu_username').fill('teste_e2e');
     await page.getByPlaceholder('nome@exemplo.com').fill('e2e@test.portify.app');
     await page.getByPlaceholder('••••••••').fill('Teste1234!');
-    await page.locator('text=Aceito os').click();
+    // Wait for username debounce (400 ms) + RPC round-trip to clear checkingUsername
+    await page.waitForTimeout(600);
+    // Click the terms div — use the checkbox icon as an anchor to avoid ambiguous text matches
+    await page.locator('[data-testid="terms-checkbox"]').click();
     await page.getByRole('button', { name: 'Criar conta' }).click();
 
     await expect(page).toHaveURL('/auth/pin-set');

@@ -18,7 +18,7 @@ test.describe('Login + PIN flow', () => {
 
     await page.getByPlaceholder('nome@exemplo.com').fill('e2e@test.portify.app');
     await page.getByPlaceholder('••••••••').fill('Teste1234!');
-    await page.getByRole('button', { name: 'Entrar' }).click();
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
 
     await expect(page).toHaveURL('/auth/pin');
 
