@@ -14,7 +14,8 @@
       "Bash(unzip -q gh.zip)",
       "Read(//Users/alves/**)",
       "Bash(echo 'export PATH=\"$HOME/bin:$PATH\"')",
-      "Bash(~/bin/gh auth *)"
+      "Bash(~/bin/gh auth *)",
+      "Bash(npx tsc *)"
     ]
   }
 }
