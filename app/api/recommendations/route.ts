@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthedUser } from '@/lib/apiAuth';
 import { getUniverse, filterUniverseForUser, type AssetClass } from '@/lib/assetUniverse';
+import { getHoldings } from '@/lib/db/holdings';
 import { recommend } from '@/lib/recommendationEngine';
 import type { UserProfile } from '@/lib/planCalculator';
 import { fetchRiskReport } from '@/lib/riskScore';
@@ -87,13 +88,8 @@ export async function GET(req: Request) {
   const goalAmount:    number | undefined = plan?.goal_amount ?? undefined;
 
   // ── Holdings ──────────────────────────────────────────────────────────────
-  const { data: holdingsRaw } = await supabase
-    .from('holdings')
-    .select('ticker, units, avg_price')
-    .eq('user_id', user.id);
-
-  const holdings = (holdingsRaw ?? [])
-    .map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
+  const holdingsRaw = await getHoldings(supabase, user.id);
+  const holdings = holdingsRaw.map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
 
   // ── UserProfile ───────────────────────────────────────────────────────────
   const userProfile: UserProfile = {

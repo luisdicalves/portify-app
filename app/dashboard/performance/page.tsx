@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
+import { getHoldings } from '@/lib/db/holdings';
 import {
   calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath,
   calcWeightedAvgDaysHeld, calcAnnualizedReturn, type Holding,
@@ -33,12 +34,10 @@ export default function PerformancePage() {
     (async () => {
       const supabase = createClient();
 
-      const [{ data: holdingsData }, { data: buys }] = await Promise.all([
-        supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
+      const [hs, { data: buys }] = await Promise.all([
+        getHoldings(supabase, user.id),
         supabase.from('transactions').select('amount, executed_at').eq('user_id', user.id).eq('type', 'buy'),
       ]);
-
-      const hs = holdingsData ?? [];
       setHoldings(hs);
 
       const validBuys = (buys ?? []).filter((b): b is typeof b & { executed_at: string } => b.executed_at != null);

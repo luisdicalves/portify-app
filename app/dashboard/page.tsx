@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
+import { getHoldings } from '@/lib/db/holdings';
+import { getPlan } from '@/lib/db/plans';
 import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
@@ -38,17 +40,14 @@ export default function DashboardPage() {
     (async () => {
       const supabase = createClient();
 
-      const [{ data: profile }, { data: holdingsData }, { data: plan }] = await Promise.all([
+      const [{ data: profile }, hs, { data: plan }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
-        supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
-        supabase.from('investment_plans').select('amount').eq('user_id', user.id).maybeSingle(),
+        getHoldings(supabase, user.id),
+        getPlan(supabase, user.id),
       ]);
       if (plan) setMonthlyPlan(plan.amount ?? null);
       if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
-
-      const hs = holdingsData ?? [];
       setHoldings(hs);
-
       const [quoteResults, divRes] = await Promise.all([
         Promise.all(hs.map(h => fetchQuote(h.ticker))),
         fetch('/api/dividends').then(r => r.ok ? r.json() : { dividends: [] }).catch(() => ({ dividends: [] })),
