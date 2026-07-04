@@ -12,11 +12,19 @@ create table if not exists public.profiles (
   avatar_url text,
   date_of_birth date,
   preferred_sectors text[],
+  preferred_assets  text[],
   pin_hash text,
   investor_since int default extract(year from now())::int,
-  risk_profile text default 'moderate' check (risk_profile in ('conservative','moderate','aggressive')),
+  risk_profile text default 'moderate'
+    check (risk_profile in ('very_conservative','conservative','moderate','aggressive','very_aggressive')),
   investment_goal text default 'retirement',
-  experience_level text default 'beginner' check (experience_level in ('beginner','intermediate','advanced')),
+  experience_level text default 'beginner'
+    check (experience_level in ('none','beginner','intermediate','experienced','professional')),
+  market_reaction  text check (market_reaction  in ('sell_all','sell_some','hold','buy_more')),
+  financial_status text check (financial_status in ('unstable','stable','comfortable','wealthy')),
+  liquidity_need   text check (liquidity_need   in ('critical','possible','unlikely','never')),
+  risk_score       numeric,
+  monthly_amount   numeric,
   created_at timestamptz default now()
 );
 
@@ -27,7 +35,9 @@ create policy "Users can view their own profile"
   on public.profiles for select using (auth.uid() = id);
 
 create policy "Users can update their own profile"
-  on public.profiles for update using (auth.uid() = id);
+  on public.profiles for update
+  using     (auth.uid() = id)
+  with check (auth.uid() = id);
 
 -- Auto-create profile on sign up
 create or replace function public.handle_new_user()
@@ -129,14 +139,16 @@ create table if not exists public.holdings (
 alter table public.holdings enable row level security;
 
 create policy "Users manage their own holdings"
-  on public.holdings for all using (auth.uid() = user_id);
+  on public.holdings for all
+  using     (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- Transactions
 create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade not null,
   ticker text not null,
-  type text not null check (type in ('buy','sell','dividend')),
+  type text not null check (type in ('buy','sell','dividend','deposit','interest','wht','interest_tax')),
   units numeric,
   price numeric,
   amount numeric not null,
@@ -154,13 +166,15 @@ create unique index if not exists transactions_user_external_id_idx on public.tr
 alter table public.transactions enable row level security;
 
 create policy "Users manage their own transactions"
-  on public.transactions for all using (auth.uid() = user_id);
+  on public.transactions for all
+  using     (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 
 -- Investment plan
 create table if not exists public.investment_plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade not null unique,
-  amount numeric not null,
+  monthly_amount numeric not null,
   frequency text not null check (frequency in ('weekly','monthly','quarterly','annual')),
   horizon_years int not null,
   goal_amount numeric,
@@ -171,4 +185,6 @@ create table if not exists public.investment_plans (
 alter table public.investment_plans enable row level security;
 
 create policy "Users manage their own plan"
-  on public.investment_plans for all using (auth.uid() = user_id);
+  on public.investment_plans for all
+  using     (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
