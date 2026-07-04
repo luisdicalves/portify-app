@@ -254,4 +254,17 @@ export const en: typeof pt = {
   netWorthCardLabel: 'Net worth',
   totalReturn: 'Total return',
   todayHighlights: "Today's highlights",
+  // For You
+  forYouTitle: 'For You',
+  recLoading: 'Generating recommendations...',
+  recEmpty: 'No recommendations available at the moment.',
+  recCompleteProfile: 'Complete your investor profile to receive personalised recommendations.',
+  recNew: 'New buy',
+  recReinforce: 'Add more',
+  recPerMonth: '/mo',
+  recScore: 'Score',
+  recPaceAlert: 'Your current pace may not be enough to reach your goal. Consider increasing your monthly plan.',
+  recMonthlyPlan: 'Monthly plan',
+  recSectionTitle: 'Recommended for you',
+  recSectionSub: 'Based on your profile and current portfolio',
 };

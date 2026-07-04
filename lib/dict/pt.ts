@@ -260,4 +260,17 @@ export const pt = {
   netWorthCardLabel: 'Património líquido',
   totalReturn: 'Retorno total',
   todayHighlights: 'Destaques do dia',
+  // Para Si (for-you)
+  forYouTitle: 'Para Si',
+  recLoading: 'A gerar recomendações...',
+  recEmpty: 'Sem recomendações disponíveis de momento.',
+  recCompleteProfile: 'Completa o teu perfil de investidor para receberes recomendações personalizadas.',
+  recNew: 'Nova compra',
+  recReinforce: 'Reforço',
+  recPerMonth: '/mês',
+  recScore: 'Score',
+  recPaceAlert: 'O ritmo atual pode não ser suficiente para atingir o teu objetivo. Considera aumentar o plano mensal.',
+  recMonthlyPlan: 'Plano mensal',
+  recSectionTitle: 'Recomendado para ti',
+  recSectionSub: 'Com base no teu perfil e carteira atual',
 };

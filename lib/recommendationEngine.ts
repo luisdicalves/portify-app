@@ -1,309 +1,380 @@
 /**
- * lib/recommendationEngine.ts
+ * lib/recommendationEngine.ts — modelo v2.0
  *
- * Motor de recomendações do Portify — Step 6.
- *
- * Recebe o universo filtrado (Camada 1, já aplicada em assetUniverse.ts)
- * e o perfil do utilizador, e produz uma lista ordenada de recomendações
- * com score composto, razão e alocação-alvo.
- *
- * Pipeline (Camadas 2 e 3):
- *   Camada 2 — Scoring composto por ativo
- *     qualityScore    40%  — fundamentais (qualityScore.ts)
- *     sectorMatch     30%  — alinhamento com setores preferidos
- *     riskFit         20%  — beta vs. tolerância ao risco do utilizador
- *     yieldFit        10%  — dividendos vs. objetivo de rendimento
- *
- *   Camada 3 — Seleção e alocação
- *     - Agrupa por classe (stock / etf / bond_etf)
- *     - Aplica os pesos de alocação do calcPlan (ex: 60% stocks, 30% ETFs)
- *     - Garante diversificação setorial (máx. 2 stocks por setor)
- *     - Devolve top N ativos por classe com targetAllocation calculado
- *
- * Exporta:
- *   Recommendation       — tipo de saída por ativo recomendado
- *   RecommendationResult — resultado completo do motor
- *   recommend(opts)      — função principal
+ * Pipeline:
+ *   Camada 2A — matchScore   (assetClassWeight 30% + sectorMatch 25% + goalCompatibility 25% + horizonCompatibility 20%)
+ *   Camada 2B — qualityScore (do CandidateAsset, calculado em qualityScore.ts)
+ *   Camada 2C — finalScore   = matchScore × 0.6 + qualityScore × 0.4
+ *   Camada 3  — top 3 por classe, distribuição em euros, new vs reinforce
  */
 
 import type { CandidateAsset, AssetClass } from '@/lib/assetUniverse';
 import { sectorMatchScore }                from '@/lib/sectorMap';
-import { calcPlan, type UserProfile }       from '@/lib/planCalculator';
+import { calcRiskScore, calcPlan, type UserProfile } from '@/lib/planCalculator';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tipos
+// Tipos públicos
 // ─────────────────────────────────────────────────────────────────────────────
+
+export type RecommendationType = 'new' | 'reinforce';
 
 export interface Recommendation {
-  asset:            CandidateAsset;
-  score:            number;           // 0–100 score composto final
-  scoreBreakdown: {
-    quality:    number;               // 0–100
-    sector:     number;               // 0 | 35 | 100
-    riskFit:    number;               // 0–100
-    yieldFit:   number;               // 0–100
-  };
-  targetAllocation: number;           // % do portfólio (0–1)
-  reasons:          string[];         // frases curtas para a UI
+  asset:           CandidateAsset;
+  matchScore:      number;             // 0–100
+  qualityScore:    number;             // 0–100
+  finalScore:      number;             // 0–100
+  suggestedAmount: number;             // €/mês, múltiplo de 5
+  allocationPct:   number;             // % do plano mensal (0–1)
+  type:            RecommendationType;
+  currentWeight:   number;             // peso atual na carteira (0 se não tem)
+  targetWeight:    number;             // peso ideal segundo o modelo
+  reason:          string;             // frase gerada automaticamente
+  alreadyOwned:    boolean;
 }
 
 export interface RecommendationResult {
   recommendations: Recommendation[];
-  allocationPlan: {
-    stock:    number;                 // 0–1 do calcPlan
-    etf:      number;
-    bond_etf: number;
-  };
-  riskScore: number;                  // score do utilizador (calcPlan)
+  allocationPlan: { stock: number; etf: number; bond_etf: number };
+  riskScore:       number;
+  monthlyAmount:   number;
+  paceAlert:       boolean;  // true se ritmo insuficiente para atingir goal_amount
+}
+
+export interface HoldingSnapshot {
+  ticker:    string;
+  units:     number;
+  avgPrice:  number;
 }
 
 export interface RecommendOptions {
-  universe:          CandidateAsset[];
-  profile:           UserProfile;
-  preferredSectors:  string[];        // ids de setor preferidos (onboarding)
-  maxResults?:       number;          // default 20
-  maxPerSector?:     number;          // max stocks por setor, default 2
+  universe:         CandidateAsset[];
+  profile:          UserProfile;
+  preferredSectors: string[];
+  monthlyAmount:    number;         // plano mensal em €
+  goalAmount?:      number;         // objetivo total em €
+  holdings?:        HoldingSnapshot[];
+  maxPerClass?:     number;         // default 3
+  maxPerSector?:    number;         // default 2 (só para stocks)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pesos do score composto
+// Camada 2A — matchScore
 // ─────────────────────────────────────────────────────────────────────────────
 
-const W = {
-  quality:  0.40,
-  sector:   0.30,
-  riskFit:  0.20,
-  yieldFit: 0.10,
-} as const;
+function scoreAssetClass(
+  asset: CandidateAsset,
+  alloc: { stock: number; etf: number; bond_etf: number },
+): number {
+  const weight   = alloc[asset.assetClass] ?? 0;
+  const maxWeight = Math.max(alloc.stock, alloc.etf, alloc.bond_etf);
+  if (maxWeight === 0) return 50;
+  return Math.round(100 * weight / maxWeight);
+}
+
+function scoreGoalCompatibility(
+  asset: CandidateAsset,
+  goal: UserProfile['investment_goal'],
+): number {
+  let score = 50;
+
+  switch (goal) {
+    case 'income':
+      if (asset.dividendYield > 2) score += 20;
+      break;
+    case 'short_purchase':
+      if (asset.beta < 0.5) score += 20;
+      break;
+    case 'wealth_growth':
+      if (asset.assetClass === 'stock') score += 10;
+      break;
+    case 'retirement':
+      if (asset.assetClass === 'etf') score += 15;
+      break;
+    case 'legacy':
+      if (asset.beta < 1 && asset.dividendYield > 1) score += 15;
+      break;
+    case 'emergency_fund':
+      if (asset.assetClass === 'bond_etf') score += 25;
+      break;
+  }
+
+  // qualityScore alto → bonus extra por objetivo
+  if (asset.qualityScore >= 70) {
+    if (goal === 'income' || goal === 'legacy') score += 10;
+  }
+
+  return Math.min(100, score);
+}
+
+function scoreHorizonCompatibility(
+  asset: CandidateAsset,
+  horizonYears: number,
+): number {
+  const { beta } = asset;
+  if (horizonYears >= 10) {
+    return beta > 1.0 ? 100 : 70;
+  }
+  if (horizonYears < 5) {
+    return beta > 1.2 ? 20 : 80;
+  }
+  return 60;
+}
+
+function calcMatchScore(
+  asset: CandidateAsset,
+  profile: UserProfile,
+  preferredSectors: string[],
+  alloc: { stock: number; etf: number; bond_etf: number },
+): number {
+  const assetClassW    = scoreAssetClass(asset, alloc);
+  const sectorW        = sectorMatchScore(asset.sector, preferredSectors);
+  const goalW          = scoreGoalCompatibility(asset, profile.investment_goal);
+  const horizonW       = scoreHorizonCompatibility(asset, profile.horizon_years);
+
+  return Math.round(
+    assetClassW * 0.30 +
+    sectorW     * 0.25 +
+    goalW       * 0.25 +
+    horizonW    * 0.20,
+  );
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Camada 2 — Scoring por ativo
+// Geração automática de reason
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Beta ideal por perfil de risco
-const IDEAL_BETA: Record<UserProfile['risk_profile'], number> = {
-  very_conservative: 0.4,
-  conservative:      0.7,
-  moderate:          1.0,
-  aggressive:        1.3,
-  very_aggressive:   1.6,
+const SECTOR_LABELS: Record<string, string> = {
+  tech:       'Tecnologia',
+  health:     'Saúde',
+  finance:    'Finanças',
+  energy:     'Energia',
+  consumer:   'Consumo',
+  industry:   'Indústria',
+  realestate: 'Imobiliário',
+  materials:  'Materiais',
+  comms:      'Comunicações',
+  other:      'Diversificado',
 };
 
-function scoreRiskFit(asset: CandidateAsset, profile: UserProfile): number {
-  const ideal = IDEAL_BETA[profile.risk_profile];
-  const diff  = Math.abs(asset.beta - ideal);
-  // Penalidade linear: diff=0 → 100, diff≥1.5 → 0
-  return Math.max(0, Math.round(100 - (diff / 1.5) * 100));
-}
+const GOAL_LABELS: Record<string, string> = {
+  emergency_fund: 'liquidez',
+  short_purchase: 'horizonte curto',
+  income:         'rendimento passivo',
+  wealth_growth:  'crescimento de capital',
+  retirement:     'reforma',
+  legacy:         'preservação de capital',
+};
 
-function scoreYieldFit(asset: CandidateAsset, profile: UserProfile): number {
-  const isIncomeGoal = profile.investment_goal === 'income';
-  const yield_ = asset.dividendYield;
+function buildReason(
+  asset: CandidateAsset,
+  finalScore: number,
+  profile: UserProfile,
+  type: RecommendationType,
+  isSubweighted: boolean,
+): string {
+  const sector   = SECTOR_LABELS[asset.sector] ?? 'Diversificado';
+  const goal     = GOAL_LABELS[profile.investment_goal] ?? '';
+  const scorePart = `${finalScore}/100`;
 
-  if (isIncomeGoal) {
-    // Objetivo rendimento: prefere dividendos altos (> 3% excelente, 0% mau)
-    if (yield_ >= 4)   return 100;
-    if (yield_ >= 3)   return 80;
-    if (yield_ >= 1.5) return 55;
-    if (yield_ >= 0.5) return 30;
-    return 10;
+  let extra = '';
+  if (isSubweighted) {
+    extra = 'Subpesado — aumentar para peso ideal';
+  } else if (type === 'reinforce') {
+    extra = asset.beta >= 1.1 ? 'Ideal para plano automático' : 'Reforço DCA';
+  } else if (profile.investment_goal === 'income' && asset.dividendYield >= 2) {
+    extra = `Dividendo ${asset.dividendYield.toFixed(1)}%/ano`;
+  } else if (asset.assetClass === 'etf' || asset.assetClass === 'bond_etf') {
+    extra = 'Diversificação automática';
   } else {
-    // Outros objetivos: dividendo alto não é prioritário, mas não é mau
-    // Score neutro por defeito; penaliza ligeiramente ativos sem dividendo
-    // para separar empatados (não é um critério decisivo)
-    if (yield_ >= 2)   return 70;
-    if (yield_ >= 0.5) return 55;
-    return 45;
+    extra = asset.qualityScore >= 70 ? 'Fundamentais sólidos' : 'Perfil compatível';
   }
-}
 
-function scoreAsset(
-  asset: CandidateAsset,
-  profile: UserProfile,
-  preferredSectors: string[],
-): Recommendation['scoreBreakdown'] & { total: number } {
-  const quality  = asset.qualityScore;
-  const sector   = sectorMatchScore(asset.sector, preferredSectors);
-  const riskFit  = scoreRiskFit(asset, profile);
-  const yieldFit = scoreYieldFit(asset, profile);
-
-  const total = Math.round(
-    quality  * W.quality  +
-    sector   * W.sector   +
-    riskFit  * W.riskFit  +
-    yieldFit * W.yieldFit,
-  );
-
-  return { quality, sector, riskFit, yieldFit, total };
+  return [sector, goal, extra, scorePart].filter(Boolean).join(' · ');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Geração de razões (frases curtas para a UI)
+// Camada 3 — distribuição em euros + new vs reinforce
 // ─────────────────────────────────────────────────────────────────────────────
 
-function buildReasons(
-  asset: CandidateAsset,
-  breakdown: Recommendation['scoreBreakdown'],
-  profile: UserProfile,
-  preferredSectors: string[],
-): string[] {
-  const reasons: string[] = [];
-
-  if (breakdown.quality >= 70)
-    reasons.push('Fundamentais sólidos');
-  else if (breakdown.quality < 40)
-    reasons.push('Fundamentais fracos — risco elevado');
-
-  if (breakdown.sector === 100)
-    reasons.push('Setor preferido');
-
-  if (breakdown.riskFit >= 75)
-    reasons.push('Beta alinhado com o teu perfil de risco');
-  else if (breakdown.riskFit < 40)
-    reasons.push(asset.beta > 1.2 ? 'Ativo volátil para o teu perfil' : 'Beta baixo para o teu perfil');
-
-  if (profile.investment_goal === 'income' && asset.dividendYield >= 3)
-    reasons.push(`Dividendo ${asset.dividendYield.toFixed(1)}% ao ano`);
-
-  if (asset.assetClass === 'etf' || asset.assetClass === 'bond_etf')
-    reasons.push('Diversificação automática');
-
-  if (asset.assetClass === 'bond_etf' && profile.risk_profile === 'very_conservative')
-    reasons.push('Adequado para perfil muito conservador');
-
-  return reasons.slice(0, 3); // máx. 3 razões por ativo
+function roundTo5(v: number): number {
+  return Math.max(5, Math.round(v / 5) * 5);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Camada 3 — Seleção, diversificação e alocação
-// ─────────────────────────────────────────────────────────────────────────────
+function distributeAmounts(
+  items: { finalScore: number }[],
+  totalEuros: number,
+  minPerItem = 10,
+): number[] {
+  let n = items.length;
+  // Reduzir N se montante por ativo < mínimo
+  while (n > 1 && totalEuros / n < minPerItem) n--;
 
-function selectWithDiversification(
-  scored: (CandidateAsset & { _score: number; _breakdown: Recommendation['scoreBreakdown'] })[],
-  maxTotal: number,
-  maxPerSector: number,
-): typeof scored {
-  const sectorCount = new Map<string, number>();
-  const selected: typeof scored = [];
+  const top  = items.slice(0, n);
+  const sum  = top.reduce((s, i) => s + i.finalScore, 0);
 
-  for (const asset of scored) {
-    if (selected.length >= maxTotal) break;
-
-    // ETFs e bond ETFs não têm restrição setorial (sector = 'other' maioritariamente)
-    if (asset.assetClass !== 'stock') {
-      selected.push(asset);
-      continue;
+  return top.map((item, idx) => {
+    if (idx === n - 1) {
+      // último recebe o resto (garante soma = totalEuros em múltiplos de 5)
+      return 0; // calculado depois
     }
-
-    const count = sectorCount.get(asset.sector) ?? 0;
-    if (count >= maxPerSector) continue;
-
-    sectorCount.set(asset.sector, count + 1);
-    selected.push(asset);
-  }
-
-  return selected;
-}
-
-function assignAllocations(
-  byClass: Record<AssetClass, Recommendation[]>,
-  planAlloc: { stock: number; etf: number; bond_etf: number },
-): void {
-  for (const cls of ['stock', 'etf', 'bond_etf'] as AssetClass[]) {
-    const items = byClass[cls];
-    if (items.length === 0) continue;
-
-    const classWeight = planAlloc[cls];
-
-    // Distribui o peso da classe pelos ativos, com scores como pesos relativos
-    const totalScore = items.reduce((s, r) => s + r.score, 0);
-    for (const rec of items) {
-      rec.targetAllocation = totalScore > 0
-        ? parseFloat(((rec.score / totalScore) * classWeight).toFixed(4))
-        : parseFloat((classWeight / items.length).toFixed(4));
-    }
-  }
+    return roundTo5(totalEuros * (item.finalScore / (sum || 1)));
+  }).map((amt, idx, arr) => {
+    if (idx < n - 1) return amt;
+    const allocated = arr.slice(0, -1).reduce((s, a) => s + a, 0);
+    return Math.max(5, roundTo5(totalEuros - allocated));
+  }).concat(items.slice(n).map(() => 0));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Função principal
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * Gera recomendações ordenadas para um utilizador.
- *
- * O universo passado deve ter sido pré-filtrado por filterUniverseForUser()
- * antes de chamar esta função.
- *
- * @example
- * const universe = await getUniverse();
- * const filtered = filterUniverseForUser(universe, { ... });
- * const result   = recommend({ universe: filtered, profile, preferredSectors });
- */
 export function recommend(opts: RecommendOptions): RecommendationResult {
   const {
     universe,
     profile,
     preferredSectors,
-    maxResults   = 20,
-    maxPerSector = 2,
+    monthlyAmount,
+    goalAmount,
+    holdings      = [],
+    maxPerClass   = 3,
+    maxPerSector  = 2,
   } = opts;
 
   const planResult = calcPlan(profile);
   const alloc      = planResult.allocation;
+  const riskScore  = calcRiskScore(profile);
 
-  // Determinar quantos ativos por classe (proporcional à alocação)
-  const totalSlots  = maxResults;
-  const stockSlots  = Math.round(totalSlots * alloc.stock);
-  const etfSlots    = Math.round(totalSlots * alloc.etf);
-  const bondSlots   = totalSlots - stockSlots - etfSlots;
+  // Valor total da carteira atual
+  const totalPortfolioValue = holdings.reduce(
+    (s, h) => s + h.units * h.avgPrice, 0,
+  );
 
-  const byClass: Record<AssetClass, Recommendation[]> = {
+  // Mapa ticker → currentWeight
+  const holdingMap = new Map<string, HoldingSnapshot>();
+  for (const h of holdings) holdingMap.set(h.ticker, h);
+
+  // ── Score todos os candidatos ──────────────────────────────────────────────
+  const scored = universe.map(asset => {
+    const matchScore   = calcMatchScore(asset, profile, preferredSectors, alloc);
+    const qualityScore = asset.qualityScore;
+    const finalScore   = Math.round(matchScore * 0.6 + qualityScore * 0.4);
+    return { asset, matchScore, qualityScore, finalScore };
+  });
+
+  // ── Seleccionar top N por classe com diversificação setorial ──────────────
+  const byClass: Record<AssetClass, typeof scored> = {
     stock:    [],
     etf:      [],
     bond_etf: [],
   };
 
   for (const cls of ['stock', 'etf', 'bond_etf'] as AssetClass[]) {
-    const candidates = universe.filter(a => a.assetClass === cls);
-    const slots = cls === 'stock' ? stockSlots : cls === 'etf' ? etfSlots : bondSlots;
-    if (slots === 0 || candidates.length === 0) continue;
+    const candidates = scored
+      .filter(s => s.asset.assetClass === cls)
+      .sort((a, b) => b.finalScore - a.finalScore);
 
-    // Score todos os candidatos da classe
-    const scored = candidates
-      .map(asset => {
-        const s = scoreAsset(asset, profile, preferredSectors);
-        return { ...asset, _score: s.total, _breakdown: s };
-      })
-      .sort((a, b) => b._score - a._score);
+    const selected: typeof scored = [];
+    const sectorCount = new Map<string, number>();
 
-    // Aplicar diversificação setorial (só para stocks)
-    const selected = cls === 'stock'
-      ? selectWithDiversification(scored, slots, maxPerSector)
-      : scored.slice(0, slots);
+    for (const item of candidates) {
+      if (selected.length >= maxPerClass) break;
 
-    byClass[cls] = selected.map(a => ({
-      asset:            { ticker: a.ticker, name: a.name, exchange: a.exchange, assetClass: a.assetClass, sector: a.sector, beta: a.beta, dividendYield: a.dividendYield, marketCap: a.marketCap, qualityScore: a.qualityScore, currency: a.currency },
-      score:            a._score,
-      scoreBreakdown:   a._breakdown,
-      targetAllocation: 0, // preenchido por assignAllocations
-      reasons:          buildReasons(a, a._breakdown, profile, preferredSectors),
-    }));
+      // holding existente sobrepesado → excluir
+      const holding = holdingMap.get(item.asset.ticker);
+      if (holding && totalPortfolioValue > 0) {
+        const currentW = (holding.units * holding.avgPrice) / totalPortfolioValue;
+        const targetW  = alloc[cls] / maxPerClass;
+        if (currentW > targetW * 1.1) continue; // sobrepesado — pular
+      }
+
+      if (cls === 'stock') {
+        const count = sectorCount.get(item.asset.sector) ?? 0;
+        if (count >= maxPerSector) continue;
+        sectorCount.set(item.asset.sector, count + 1);
+      }
+
+      selected.push(item);
+    }
+
+    byClass[cls] = selected;
   }
 
-  assignAllocations(byClass, alloc);
+  // ── Distribuir euros por classe ────────────────────────────────────────────
+  const euros = {
+    stock:    monthlyAmount * alloc.stock,
+    etf:      monthlyAmount * alloc.etf,
+    bond_etf: monthlyAmount * alloc.bond_etf,
+  };
 
-  // Lista final: stocks → ETFs → bond ETFs, dentro de cada grupo por score desc
-  const recommendations = [
-    ...byClass.stock,
-    ...byClass.etf,
-    ...byClass.bond_etf,
-  ];
+  const recommendations: Recommendation[] = [];
+
+  for (const cls of ['stock', 'etf', 'bond_etf'] as AssetClass[]) {
+    const items   = byClass[cls];
+    if (items.length === 0) continue;
+
+    const amounts = distributeAmounts(items, euros[cls]);
+
+    items.forEach((item, idx) => {
+      const suggestedAmount = amounts[idx] ?? 0;
+      if (suggestedAmount === 0) return;
+
+      const holding = holdingMap.get(item.asset.ticker);
+      const alreadyOwned = !!holding;
+      const currentWeight = (holding && totalPortfolioValue > 0)
+        ? (holding.units * holding.avgPrice) / totalPortfolioValue
+        : 0;
+      const targetWeight  = alloc[cls] / items.length;
+
+      const isSubweighted = alreadyOwned && currentWeight < targetWeight * 0.9;
+      const type: RecommendationType = alreadyOwned ? 'reinforce' : 'new';
+
+      recommendations.push({
+        asset:           item.asset,
+        matchScore:      item.matchScore,
+        qualityScore:    item.qualityScore,
+        finalScore:      item.finalScore,
+        suggestedAmount,
+        allocationPct:   suggestedAmount / monthlyAmount,
+        type,
+        currentWeight,
+        targetWeight,
+        reason:          buildReason(item.asset, item.finalScore, profile, type, isSubweighted),
+        alreadyOwned,
+      });
+    });
+  }
+
+  // ── Ordenação: subpesados → novas compras → reforços DCA ──────────────────
+  recommendations.sort((a, b) => {
+    const rank = (r: Recommendation) => {
+      if (r.alreadyOwned && r.currentWeight < r.targetWeight * 0.9) return 0; // subpesado
+      if (!r.alreadyOwned) return 1;                                           // new
+      return 2;                                                                // reinforce DCA
+    };
+    const diff = rank(a) - rank(b);
+    return diff !== 0 ? diff : b.finalScore - a.finalScore;
+  });
+
+  // ── Alerta de ritmo ───────────────────────────────────────────────────────
+  let paceAlert = false;
+  if (goalAmount && goalAmount > totalPortfolioValue && profile.horizon_years > 0) {
+    const goalRestante   = goalAmount - totalPortfolioValue;
+    const monthsLeft     = profile.horizon_years * 12;
+    const rate           = planResult.rate / 12;
+    // PMT necessário para atingir goal (fórmula FV de anuidade)
+    const pmtNeeded = rate > 0
+      ? goalRestante * rate / (Math.pow(1 + rate, monthsLeft) - 1)
+      : goalRestante / monthsLeft;
+    paceAlert = pmtNeeded > monthlyAmount * 1.1;
+  }
 
   return {
     recommendations,
     allocationPlan: alloc,
-    riskScore:      planResult.riskScore,
+    riskScore,
+    monthlyAmount,
+    paceAlert,
   };
 }
 
@@ -311,15 +382,13 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
 // Utilitários de apresentação
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Formata targetAllocation como percentagem legível. */
-export function fmtAllocation(value: number): string {
-  return `${Math.round(value * 100)}%`;
-}
-
-/** Score composto → badge de texto para a UI. */
 export function recommendationBadge(score: number): { label: string; color: string } {
   if (score >= 78) return { label: 'Muito recomendado', color: 'var(--gain)'               };
   if (score >= 62) return { label: 'Recomendado',       color: 'var(--gain)'               };
   if (score >= 48) return { label: 'Neutro',            color: 'var(--on-surface-variant)' };
   return                  { label: 'Com reservas',      color: '#F59E0B'                   };
+}
+
+export function fmtEur(value: number): string {
+  return `${value.toFixed(0)} €`;
 }
