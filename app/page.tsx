@@ -43,7 +43,7 @@ export default function SplashPage() {
         {/* Title */}
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: 32, fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.02em' }}>Portify</div>
-          <div style={{ fontSize: 16, color: 'var(--on-surface-variant)', marginTop: 8, maxWidth: 240, textWrap: 'pretty' as never }}>
+          <div style={{ fontSize: 16, color: 'var(--on-surface-variant)', marginTop: 8, maxWidth: 240, textWrap: 'pretty' }}>
             Todo o seu património num só lugar
           </div>
         </div>
