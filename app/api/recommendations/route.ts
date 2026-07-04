@@ -8,6 +8,18 @@ import { fetchRiskReport } from '@/lib/riskScore';
 import { calcQualityScoreFromReport } from '@/lib/qualityScore';
 import { checkRateLimit } from '@/lib/rateLimiter';
 
+// ── Enum parsers ──────────────────────────────────────────────────────────────
+function parseEnum<T extends string>(value: string | null | undefined, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+const RISK_PROFILES     = ['very_conservative', 'conservative', 'moderate', 'aggressive', 'very_aggressive'] as const;
+const INVESTMENT_GOALS  = ['emergency_fund', 'short_purchase', 'income', 'wealth_growth', 'retirement', 'legacy'] as const;
+const EXPERIENCE_LEVELS = ['none', 'beginner', 'intermediate', 'experienced', 'professional'] as const;
+const MARKET_REACTIONS  = ['sell_all', 'sell_some', 'hold', 'buy_more'] as const;
+const FINANCIAL_STATUSES = ['unstable', 'stable', 'comfortable', 'wealthy'] as const;
+const LIQUIDITY_NEEDS   = ['critical', 'possible', 'unlikely', 'never'] as const;
+
 // 2 calls per hour per user — the Finnhub calls are cached server-side;
 // this prevents burst abuse of the rate limiter.
 const RATE_LIMIT_MAX    = 2;
@@ -84,15 +96,15 @@ export async function GET(req: Request) {
     .map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
 
   // ── UserProfile ───────────────────────────────────────────────────────────
-  const userProfile = {
-    risk_profile:     (profileRaw.risk_profile  ?? 'moderate')      as UserProfile['risk_profile'],
-    investment_goal:  (profileRaw.investment_goal ?? 'wealth_growth') as UserProfile['investment_goal'],
-    experience_level: (profileRaw.experience_level ?? 'beginner')    as UserProfile['experience_level'],
-    market_reaction:  (profileRaw.market_reaction  ?? 'hold')        as UserProfile['market_reaction'],
-    financial_status: (profileRaw.financial_status ?? 'stable')      as UserProfile['financial_status'],
-    liquidity_need:   (profileRaw.liquidity_need   ?? 'unlikely')    as UserProfile['liquidity_need'],
+  const userProfile: UserProfile = {
+    risk_profile:     parseEnum(profileRaw.risk_profile,     RISK_PROFILES,      'moderate'),
+    investment_goal:  parseEnum(profileRaw.investment_goal,  INVESTMENT_GOALS,   'wealth_growth'),
+    experience_level: parseEnum(profileRaw.experience_level, EXPERIENCE_LEVELS,  'beginner'),
+    market_reaction:  parseEnum(profileRaw.market_reaction,  MARKET_REACTIONS,   'hold'),
+    financial_status: parseEnum(profileRaw.financial_status, FINANCIAL_STATUSES, 'stable'),
+    liquidity_need:   parseEnum(profileRaw.liquidity_need,   LIQUIDITY_NEEDS,    'unlikely'),
     horizon_years:    horizonYears,
-  } satisfies UserProfile;
+  };
 
   const assetClasses: AssetClass[] = ['stock', 'etf', 'bond_etf'];
 
