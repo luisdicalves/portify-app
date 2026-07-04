@@ -1,13 +1,18 @@
 export type ParsedHolding = { ticker: string; units: number; avg_price: number; name?: string };
+
+export type TransactionType = 'buy' | 'sell' | 'dividend' | 'withholding_tax' | 'interest' | 'interest_tax' | 'deposit';
+
 export type ParsedTransaction = {
   external_id: string;
-  ticker: string;
-  type: 'buy' | 'sell' | 'dividend';
+  ticker?: string;
+  type: TransactionType;
   units?: number;
   price?: number;
   amount: number;
   executed_at: string;
+  notes?: string;
 };
+
 export type ParseResult = { holdings: ParsedHolding[]; transactions: ParsedTransaction[] };
 
 // Excel serial date → ISO string
@@ -39,6 +44,34 @@ export function parseHoldingsCsv(text: string): ParseResult {
   return { holdings: rowsToHoldings(header, rows), transactions: [] };
 }
 
+// Maps an XTB "Type" cell to our internal transaction type. Returns null for
+// rows we intentionally ignore (e.g. rollovers, unrecognized categories).
+function mapXtbType(rawType: string): TransactionType | null {
+  const t = rawType.toLowerCase();
+  if (t.includes('stock') || t.includes('etf')) return t.includes('sale') || t.includes('sell') ? 'sell' : 'buy';
+  if (t === 'divident' || t === 'dividend') return 'dividend';
+  if (t.includes('withholding')) return 'withholding_tax';
+  if (t.includes('free funds interest') && t.includes('tax')) return 'interest_tax';
+  if (t.includes('free funds interest')) return 'interest';
+  if (t === 'deposit') return 'deposit';
+  return null;
+}
+
+// Finds the header row and builds a column-name -> index map. Column order
+// and exact naming (Symbol vs Ticker) vary between XTB export variants, so
+// we resolve by name instead of fixed position.
+function findXtbHeader(data: (string | number | null)[][]): { rowIdx: number; cols: Record<string, number> } | null {
+  for (let i = 0; i < data.length; i++) {
+    const row = data[i].map(c => String(c ?? '').trim().toLowerCase());
+    if (row.includes('id') && row.includes('type')) {
+      const cols: Record<string, number> = {};
+      row.forEach((cell, idx) => { cols[cell] = idx; });
+      return { rowIdx: i, cols };
+    }
+  }
+  return null;
+}
+
 export async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
   const XLSX = await import('xlsx');
   const wb = XLSX.read(buffer, { type: 'array' });
@@ -48,39 +81,47 @@ export async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
   if (cashSheet) {
     const ws = wb.Sheets[cashSheet];
     const data = XLSX.utils.sheet_to_json<(string | number | null)[]>(ws, { header: 1 });
-    const headerIdx = data.findIndex(row => String(row[0]).trim() === 'ID' && String(row[1]).trim() === 'Type');
-    if (headerIdx === -1) throw new Error('xtb_no_header');
+    const header = findXtbHeader(data);
+    if (!header) throw new Error('xtb_no_header');
+    const { rowIdx, cols } = header;
+
+    const idIdx = cols['id'];
+    const typeIdx = cols['type'];
+    const timeIdx = cols['time'];
+    const commentIdx = cols['comment'];
+    const symbolIdx = cols['symbol'] ?? cols['ticker'];
+    const amountIdx = cols['amount'];
 
     const holdingsMap = new Map<string, { units: number; totalCost: number }>();
     const transactions: ParsedTransaction[] = [];
 
-    for (const row of data.slice(headerIdx + 1)) {
-      const extId = String(row[0] ?? '').trim();
-      const type = String(row[1] ?? '');
-      const timeSer = typeof row[2] === 'number' ? row[2] : null;
-      const comment = String(row[3] ?? '');
-      const symbol = String(row[4] ?? '').trim();
-      const amount = typeof row[5] === 'number' ? row[5] : 0;
-      if (!extId || !type) continue;
+    for (const row of data.slice(rowIdx + 1)) {
+      const extId = String(row[idIdx] ?? '').trim();
+      const rawType = String(row[typeIdx] ?? '');
+      const timeSer = typeof row[timeIdx] === 'number' ? (row[timeIdx] as number) : null;
+      const comment = String(row[commentIdx] ?? '');
+      const symbol = symbolIdx != null ? String(row[symbolIdx] ?? '').trim() : '';
+      const amount = typeof row[amountIdx] === 'number' ? (row[amountIdx] as number) : 0;
+      if (!extId || !rawType) continue;
 
-      const typeLow = type.toLowerCase();
+      const txType = mapXtbType(rawType);
+      if (!txType) continue;
+
       const executedAt = timeSer ? xlDateToIso(timeSer) : new Date().toISOString();
 
-      if (typeLow.includes('stock')) {
+      if (txType === 'buy' || txType === 'sell') {
         const volumeMatch = comment.match(/OPEN (?:BUY|SELL) ([0-9.]+)/);
         const priceMatch = comment.match(/@ ([0-9.]+)/);
         if (!volumeMatch || !priceMatch || !symbol) continue;
         const volume = parseFloat(volumeMatch[1]);
         const price = parseFloat(priceMatch[1]);
         if (isNaN(volume) || isNaN(price)) continue;
-        const isSale = typeLow.includes('sale') || typeLow.includes('sell');
-        const txType = isSale ? 'sell' : 'buy';
 
         // Update holdings map. On a sale, reduce totalCost proportionally too
         // (at the average cost basis before this sale) so avg_price stays
         // constant instead of inflating as units are sold off.
         const h = holdingsMap.get(symbol) ?? { units: 0, totalCost: 0 };
-        if (isSale) {
+        if (txType === 'sell') {
           const avgCostBefore = h.units > 0 ? h.totalCost / h.units : 0;
           h.units -= volume;
           h.totalCost -= volume * avgCostBefore;
@@ -99,16 +140,30 @@ export async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
           amount: Math.abs(amount),
           executed_at: executedAt,
         });
-      } else if (typeLow === 'divident' || typeLow === 'dividend') {
+        continue;
+      }
+
+      if (txType === 'dividend' || txType === 'withholding_tax') {
         if (!symbol) continue;
         transactions.push({
           external_id: `xtb_${extId}`,
           ticker: symbol,
-          type: 'dividend',
+          type: txType,
           amount,
           executed_at: executedAt,
+          notes: comment || undefined,
         });
+        continue;
       }
+
+      // interest, interest_tax, deposit: no ticker
+      transactions.push({
+        external_id: `xtb_${extId}`,
+        type: txType,
+        amount,
+        executed_at: executedAt,
+        notes: comment || undefined,
+      });
     }
 
     const holdings = Array.from(holdingsMap.entries())
@@ -132,7 +187,7 @@ export async function parseXlsxFile(buffer: ArrayBuffer): Promise<ParseResult> {
 
 export async function parseFile(file: File): Promise<ParseResult> {
   const ext = file.name.split('.').pop()?.toLowerCase();
-  if (ext === 'xlsx') return parseXlsxFile(await file.arrayBuffer());
-  const text = await file.text();
-  return parseHoldingsCsv(text);
+  if (ext === 'csv') return parseHoldingsCsv(await file.text());
+  if (ext === 'xlsx' || ext === 'xlsm') return parseXlsxFile(await file.arrayBuffer());
+  throw new Error('unsupported_format');
 }
