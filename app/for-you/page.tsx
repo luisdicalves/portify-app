@@ -58,6 +58,12 @@ function AllocationBar({ pct }: { pct: number }) {
 
 function RecCard({ rec, t }: { rec: Recommendation; t: ReturnType<typeof useDict> }) {
   const [expanded, setExpanded] = useState(false);
+  const router = useRouter();
+
+  function goInvest(e: React.MouseEvent) {
+    e.stopPropagation();
+    router.push(`/portfolio/${rec.asset.ticker.toLowerCase()}?action=buy`);
+  }
 
   const classLabel =
     rec.asset.assetClass === 'stock'    ? 'Ação' :
@@ -157,6 +163,19 @@ function RecCard({ rec, t }: { rec: Recommendation; t: ReturnType<typeof useDict
               <span style={{ fontWeight: 600 }}>{rec.asset.dividendYield.toFixed(1)}%</span>
             </div>
           )}
+
+          <button
+            onClick={goInvest}
+            style={{
+              marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              width: '100%', padding: '10px 0', border: 'none', borderRadius: 'var(--radius-md)',
+              background: 'var(--primary)', color: 'var(--on-primary)',
+              fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: 17 }}>bolt</span>
+            {t.recInvestNow}
+          </button>
         </div>
       )}
     </div>
