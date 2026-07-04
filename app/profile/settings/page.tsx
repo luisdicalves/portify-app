@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Switch from '@/components/ui/Switch';
@@ -79,6 +79,49 @@ export default function SettingsPage() {
   const [exportEnd, setExportEnd] = useState('');
   const [exportRangeTarget, setExportRangeTarget] = useState<'start' | 'end' | null>(null);
   const [exportToast, setExportToast] = useState(false);
+
+  const [uninvestedCash, setUninvestedCash] = useState<number>(0);
+  const [freeFundsRate, setFreeFundsRate] = useState<number>(0);
+  const [cashSheetField, setCashSheetField] = useState<'cash' | 'rate' | null>(null);
+  const [cashInput, setCashInput] = useState('');
+  const [savingCash, setSavingCash] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('uninvested_cash, free_funds_annual_rate_pct')
+        .eq('id', user.id)
+        .single();
+      if (data) {
+        setUninvestedCash(data.uninvested_cash ?? 0);
+        setFreeFundsRate(data.free_funds_annual_rate_pct ?? 0);
+      }
+    })();
+  }, []);
+
+  function openCashSheet(field: 'cash' | 'rate') {
+    setCashInput(String(field === 'cash' ? uninvestedCash : freeFundsRate));
+    setCashSheetField(field);
+  }
+
+  async function saveCashField() {
+    const value = parseFloat(cashInput.replace(',', '.'));
+    if (Number.isNaN(value) || value < 0) return;
+    setSavingCash(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const column = cashSheetField === 'cash' ? 'uninvested_cash' : 'free_funds_annual_rate_pct';
+      await supabase.from('profiles').update({ [column]: value }).eq('id', user.id);
+      if (cashSheetField === 'cash') setUninvestedCash(value); else setFreeFundsRate(value);
+    }
+    setSavingCash(false);
+    setCashSheetField(null);
+  }
 
   function closeImport() {
     setImportOpen(false);
@@ -202,6 +245,15 @@ export default function SettingsPage() {
           </Card>
         </div>
 
+        {/* Free funds */}
+        <div>
+          <SectionLabel label={t.freeFundsSection} />
+          <Card>
+            <SettingsRow icon="account_balance_wallet" label={t.uninvestedCashLabel} value={`${uninvestedCash.toFixed(2)} €`} onPress={() => openCashSheet('cash')} />
+            <SettingsRow icon="percent" label={t.freeFundsRateLabel} value={`${freeFundsRate.toFixed(2)}%`} onPress={() => openCashSheet('rate')} border={false} />
+          </Card>
+        </div>
+
         {/* Notifications */}
         <div>
           <SectionLabel label={t.notificationsSection} />
@@ -245,6 +297,29 @@ export default function SettingsPage() {
         </div>
 
       </div>
+
+      {cashSheetField && (
+        <div onClick={() => setCashSheetField(null)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'flex-end', zIndex: 30 }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: '20px 20px 0 0', padding: '20px 16px 34px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>
+              {cashSheetField === 'cash' ? t.uninvestedCashLabel : t.freeFundsRateLabel}
+            </div>
+            <div className="field-wrap">
+              <input
+                className="field-input"
+                type="number"
+                inputMode="decimal"
+                value={cashInput}
+                onChange={e => setCashInput(e.target.value)}
+                placeholder="0.00"
+              />
+            </div>
+            <button className="btn-primary" disabled={savingCash} onClick={saveCashField}>
+              {savingCash ? t.impImporting : t.save}
+            </button>
+          </div>
+        </div>
+      )}
 
       {importOpen && (
         <div onClick={closeImport} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>

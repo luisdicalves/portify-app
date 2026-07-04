@@ -9,6 +9,7 @@ import { SkeletonRow } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -46,6 +47,7 @@ export default function PortfolioPage() {
   const [tab, setTab] = useState<typeof TAB_IDS[number]>('positions');
   const [txns, setTxns] = useState<Transaction[]>([]);
   const [dividends, setDividends] = useState<{ ticker: string; letter: string; amount: number; executed_at: string }[]>([]);
+  const [cashSettings, setCashSettings] = useState({ uninvestedCash: 0, freeFundsAnnualRatePct: 0 });
   const [openTxnId, setOpenTxnId] = useState<string | null>(null);
   const [sellPickerOpen, setSellPickerOpen] = useState(false);
 
@@ -121,8 +123,20 @@ export default function PortfolioPage() {
     setTxns(prev => prev.filter(tx => tx.id !== id));
   }
 
+  async function fetchCashSettings() {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('uninvested_cash, free_funds_annual_rate_pct')
+      .eq('id', user.id)
+      .single();
+    if (data) setCashSettings({ uninvestedCash: data.uninvested_cash ?? 0, freeFundsAnnualRatePct: data.free_funds_annual_rate_pct ?? 0 });
+  }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
-  useEffect(() => { fetchHoldings(); fetchTransactions(); }, []);
+  useEffect(() => { fetchHoldings(); fetchTransactions(); fetchCashSettings(); }, []);
 
   const totalValue = assets.reduce((sum, a) => sum + a.value, 0);
   const totalInvested = assets.reduce((sum, a) => sum + a.cost, 0);
@@ -136,6 +150,14 @@ export default function PortfolioPage() {
     .filter(d => Date.now() - new Date(d.executed_at).getTime() < 365 * 86400000)
     .reduce((sum, d) => sum + d.amount, 0);
   const dividendYieldPct = totalValue > 0 ? (dividends12mo / totalValue) * 100 : 0;
+
+  const forecast = buildCashFlowForecast(
+    assets.map(a => ({ ticker: a.ticker, units: a.units })),
+    dividends.map(d => ({ ticker: d.ticker, amount: d.amount, executed_at: d.executed_at })),
+    cashSettings.uninvestedCash,
+    cashSettings.freeFundsAnnualRatePct,
+    { horizonMonths: 12 },
+  );
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -224,9 +246,38 @@ export default function PortfolioPage() {
 
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>{t.upcoming}</div>
-              <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
-                {t.noUpcomingDividends}
-              </div>
+              {forecast.dividends.length === 0 ? (
+                <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
+                  {t.noUpcomingDividends}
+                </div>
+              ) : (
+                <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+                  {forecast.dividends.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderBottom: i < forecast.dividends.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
+                        {d.ticker.charAt(0)}
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 14, fontWeight: 700 }}>{d.ticker}</span>
+                          {d.confidence === 'low' && (
+                            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', color: 'var(--on-surface-variant)' }}>
+                              {t.lowConfidence}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>
+                          {new Date(d.expectedDate).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+{eur.format(d.netAmount)} €</div>
+                        <div style={{ fontSize: 10, color: 'var(--on-surface-variant)' }}>{t.grossLabel} {eur.format(d.grossAmount)} €</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
