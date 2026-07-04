@@ -9,6 +9,7 @@ import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath 
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
+import { useUser } from '@/lib/hooks/useUser';
 
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 
@@ -22,6 +23,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const { lang } = useApp();
   const t = useDict(lang);
+  const { user } = useUser();
   const [tf, setTf] = useState(4);
   const [fullName, setFullName] = useState('');
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -32,10 +34,9 @@ export default function DashboardPage() {
   const [upcomingDividends, setUpcomingDividends] = useState<UpcomingDividend[]>([]);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
 
       const [{ data: profile }, { data: holdingsData }, { data: plan }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
@@ -65,7 +66,7 @@ export default function DashboardPage() {
 
       setLoading(false);
     })();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (holdings.length === 0) { setChartValues(null); return; }

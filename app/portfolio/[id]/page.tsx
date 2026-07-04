@@ -10,6 +10,7 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import type { RiskReport as RiskReportData } from '@/lib/riskScore';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
+import { useUser, getUser } from '@/lib/hooks/useUser';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -44,6 +45,7 @@ function buildLinePath(values: number[]) {
 export default function AssetDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
   const ticker = params.id.toUpperCase();
@@ -65,14 +67,13 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [riskRequested, setRiskRequested] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
       const { data } = await supabase.from('holdings').select('units, avg_price').eq('user_id', user.id).eq('ticker', ticker).maybeSingle();
       setHolding(data ?? null);
     })();
-  }, [ticker]);
+  }, [user, ticker]);
 
   useEffect(() => {
     setQuoteLoading(true);
@@ -122,9 +123,9 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     if (!unitsNum || unitsNum <= 0 || !priceNum || priceNum <= 0) { setError(t.bsError); return; }
 
     setSaving(true);
+    const u = await getUser();
+    if (!u) { setSaving(false); return; }
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setSaving(false); return; }
 
     const [hh, mm] = time.split(':').map(Number);
     const executedAt = new Date(tradeDate);
@@ -132,26 +133,26 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     const amount = unitsNum * priceNum;
 
     await supabase.from('transactions').insert({
-      user_id: user.id, ticker, type: sheet, units: unitsNum, price: priceNum, amount, executed_at: executedAt.toISOString(),
+      user_id: u.id, ticker, type: sheet, units: unitsNum, price: priceNum, amount, executed_at: executedAt.toISOString(),
     });
 
     if (sheet === 'buy') {
       if (holding) {
         const newUnits = holding.units + unitsNum;
         const newAvg = (holding.units * holding.avg_price + unitsNum * priceNum) / newUnits;
-        await supabase.from('holdings').update({ units: newUnits, avg_price: newAvg }).eq('user_id', user.id).eq('ticker', ticker);
+        await supabase.from('holdings').update({ units: newUnits, avg_price: newAvg }).eq('user_id', u.id).eq('ticker', ticker);
         setHolding({ units: newUnits, avg_price: newAvg });
       } else {
-        await supabase.from('holdings').insert({ user_id: user.id, ticker, units: unitsNum, avg_price: priceNum });
+        await supabase.from('holdings').insert({ user_id: u.id, ticker, units: unitsNum, avg_price: priceNum });
         setHolding({ units: unitsNum, avg_price: priceNum });
       }
     } else if (holding) {
       const newUnits = holding.units - unitsNum;
       if (newUnits <= 0) {
-        await supabase.from('holdings').delete().eq('user_id', user.id).eq('ticker', ticker);
+        await supabase.from('holdings').delete().eq('user_id', u.id).eq('ticker', ticker);
         setHolding(null);
       } else {
-        await supabase.from('holdings').update({ units: newUnits }).eq('user_id', user.id).eq('ticker', ticker);
+        await supabase.from('holdings').update({ units: newUnits }).eq('user_id', u.id).eq('ticker', ticker);
         setHolding({ ...holding, units: newUnits });
       }
     }

@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { useUser } from '@/lib/hooks/useUser';
 
 export default function PersonalPage() {
   const router = useRouter();
+  const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
 
@@ -21,10 +23,9 @@ export default function PersonalPage() {
   const [message, setMessage] = useState('');
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
       const { data: profile } = await supabase
         .from('profiles')
         .select('first_name, last_name, date_of_birth, user_handle')
@@ -38,7 +39,7 @@ export default function PersonalPage() {
       }
       if (user.email) { setEmail(user.email); setSavedEmail(user.email); }
     })();
-  }, []);
+  }, [user]);
 
   async function saveEmail() {
     setMessage('');
