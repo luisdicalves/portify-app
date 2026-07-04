@@ -7,14 +7,7 @@ import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
 import { onbState } from '@/lib/onboardingState';
-
-const OPTIONS = [
-  { id: 'very_conservative', label: 'Muito conservador', desc: 'Aceito retornos baixos. Zero perdas.',       icon: 'shield' },
-  { id: 'conservative',      label: 'Conservador',       desc: 'Prefiro proteger o capital.',                icon: 'security' },
-  { id: 'moderate',          label: 'Moderado',          desc: 'Equilíbrio entre risco e retorno.',          icon: 'balance' },
-  { id: 'aggressive',        label: 'Agressivo',         desc: 'Aceito volatilidade por mais retorno.',      icon: 'local_fire_department' },
-  { id: 'very_aggressive',   label: 'Muito agressivo',   desc: 'Maximizar retorno. Aceito perdas elevadas.', icon: 'bolt' },
-];
+import { RISK_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 
 export default function RiskPage() {
   const router = useRouter();

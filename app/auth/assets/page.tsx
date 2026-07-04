@@ -3,9 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
-import { createClient } from '@/lib/supabase/client';
-import { getSessionUserId } from '@/lib/hooks/useUser';
-
 const ASSETS = [
   { id: 'stocks', icon: 'show_chart',  iconBg: 'var(--primary-strong)', label: 'Ações', desc: 'Apple, Tesla, Nvidia e outras cotadas.' },
   { id: 'etfs',   icon: 'donut_small', iconBg: 'var(--gain-strong)',    label: 'ETFs',  desc: 'S&P 500, MSCI World e fundos indexados.' },
@@ -22,13 +19,6 @@ export default function AssetsPage() {
 
   async function handleContinue() {
     setSaving(true);
-    try {
-      const userId = await getSessionUserId();
-      if (userId) {
-        const supabase = createClient();
-        await supabase.from('profiles').update({ preferred_assets: Array.from(selected) }).eq('id', userId);
-      }
-    } catch { /* best-effort */ }
     router.push('/auth/experience');
   }
 

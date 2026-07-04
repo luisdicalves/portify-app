@@ -6,6 +6,8 @@ import BottomNav from '@/components/ui/BottomNav';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
 import RiskReport from '@/components/ui/RiskReport';
 import { createClient } from '@/lib/supabase/client';
+import { getHolding, upsertHolding, updateHolding, deleteHolding } from '@/lib/db/holdings';
+import { insertTransaction } from '@/lib/db/transactions';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import type { RiskReport as RiskReportData } from '@/lib/riskScore';
@@ -70,8 +72,8 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data } = await supabase.from('holdings').select('units, avg_price').eq('user_id', user.id).eq('ticker', ticker).maybeSingle();
-      setHolding(data ?? null);
+      const data = await getHolding(supabase, user.id, ticker);
+      setHolding(data);
     })();
   }, [user, ticker]);
 
@@ -118,6 +120,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   }
 
   async function confirmTrade() {
+    if (!sheet) return;
     const unitsNum = parseFloat(shares.replace(',', '.'));
     const priceNum = parseFloat(avgPrice.replace(',', '.'));
     if (!unitsNum || unitsNum <= 0 || !priceNum || priceNum <= 0) { setError(t.bsError); return; }
@@ -132,7 +135,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     if (!Number.isNaN(hh) && !Number.isNaN(mm)) executedAt.setHours(hh, mm);
     const amount = unitsNum * priceNum;
 
-    await supabase.from('transactions').insert({
+    await insertTransaction(supabase, {
       user_id: u.id, ticker, type: sheet, units: unitsNum, price: priceNum, amount, executed_at: executedAt.toISOString(),
     });
 
@@ -140,19 +143,19 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       if (holding) {
         const newUnits = holding.units + unitsNum;
         const newAvg = (holding.units * holding.avg_price + unitsNum * priceNum) / newUnits;
-        await supabase.from('holdings').update({ units: newUnits, avg_price: newAvg }).eq('user_id', u.id).eq('ticker', ticker);
+        await updateHolding(supabase, u.id, ticker, { units: newUnits, avg_price: newAvg });
         setHolding({ units: newUnits, avg_price: newAvg });
       } else {
-        await supabase.from('holdings').insert({ user_id: u.id, ticker, units: unitsNum, avg_price: priceNum });
+        await upsertHolding(supabase, u.id, ticker, unitsNum, priceNum);
         setHolding({ units: unitsNum, avg_price: priceNum });
       }
     } else if (holding) {
       const newUnits = holding.units - unitsNum;
       if (newUnits <= 0) {
-        await supabase.from('holdings').delete().eq('user_id', u.id).eq('ticker', ticker);
+        await deleteHolding(supabase, u.id, ticker);
         setHolding(null);
       } else {
-        await supabase.from('holdings').update({ units: newUnits }).eq('user_id', u.id).eq('ticker', ticker);
+        await updateHolding(supabase, u.id, ticker, { units: newUnits });
         setHolding({ ...holding, units: newUnits });
       }
     }

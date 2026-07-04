@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
-import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath } from '@/lib/portfolioMetrics';
+import { getHoldings } from '@/lib/db/holdings';
+import { getPlan } from '@/lib/db/plans';
+import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
@@ -16,7 +18,6 @@ const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximumFractionDigits: 1 });
 
-type Holding = { ticker: string; units: number; avg_price: number };
 type UpcomingDividend = { ticker: string; expectedDate: string; netAmount: number; confidence: 'high' | 'low' };
 
 export default function DashboardPage() {
@@ -30,6 +31,7 @@ export default function DashboardPage() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [chartValues, setChartValues] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingChart, setLoadingChart] = useState(true);
   const [monthlyPlan, setMonthlyPlan] = useState<number | null>(null);
   const [upcomingDividends, setUpcomingDividends] = useState<UpcomingDividend[]>([]);
 
@@ -38,17 +40,14 @@ export default function DashboardPage() {
     (async () => {
       const supabase = createClient();
 
-      const [{ data: profile }, { data: holdingsData }, { data: plan }] = await Promise.all([
+      const [{ data: profile }, hs, { data: plan }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
-        supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
-        supabase.from('investment_plans').select('monthly_amount').eq('user_id', user.id).maybeSingle(),
+        getHoldings(supabase, user.id),
+        getPlan(supabase, user.id),
       ]);
-      if (plan) setMonthlyPlan((plan as { monthly_amount?: number }).monthly_amount ?? null);
+      if (plan) setMonthlyPlan(plan.amount ?? null);
       if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
-
-      const hs = holdingsData ?? [];
       setHoldings(hs);
-
       const [quoteResults, divRes] = await Promise.all([
         Promise.all(hs.map(h => fetchQuote(h.ticker))),
         fetch('/api/dividends').then(r => r.ok ? r.json() : { dividends: [] }).catch(() => ({ dividends: [] })),
@@ -69,11 +68,13 @@ export default function DashboardPage() {
   }, [user]);
 
   useEffect(() => {
-    if (holdings.length === 0) { setChartValues(null); return; }
+    if (holdings.length === 0) { setChartValues(null); setLoadingChart(false); return; }
+    setLoadingChart(true);
     (async () => {
       const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
       const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
       setChartValues(buildPortfolioSeries(holdings, histories));
+      setLoadingChart(false);
     })();
   }, [holdings, tf]);
 
@@ -157,7 +158,9 @@ export default function DashboardPage() {
             ))}
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
-            {chartValues && chartValues.length > 1 ? (
+            {loadingChart ? (
+              <SkeletonChart height={88} />
+            ) : chartValues && chartValues.length > 1 ? (
               <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
                 <defs>
                   <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
@@ -168,8 +171,6 @@ export default function DashboardPage() {
                 <path d={area} fill="url(#pHomeG)" />
                 <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
               </svg>
-            ) : loading ? (
-              <SkeletonChart height={88} />
             ) : (
               <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
                 {t.noHistoricalData}

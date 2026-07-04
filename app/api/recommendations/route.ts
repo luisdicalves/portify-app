@@ -2,11 +2,24 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthedUser } from '@/lib/apiAuth';
 import { getUniverse, filterUniverseForUser, type AssetClass } from '@/lib/assetUniverse';
+import { getHoldings } from '@/lib/db/holdings';
 import { recommend } from '@/lib/recommendationEngine';
 import type { UserProfile } from '@/lib/planCalculator';
 import { fetchRiskReport } from '@/lib/riskScore';
 import { calcQualityScoreFromReport } from '@/lib/qualityScore';
 import { checkRateLimit } from '@/lib/rateLimiter';
+
+// ── Enum parsers ──────────────────────────────────────────────────────────────
+function parseEnum<T extends string>(value: string | null | undefined, allowed: readonly T[], fallback: T): T {
+  return allowed.includes(value as T) ? (value as T) : fallback;
+}
+
+const RISK_PROFILES     = ['very_conservative', 'conservative', 'moderate', 'aggressive', 'very_aggressive'] as const;
+const INVESTMENT_GOALS  = ['emergency_fund', 'short_purchase', 'income', 'wealth_growth', 'retirement', 'legacy'] as const;
+const EXPERIENCE_LEVELS = ['none', 'beginner', 'intermediate', 'experienced', 'professional'] as const;
+const MARKET_REACTIONS  = ['sell_all', 'sell_some', 'hold', 'buy_more'] as const;
+const FINANCIAL_STATUSES = ['unstable', 'stable', 'comfortable', 'wealthy'] as const;
+const LIQUIDITY_NEEDS   = ['critical', 'possible', 'unlikely', 'never'] as const;
 
 // 2 calls per hour per user — the Finnhub calls are cached server-side;
 // this prevents burst abuse of the rate limiter.
@@ -49,10 +62,7 @@ export async function GET(req: Request) {
   // ── Perfil ────────────────────────────────────────────────────────────────
   const { data: profileRaw, error: profileErr } = await supabase
     .from('profiles')
-    .select(
-      'risk_profile, investment_goal, experience_level, market_reaction, ' +
-      'financial_status, liquidity_need, preferred_assets, preferred_sectors, risk_score'
-    )
+    .select('risk_profile, investment_goal, experience_level, market_reaction, financial_status, liquidity_need, preferred_sectors, risk_score')
     .eq('id', user.id)
     .single();
 
@@ -60,66 +70,41 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'profile_not_found' }, { status: 404 });
   }
 
-  const profile = (profileRaw as unknown) as {
-    risk_profile:     string | null;
-    investment_goal:  string | null;
-    experience_level: string | null;
-    market_reaction:  string | null;
-    financial_status: string | null;
-    liquidity_need:   string | null;
-    preferred_assets:  unknown;
-    preferred_sectors: unknown;
-    risk_score:        number | null;
-  };
-
-  if (!profile.risk_profile || !profile.investment_goal) {
+  if (!profileRaw.risk_profile || !profileRaw.investment_goal) {
     return NextResponse.json({ error: 'incomplete_profile' }, { status: 422 });
   }
 
   // ── Plano de investimento ─────────────────────────────────────────────────
   const { data: plan } = await supabase
     .from('investment_plans')
-    .select('horizon_years, monthly_amount, goal_amount')
+    .select('horizon_years, amount, goal_amount')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  const horizonYears:   number = (plan as { horizon_years?: number } | null)?.horizon_years   ?? 10;
-  const monthlyAmount:  number = (plan as { monthly_amount?: number } | null)?.monthly_amount  ?? 250;
-  const goalAmount:     number | undefined = (plan as { goal_amount?: number } | null)?.goal_amount ?? undefined;
+  const horizonYears:  number           = plan?.horizon_years ?? 10;
+  const monthlyAmount: number           = plan?.amount        ?? 250;
+  const goalAmount:    number | undefined = plan?.goal_amount ?? undefined;
 
   // ── Holdings ──────────────────────────────────────────────────────────────
-  const { data: holdingsRaw } = await supabase
-    .from('holdings')
-    .select('ticker, units, avg_price')
-    .eq('user_id', user.id);
-
-  const holdings = ((holdingsRaw ?? []) as { ticker: string; units: number; avg_price: number }[])
-    .map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
+  const holdingsRaw = await getHoldings(supabase, user.id);
+  const holdings = holdingsRaw.map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
 
   // ── UserProfile ───────────────────────────────────────────────────────────
-  const userProfile = {
-    risk_profile:     (profile.risk_profile  ?? 'moderate')      as UserProfile['risk_profile'],
-    investment_goal:  (profile.investment_goal ?? 'wealth_growth') as UserProfile['investment_goal'],
-    experience_level: (profile.experience_level ?? 'beginner')    as UserProfile['experience_level'],
-    market_reaction:  (profile.market_reaction  ?? 'hold')        as UserProfile['market_reaction'],
-    financial_status: (profile.financial_status ?? 'stable')      as UserProfile['financial_status'],
-    liquidity_need:   (profile.liquidity_need   ?? 'unlikely')    as UserProfile['liquidity_need'],
+  const userProfile: UserProfile = {
+    risk_profile:     parseEnum(profileRaw.risk_profile,     RISK_PROFILES,      'moderate'),
+    investment_goal:  parseEnum(profileRaw.investment_goal,  INVESTMENT_GOALS,   'wealth_growth'),
+    experience_level: parseEnum(profileRaw.experience_level, EXPERIENCE_LEVELS,  'beginner'),
+    market_reaction:  parseEnum(profileRaw.market_reaction,  MARKET_REACTIONS,   'hold'),
+    financial_status: parseEnum(profileRaw.financial_status, FINANCIAL_STATUSES, 'stable'),
+    liquidity_need:   parseEnum(profileRaw.liquidity_need,   LIQUIDITY_NEEDS,    'unlikely'),
     horizon_years:    horizonYears,
-  } satisfies UserProfile;
+  };
 
-  // ── Asset classes preferidas ──────────────────────────────────────────────
-  const rawAssets: string[] = Array.isArray(profile.preferred_assets)
-    ? (profile.preferred_assets as string[])
-    : ['stock', 'etf', 'bond_etf'];
+  const assetClasses: AssetClass[] = ['stock', 'etf', 'bond_etf'];
 
-  const assetClasses: AssetClass[] = rawAssets
-    .filter((a): a is AssetClass => ['stock', 'etf', 'bond_etf'].includes(a));
-
-  const preferredSectors: string[] = Array.isArray(profile.preferred_sectors)
-    ? (profile.preferred_sectors as string[])
-    : [];
+  const preferredSectors: string[] = profileRaw.preferred_sectors ?? [];
 
   try {
     const universe = await getUniverse();

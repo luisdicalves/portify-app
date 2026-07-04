@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthedUser } from '@/lib/apiAuth';
+import { getHoldings } from '@/lib/db/holdings';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
 
 export async function GET() {
@@ -9,11 +10,8 @@ export async function GET() {
 
   const supabase = createClient();
 
-  const [{ data: holdingsRaw }, { data: txRaw }] = await Promise.all([
-    supabase
-      .from('holdings')
-      .select('ticker, units')
-      .eq('user_id', user.id),
+  const [holdingsRaw, { data: txRaw }] = await Promise.all([
+    getHoldings(supabase, user.id),
     supabase
       .from('transactions')
       .select('ticker, amount, executed_at')
@@ -21,8 +19,10 @@ export async function GET() {
       .eq('type', 'dividend'),
   ]);
 
-  const holdings = (holdingsRaw ?? []) as { ticker: string; units: number }[];
-  const history  = (txRaw ?? []) as { ticker: string; amount: number; executed_at: string }[];
+  const holdings = holdingsRaw.map(h => ({ ticker: h.ticker, units: h.units }));
+  const history = (txRaw ?? [])
+    .filter((t): t is typeof t & { ticker: string; executed_at: string } => t.ticker != null && t.executed_at != null)
+    .map(t => ({ ticker: t.ticker, amount: t.amount, executed_at: t.executed_at }));
 
   const forecast = buildCashFlowForecast(holdings, history, 0, 0, { horizonMonths: 3 });
 

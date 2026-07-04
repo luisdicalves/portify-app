@@ -1,12 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
 import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
+import { getHoldings } from '@/lib/db/holdings';
+import { getTransactions, deleteTransaction as dbDeleteTransaction } from '@/lib/db/transactions';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
@@ -32,6 +34,11 @@ export default function PortfolioPage() {
   const router = useRouter();
   const { user } = useUser();
   const { lang } = useApp();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  function getClient() {
+    if (!supabaseRef.current) supabaseRef.current = createClient();
+    return supabaseRef.current;
+  }
   const t = useDict(lang);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,16 +53,11 @@ export default function PortfolioPage() {
     setLoading(true);
     const u = await getUser();
     if (!u) { setLoading(false); return; }
-    const supabase = createClient();
 
-    const { data: holdings } = await supabase
-      .from('holdings')
-      .select('ticker, units, avg_price')
-      .eq('user_id', u.id);
+    const holdings = await getHoldings(getClient(), u.id);
+    const quotes = await Promise.all(holdings.map(h => fetchQuote(h.ticker)));
 
-    const quotes = await Promise.all((holdings ?? []).map(h => fetchQuote(h.ticker)));
-
-    const mapped: Asset[] = (holdings ?? []).map((h, i) => {
+    const mapped: Asset[] = holdings.map((h, i) => {
       const quote = quotes[i];
       const price = quote?.price ?? h.avg_price;
       const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
@@ -78,13 +80,8 @@ export default function PortfolioPage() {
   async function fetchTransactions() {
     const u = await getUser();
     if (!u) return;
-    const supabase = createClient();
 
-    const { data } = await supabase
-      .from('transactions')
-      .select('id, ticker, type, units, price, amount, executed_at, notes')
-      .eq('user_id', u.id)
-      .order('executed_at', { ascending: false });
+    const { data } = await getTransactions(getClient(), u.id);
 
     const POSITIVE_TYPES = new Set(['dividend', 'deposit', 'interest']);
     const LABEL_BY_TYPE: Record<string, string> = {
@@ -97,12 +94,14 @@ export default function PortfolioPage() {
     const mapped: Transaction[] = (data ?? []).map(row => {
       const gain = row.type === 'buy' ? false : POSITIVE_TYPES.has(row.type) || row.amount >= 0;
       const hasTicker = row.ticker != null && row.ticker !== '';
+      const ticker = row.ticker ?? '';
+      const executedAt = row.executed_at ?? new Date().toISOString();
       return {
         id: row.id,
-        sym: hasTicker ? row.ticker : LABEL_BY_TYPE[row.type] ?? row.type,
-        avatar: hasTicker ? row.ticker.charAt(0) : '',
+        sym: hasTicker ? ticker : LABEL_BY_TYPE[row.type] ?? row.type,
+        avatar: hasTicker ? ticker.charAt(0) : '',
         type: row.type as Transaction['type'],
-        dateText: new Date(row.executed_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        dateText: new Date(executedAt).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
         total: `${gain ? '+' : '-'}${eur.format(Math.abs(row.amount))} €`,
         totalColor: gain ? 'var(--gain)' : 'var(--on-surface)',
         units: row.units != null ? String(row.units) : undefined,
@@ -113,26 +112,21 @@ export default function PortfolioPage() {
     setTxns(mapped);
 
     const divs = (data ?? [])
-      .filter(row => row.type === 'dividend')
-      .map(row => ({ ticker: row.ticker, letter: row.ticker.charAt(0), amount: row.amount, executed_at: row.executed_at }));
+      .filter(row => row.type === 'dividend' && row.ticker != null)
+      .map(row => ({ ticker: row.ticker!, letter: row.ticker!.charAt(0), amount: row.amount, executed_at: row.executed_at ?? new Date().toISOString() }));
     setDividends(divs);
   }
 
   async function deleteTransaction(id: string) {
-    const supabase = createClient();
-    await supabase.from('transactions').delete().eq('id', id);
+    await dbDeleteTransaction(getClient(), id);
     setTxns(prev => prev.filter(tx => tx.id !== id));
   }
 
   async function fetchCashSettings() {
     const u = await getUser();
     if (!u) return;
-    const supabase = createClient();
-    const { data } = await supabase
-      .from('profiles')
-      .select('uninvested_cash, free_funds_annual_rate_pct')
-      .eq('id', u.id)
-      .single();
+    const { data } = await getClient()
+      .from('profiles').select('uninvested_cash, free_funds_annual_rate_pct').eq('id', u.id).single();
     if (data) setCashSettings({ uninvestedCash: data.uninvested_cash ?? 0, freeFundsAnnualRatePct: data.free_funds_annual_rate_pct ?? 0 });
   }
 

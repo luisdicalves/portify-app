@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { calcPlan, calcFV, type UserProfile } from '@/lib/planCalculator';
+import type { DbProfile, DbPlan } from '@/lib/types/profile';
 import { useUser, getSessionUserId } from '@/lib/hooks/useUser';
 import { onbState } from '@/lib/onboardingState';
 
@@ -60,18 +61,8 @@ function fmt(n: number) {
 }
 
 // ── Tipos ─────────────────────────────────────────────────────────
-type Profile = UserProfile & {
-  first_name: string;
-  last_name: string;
-  user_handle: string;
-  preferred_sectors: string[];
-};
-interface Plan {
-  amount: number;
-  frequency: string;
-  horizon_years: number;
-  goal_amount: number;
-}
+type Profile = DbProfile;
+type Plan = DbPlan;
 
 // ── Row do resumo ─────────────────────────────────────────────────
 function Row({ icon, label, value, last = false }: { icon: string; label: string; value: string; last?: boolean }) {
@@ -146,7 +137,7 @@ export default function SummaryPage() {
 
   // ── Projecção via calcPlan ─────────────────────────────────────
   const planResult = (profile && plan)
-    ? calcPlan({ ...profile, horizon_years: plan.horizon_years })
+    ? calcPlan({ ...(profile as unknown as UserProfile), horizon_years: plan.horizon_years })
     : null;
   const rate      = planResult?.rate      ?? 0.07;
   const rateLow   = planResult?.rateLow   ?? Math.max(0, rate - 0.01);
@@ -234,7 +225,7 @@ export default function SummaryPage() {
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, background: 'var(--primary-container)', borderRadius: 'var(--radius-full)', padding: '4px 14px' }}>
               <span className="material-symbols-outlined icf" style={{ fontSize: 14, color: 'var(--primary-strong)' }}>psychology</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--primary-strong)' }}>Score {planResult.riskScore}</span>
-              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>· {RISK_LABELS[profile.risk_profile]}</span>
+              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>· {RISK_LABELS[profile.risk_profile ?? '']}</span>
             </div>
           )}
           {planResult && (
@@ -271,12 +262,12 @@ export default function SummaryPage() {
             Perfil de investidor
           </div>
           <div style={{ background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: '0 16px' }}>
-            <Row icon="school"               label="Experiência"        value={EXP_LABELS[profile.experience_level] ?? '—'} />
-            <Row icon="local_fire_department" label="Perfil de risco"   value={RISK_LABELS[profile.risk_profile] ?? '—'} />
-            <Row icon="flag"                 label="Objetivo"           value={GOAL_LABELS[profile.investment_goal] ?? '—'} />
-            <Row icon="trending_down"        label="Reação a queda"     value={REACTION_LABELS[profile.market_reaction] ?? '—'} />
-            <Row icon="savings"              label="Situação financeira" value={FINANCIAL_LABELS[profile.financial_status] ?? '—'} />
-            <Row icon="lock"                 label="Acesso ao dinheiro" value={LIQUIDITY_LABELS[profile.liquidity_need] ?? '—'} last />
+            <Row icon="school"               label="Experiência"        value={EXP_LABELS[profile.experience_level ?? ''] ?? '—'} />
+            <Row icon="local_fire_department" label="Perfil de risco"   value={RISK_LABELS[profile.risk_profile ?? ''] ?? '—'} />
+            <Row icon="flag"                 label="Objetivo"           value={GOAL_LABELS[profile.investment_goal ?? ''] ?? '—'} />
+            <Row icon="trending_down"        label="Reação a queda"     value={REACTION_LABELS[profile.market_reaction ?? ''] ?? '—'} />
+            <Row icon="savings"              label="Situação financeira" value={FINANCIAL_LABELS[profile.financial_status ?? ''] ?? '—'} />
+            <Row icon="lock"                 label="Acesso ao dinheiro" value={LIQUIDITY_LABELS[profile.liquidity_need ?? ''] ?? '—'} last />
           </div>
         </div>
 
@@ -288,7 +279,7 @@ export default function SummaryPage() {
           <div style={{ background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: '0 16px' }}>
             <Row icon="payments"       label="Montante"  value={`${fmt(plan.amount)}/${FREQ_LABELS[plan.frequency]?.toLowerCase()}`} />
             <Row icon="calendar_month" label="Horizonte" value={`${plan.horizon_years} anos`} />
-            <Row icon="target"         label="Objetivo"  value={fmt(plan.goal_amount)} last />
+            <Row icon="target"         label="Objetivo"  value={plan.goal_amount != null ? fmt(plan.goal_amount) : '—'} last />
           </div>
         </div>
 

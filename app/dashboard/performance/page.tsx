@@ -5,9 +5,10 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
+import { getHoldings } from '@/lib/db/holdings';
 import {
   calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath,
-  calcWeightedAvgDaysHeld, calcAnnualizedReturn,
+  calcWeightedAvgDaysHeld, calcAnnualizedReturn, type Holding,
 } from '@/lib/portfolioMetrics';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 import { useUser } from '@/lib/hooks/useUser';
@@ -17,7 +18,6 @@ const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-type Holding = { ticker: string; units: number; avg_price: number };
 
 export default function PerformancePage() {
   const router = useRouter();
@@ -34,16 +34,15 @@ export default function PerformancePage() {
     (async () => {
       const supabase = createClient();
 
-      const [{ data: holdingsData }, { data: buys }] = await Promise.all([
-        supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
+      const [hs, { data: buys }] = await Promise.all([
+        getHoldings(supabase, user.id),
         supabase.from('transactions').select('amount, executed_at').eq('user_id', user.id).eq('type', 'buy'),
       ]);
-
-      const hs = holdingsData ?? [];
       setHoldings(hs);
 
-      if (buys && buys.length > 0) {
-        setAvgDaysHeld(calcWeightedAvgDaysHeld(buys));
+      const validBuys = (buys ?? []).filter((b): b is typeof b & { executed_at: string } => b.executed_at != null);
+      if (validBuys.length > 0) {
+        setAvgDaysHeld(calcWeightedAvgDaysHeld(validBuys));
       }
 
       const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));

@@ -7,41 +7,15 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { useUser } from '@/lib/hooks/useUser';
 import BottomNav from '@/components/ui/BottomNav';
-import { SelectList, SelectOption } from '@/components/ui/SelectList';
+import { SelectList } from '@/components/ui/SelectList';
 import { calcPlan } from '@/lib/planCalculator';
 import type { UserProfile } from '@/lib/planCalculator';
+import type { DbProfile, DbPlan } from '@/lib/types/profile';
+import { RISK_OPTIONS, OBJECTIVE_OPTIONS, SECTOR_OPTIONS } from '@/lib/profileOptions';
 
-const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
-const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
+const RISK_LABELS: Record<string, string> = { very_conservative: 'Muito conservador', conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo', very_aggressive: 'Muito agressivo' };
+const GOAL_LABELS: Record<string, string> = { emergency_fund: 'Fundo de emergência', short_purchase: 'Compra a curto prazo', income: 'Rendimento passivo', wealth_growth: 'Crescimento', retirement: 'Reforma', legacy: 'Legado' };
 const FREQ_LABELS: Record<string, string> = { weekly: 'Semanal', monthly: 'Mensal', quarterly: 'Trimestral', annual: 'Anual' };
-
-// Same options as the onboarding pages (app/auth/risk, app/auth/objective) —
-// duplicated here so the profile page can edit them in a bottom sheet instead
-// of re-running the onboarding flow.
-const RISK_OPTIONS: SelectOption[] = [
-  { id: 'conservative', label: 'Conservador', desc: 'Prefiro proteger o capital.', icon: 'shield' },
-  { id: 'moderate', label: 'Moderado', desc: 'Equilíbrio entre risco e retorno.', icon: 'balance' },
-  { id: 'aggressive', label: 'Agressivo', desc: 'Aceito volatilidade por mais retorno.', icon: 'local_fire_department' },
-];
-
-const OBJECTIVE_OPTIONS: SelectOption[] = [
-  { id: 'short', label: 'Curto prazo', desc: 'Comprar e vender no curto prazo.', icon: 'speed' },
-  { id: 'long', label: 'Longo prazo', desc: 'Manter posições durante anos.', icon: 'calendar_month' },
-  { id: 'income', label: 'Rendimento', desc: 'Gerar rendimento com dividendos.', icon: 'payments' },
-  { id: 'retirement', label: 'Reforma', desc: 'Construir um capital para a reforma.', icon: 'beach_access' },
-];
-
-const SECTOR_OPTIONS = [
-  { id: 'tech', label: 'Tecnologia', icon: 'computer' },
-  { id: 'health', label: 'Saúde', icon: 'health_and_safety' },
-  { id: 'finance', label: 'Finanças', icon: 'account_balance' },
-  { id: 'energy', label: 'Energia', icon: 'bolt' },
-  { id: 'consumer', label: 'Consumo', icon: 'shopping_bag' },
-  { id: 'industry', label: 'Indústria', icon: 'factory' },
-  { id: 'realestate', label: 'Imobiliário', icon: 'apartment' },
-  { id: 'materials', label: 'Materiais', icon: 'diamond' },
-  { id: 'comms', label: 'Comunicações', icon: 'cell_tower' },
-];
 
 const PLAN_AMOUNTS = ['100 €', '250 €', '300 €', '500 €', '1.000 €'];
 const PLAN_PERIODS = ['Semanal', 'Mensal', 'Trimestral', 'Anual'];
@@ -73,26 +47,8 @@ function horizonLabel(years: number | null | undefined) {
   return '> 10 anos';
 }
 
-type Profile = {
-  first_name: string | null;
-  last_name: string | null;
-  user_handle: string | null;
-  risk_profile: string | null;
-  investment_goal: string | null;
-  experience_level: string | null;
-  market_reaction: string | null;
-  financial_status: string | null;
-  liquidity_need: string | null;
-  preferred_sectors: string[] | null;
-  investor_since: number | null;
-};
-
-type Plan = {
-  amount: number;
-  frequency: string;
-  horizon_years: number;
-  goal_amount: number;
-};
+type Profile = DbProfile;
+type Plan = DbPlan;
 
 function SectionLabel({ label }: { label: string }) {
   return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
@@ -239,7 +195,7 @@ export default function ProfilePage() {
   }
 
   function openPlanSheet() {
-    setPlanGoal(plan ? String(plan.goal_amount) : '100000');
+    setPlanGoal(plan?.goal_amount != null ? String(plan.goal_amount) : '100000');
     setPlanAmt(plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : 1);
     setPlanPeriod(plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : 1);
     setPlanHorizon(plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2);
