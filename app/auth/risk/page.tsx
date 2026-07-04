@@ -6,6 +6,7 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
+import { onbState } from '@/lib/onboardingState';
 
 const OPTIONS = [
   { id: 'very_conservative', label: 'Muito conservador', desc: 'Aceito retornos baixos. Zero perdas.',       icon: 'shield' },
@@ -32,7 +33,7 @@ export default function RiskPage() {
         const { error } = await supabase.from('profiles').update({ risk_profile: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
-      sessionStorage.setItem('onb_risk_profile', OPTIONS[selected].id);
+      onbState.setRiskProfile(OPTIONS[selected].id);
       router.push('/auth/reaction');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');

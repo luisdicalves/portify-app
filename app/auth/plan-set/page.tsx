@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { calcPlan, calcFV, calcPMT, calcYears, type UserProfile } from '@/lib/planCalculator';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/lib/hooks/useUser';
+import { onbState } from '@/lib/onboardingState';
 
 // ── Constantes ────────────────────────────────────────────────────
 const AMOUNT_VALUES = [50, 100, 250, 500, 1000, 2000];
@@ -49,7 +50,7 @@ export default function PlanSetPage() {
   const [freqIdx, setFreqIdx] = useState(1);   // Mensal
   const [years, setYears]     = useState(() => {
     if (typeof window === 'undefined') return 10;
-    const h = parseInt(sessionStorage.getItem('onb_horizon') ?? '', 10);
+    const h = onbState.getHorizon() ?? NaN;
     return !isNaN(h) && h >= 1 && h <= 50 ? h : 10;
   });
   const [goal, setGoal]       = useState('');
@@ -92,12 +93,7 @@ export default function PlanSetPage() {
     : projectedGoal;
 
   function handleContinue() {
-    sessionStorage.setItem('onb_plan', JSON.stringify({
-      amount:        monthlyAmt,
-      frequency:     FREQUENCIES[freqIdx],
-      horizon_years: years,
-      goal_amount:   finalGoal,
-    }));
+    onbState.setPlan({ amount: monthlyAmt, frequency: FREQUENCIES[freqIdx], horizon_years: years, goal_amount: finalGoal });
     router.push('/auth/summary');
   }
 
