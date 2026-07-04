@@ -254,6 +254,15 @@ export const en: typeof pt = {
   netWorthCardLabel: 'Net worth',
   totalReturn: 'Total return',
   todayHighlights: "Today's highlights",
+  // Profile — riskScore
+  riskScoreLabel: 'Risk score',
+  riskScoreVeryConservative: 'Very conservative',
+  riskScoreConservative: 'Conservative',
+  riskScoreModerate: 'Moderate',
+  riskScoreAggressive: 'Aggressive',
+  riskScoreVeryAggressive: 'Very aggressive',
+  riskScoreDesc: 'Calculated from your full investor profile.',
+  allocationLabel: 'Suggested allocation',
   // For You
   forYouTitle: 'For You',
   recLoading: 'Generating recommendations...',
