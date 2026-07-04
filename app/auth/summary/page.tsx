@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { calcPlan, calcFV, type UserProfile } from '@/lib/planCalculator';
-import { useUser, getUser } from '@/lib/hooks/useUser';
+import { useUser, getSessionUserId } from '@/lib/hooks/useUser';
 
 // ── Labels ────────────────────────────────────────────────────────
 const RISK_LABELS: Record<string, string> = {
@@ -163,12 +163,12 @@ export default function SummaryPage() {
     setSaveError(null);
 
     try {
-      const u = await getUser();
-      if (!u) throw new Error('Sessão expirada.');
+      const userId = await getSessionUserId();
+      if (!userId) throw new Error('Sessão expirada.');
       const supabase = createClient();
 
       const { error: planError } = await supabase.from('investment_plans').upsert({
-        user_id:       u.id,
+        user_id:       userId,
         amount:        plan.amount,
         frequency:     plan.frequency,
         horizon_years: plan.horizon_years,
@@ -183,7 +183,7 @@ export default function SummaryPage() {
           allocated_etf:     planResult.allocation.etf,
           allocated_bond_etf: planResult.allocation.bond_etf,
           estimated_rate:    planResult.rate,
-        }).eq('id', u.id);
+        }).eq('id', userId);
       }
 
       sessionStorage.removeItem('onb_plan');

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { createClient } from '@/lib/supabase/client';
-import { getUser } from '@/lib/hooks/useUser';
+import { getSessionUserId } from '@/lib/hooks/useUser';
 
 const ASSETS = [
   { id: 'stocks', icon: 'show_chart',  iconBg: 'var(--primary-strong)', label: 'Ações', desc: 'Apple, Tesla, Nvidia e outras cotadas.' },
@@ -23,10 +23,10 @@ export default function AssetsPage() {
   async function handleContinue() {
     setSaving(true);
     try {
-      const user = await getUser();
-      if (user) {
+      const userId = await getSessionUserId();
+      if (userId) {
         const supabase = createClient();
-        await supabase.from('profiles').update({ preferred_assets: Array.from(selected) }).eq('id', user.id);
+        await supabase.from('profiles').update({ preferred_assets: Array.from(selected) }).eq('id', userId);
       }
     } catch { /* best-effort */ }
     router.push('/auth/experience');

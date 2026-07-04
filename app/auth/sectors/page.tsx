@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { createClient } from '@/lib/supabase/client';
-import { getUser } from '@/lib/hooks/useUser';
+import { getSessionUserId } from '@/lib/hooks/useUser';
 
 const SECTORS = [
   { id: 'tech',       label: 'Tecnologia',   icon: 'computer' },
@@ -34,10 +34,10 @@ export default function SectorsPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const user = await getUser();
-      if (user) {
+      const userId = await getSessionUserId();
+      if (userId) {
         const supabase = createClient();
-        const { error } = await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', user.id);
+        const { error } = await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', userId);
         if (error) throw error;
       }
       router.push('/auth/plan-ask');

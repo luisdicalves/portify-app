@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
-import { getUser } from '@/lib/hooks/useUser';
+import { getSessionUserId } from '@/lib/hooks/useUser';
 
 const OPTIONS = [
   { id: 'unstable',    label: 'Instável',    desc: 'Rendimento variável ou incerto.',          icon: 'warning' },
@@ -25,10 +25,10 @@ export default function FinancialPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const user = await getUser();
-      if (user) {
+      const userId = await getSessionUserId();
+      if (userId) {
         const supabase = createClient();
-        const { error } = await supabase.from('profiles').update({ financial_status: OPTIONS[selected].id }).eq('id', user.id);
+        const { error } = await supabase.from('profiles').update({ financial_status: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
       router.push('/auth/liquidity');
