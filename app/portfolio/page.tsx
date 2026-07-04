@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
@@ -32,6 +32,11 @@ export default function PortfolioPage() {
   const router = useRouter();
   const { user } = useUser();
   const { lang } = useApp();
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  function getClient() {
+    if (!supabaseRef.current) supabaseRef.current = createClient();
+    return supabaseRef.current;
+  }
   const t = useDict(lang);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +51,8 @@ export default function PortfolioPage() {
     setLoading(true);
     const u = await getUser();
     if (!u) { setLoading(false); return; }
-    const supabase = createClient();
 
-    const { data: holdings } = await supabase
+    const { data: holdings } = await getClient()
       .from('holdings')
       .select('ticker, units, avg_price')
       .eq('user_id', u.id);
@@ -78,9 +82,8 @@ export default function PortfolioPage() {
   async function fetchTransactions() {
     const u = await getUser();
     if (!u) return;
-    const supabase = createClient();
 
-    const { data } = await supabase
+    const { data } = await getClient()
       .from('transactions')
       .select('id, ticker, type, units, price, amount, executed_at, notes')
       .eq('user_id', u.id)
@@ -121,16 +124,14 @@ export default function PortfolioPage() {
   }
 
   async function deleteTransaction(id: string) {
-    const supabase = createClient();
-    await supabase.from('transactions').delete().eq('id', id);
+    await getClient().from('transactions').delete().eq('id', id);
     setTxns(prev => prev.filter(tx => tx.id !== id));
   }
 
   async function fetchCashSettings() {
     const u = await getUser();
     if (!u) return;
-    const supabase = createClient();
-    const { data } = await supabase
+    const { data } = await getClient()
       .from('profiles')
       .select('uninvested_cash, free_funds_annual_rate_pct')
       .eq('id', u.id)
