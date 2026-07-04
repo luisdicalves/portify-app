@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { calcPlan, calcFV, type UserProfile } from '@/lib/planCalculator';
 import type { DbProfile, DbPlan } from '@/lib/types/profile';
 import { useUser, getSessionUserId } from '@/lib/hooks/useUser';
+import { onbState } from '@/lib/onboardingState';
 
 // ── Labels ────────────────────────────────────────────────────────
 const RISK_LABELS: Record<string, string> = {
@@ -122,10 +123,8 @@ export default function SummaryPage() {
 
       if (p) setProfile(p as Profile);
 
-      const stored = sessionStorage.getItem('onb_plan');
-      if (stored) {
-        try { setPlan(JSON.parse(stored)); } catch { /* ignore */ }
-      }
+      const stored = onbState.getPlan();
+      if (stored) setPlan(stored);
 
       setLoaded(true);
     })();
@@ -177,8 +176,7 @@ export default function SummaryPage() {
         }).eq('id', userId);
       }
 
-      sessionStorage.removeItem('onb_plan');
-      sessionStorage.removeItem('onb_risk_profile');
+      onbState.clear();
 
       setToast(true);
       setTimeout(() => router.push('/dashboard'), 1800);

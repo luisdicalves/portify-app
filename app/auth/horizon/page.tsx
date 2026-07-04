@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
+import { onbState } from '@/lib/onboardingState';
 
 function getWarning(years: number): { text: string; color: string } | null {
   if (years < 2) return { text: 'Com menos de 2 anos, recomendamos perfis muito conservadores para evitar perdas.', color: 'var(--loss)' };
@@ -28,7 +29,7 @@ export default function HorizonPage() {
   async function handleContinue() {
     if (!isValid) { setError('Introduz um valor entre 1 e 50 anos.'); return; }
     setError('');
-    sessionStorage.setItem('onb_horizon', String(parsed));
+    onbState.setHorizon(parsed);
     router.push('/auth/risk');
   }
 
