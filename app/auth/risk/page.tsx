@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
+import { getUser } from '@/lib/hooks/useUser';
 
 const OPTIONS = [
   { id: 'very_conservative', label: 'Muito conservador', desc: 'Aceito retornos baixos. Zero perdas.',       icon: 'shield' },
@@ -25,9 +26,9 @@ export default function RiskPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUser();
       if (user) {
+        const supabase = createClient();
         const { error } = await supabase.from('profiles').update({ risk_profile: OPTIONS[selected].id }).eq('id', user.id);
         if (error) throw error;
       }

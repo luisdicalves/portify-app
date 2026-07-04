@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { calcPlan, calcFV, calcPMT, calcYears, type UserProfile } from '@/lib/planCalculator';
 import { createClient } from '@/lib/supabase/client';
+import { useUser } from '@/lib/hooks/useUser';
 
 // ── Constantes ────────────────────────────────────────────────────
 const AMOUNT_VALUES = [50, 100, 250, 500, 1000, 2000];
@@ -40,6 +41,7 @@ const lbl = {
 // ── Página ────────────────────────────────────────────────────────
 export default function PlanSetPage() {
   const router = useRouter();
+  const { user } = useUser();
 
   type Mode = 'calc_goal' | 'calc_years' | 'calc_amount';
   const [mode, setMode]       = useState<Mode>('calc_goal');
@@ -54,10 +56,9 @@ export default function PlanSetPage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
       const { data } = await supabase
         .from('profiles')
         .select('risk_profile, investment_goal, experience_level, market_reaction, financial_status, liquidity_need')
@@ -65,7 +66,7 @@ export default function PlanSetPage() {
         .single();
       if (data) setProfile(data as UserProfile);
     })();
-  }, []);
+  }, [user]);
 
   // ── Cálculo dinâmico ──────────────────────────────────────────
   const plan      = profile ? calcPlan({ ...profile, horizon_years: years }) : null;

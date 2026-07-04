@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { createClient } from '@/lib/supabase/client';
+import { getUser } from '@/lib/hooks/useUser';
 
 export default function PinPage() {
   const { lang } = useApp();
@@ -28,7 +29,7 @@ export default function PinPage() {
     const supabase = createClient();
     const { data: ok } = await supabase.rpc('verify_pin', { p_pin: value });
     if (ok) {
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getUser();
       if (user) {
         const { data: plan } = await supabase
           .from('investment_plans')

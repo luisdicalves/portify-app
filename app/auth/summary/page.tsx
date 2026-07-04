@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { calcPlan, calcFV, type UserProfile } from '@/lib/planCalculator';
+import { useUser, getUser } from '@/lib/hooks/useUser';
 
 // ── Labels ────────────────────────────────────────────────────────
 const RISK_LABELS: Record<string, string> = {
@@ -110,6 +111,7 @@ function Toast({ visible }: { visible: boolean }) {
 // ── Página ────────────────────────────────────────────────────────
 export default function SummaryPage() {
   const router = useRouter();
+  const { user } = useUser();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [plan, setPlan]       = useState<Plan | null>(null);
   const [loaded, setLoaded]   = useState(false);
@@ -118,11 +120,9 @@ export default function SummaryPage() {
   const [toast, setToast]     = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoaded(true); return; }
-
       const { data: p } = await supabase
         .from('profiles')
         .select('first_name, last_name, user_handle, experience_level, risk_profile, investment_goal, market_reaction, financial_status, liquidity_need, preferred_sectors')
@@ -138,7 +138,7 @@ export default function SummaryPage() {
 
       setLoaded(true);
     })();
-  }, []);
+  }, [user]);
 
   // Redirecionar se plano não existe após carregar (sessionStorage perdido)
   useEffect(() => {
@@ -163,12 +163,12 @@ export default function SummaryPage() {
     setSaveError(null);
 
     try {
+      const u = await getUser();
+      if (!u) throw new Error('Sessão expirada.');
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Sessão expirada.');
 
       const { error: planError } = await supabase.from('investment_plans').upsert({
-        user_id:       user.id,
+        user_id:       u.id,
         amount:        plan.amount,
         frequency:     plan.frequency,
         horizon_years: plan.horizon_years,
@@ -183,7 +183,7 @@ export default function SummaryPage() {
           allocated_etf:     planResult.allocation.etf,
           allocated_bond_etf: planResult.allocation.bond_etf,
           estimated_rate:    planResult.rate,
-        }).eq('id', user.id);
+        }).eq('id', u.id);
       }
 
       sessionStorage.removeItem('onb_plan');
