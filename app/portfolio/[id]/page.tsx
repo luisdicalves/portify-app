@@ -5,14 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
 import RiskReport from '@/components/ui/RiskReport';
-import { createClient } from '@/lib/supabase/client';
-import { getHolding, upsertHolding, updateHolding, deleteHolding } from '@/lib/db/holdings';
-import { insertTransaction } from '@/lib/db/transactions';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
-import type { RiskReport as RiskReportData } from '@/lib/riskScore';
-import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
-import { useUser, getUser } from '@/lib/hooks/useUser';
+import { useUser } from '@/lib/hooks/useUser';
+import { useAssetDetail } from '@/lib/hooks/useAssetDetail';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -52,7 +48,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const t = useDict(lang);
   const ticker = params.id.toUpperCase();
 
-  const [holding, setHolding] = useState<{ units: number; avg_price: number } | null>(null);
+  const { holding, quote, quoteLoading, history, riskReport, riskLoading, riskRequested, saving, loadRiskReport, confirmTrade } = useAssetDetail(ticker, user?.id, lang);
   const [sheet, setSheet] = useState<'buy' | 'sell' | null>(null);
   const [shares, setShares] = useState('');
   const [avgPrice, setAvgPrice] = useState('');
@@ -60,45 +56,6 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   const [time, setTime] = useState(nowTime());
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [quote, setQuote] = useState<Quote | null>(null);
-  const [quoteLoading, setQuoteLoading] = useState(true);
-  const [history, setHistory] = useState<HistoryPoint[] | null>(null);
-  const [riskReport, setRiskReport] = useState<RiskReportData | null>(null);
-  const [riskLoading, setRiskLoading] = useState(false);
-  const [riskRequested, setRiskRequested] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const supabase = createClient();
-      const data = await getHolding(supabase, user.id, ticker);
-      setHolding(data);
-    })();
-  }, [user, ticker]);
-
-  useEffect(() => {
-    setQuoteLoading(true);
-    fetchQuote(ticker).then(q => { setQuote(q); setQuoteLoading(false); });
-  }, [ticker]);
-
-  useEffect(() => {
-    fetchHistory(ticker, 30).then(pts => setHistory(pts));
-  }, [ticker]);
-
-  async function loadRiskReport() {
-    setRiskRequested(true);
-    setRiskLoading(true);
-    try {
-      const res = await fetch(`/api/risk?symbol=${encodeURIComponent(ticker)}&lang=${lang}`);
-      if (!res.ok) throw new Error('risk_failed');
-      setRiskReport(await res.json());
-    } catch {
-      setRiskReport(null);
-    } finally {
-      setRiskLoading(false);
-    }
-  }
 
   function openSheet(mode: 'buy' | 'sell') {
     setShares('');
@@ -119,53 +76,6 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
     setError('');
   }
 
-  async function confirmTrade() {
-    if (!sheet) return;
-    const unitsNum = parseFloat(shares.replace(',', '.'));
-    const priceNum = parseFloat(avgPrice.replace(',', '.'));
-    if (!unitsNum || unitsNum <= 0 || !priceNum || priceNum <= 0) { setError(t.bsError); return; }
-
-    setSaving(true);
-    const u = await getUser();
-    if (!u) { setSaving(false); return; }
-    const supabase = createClient();
-
-    const [hh, mm] = time.split(':').map(Number);
-    const executedAt = new Date(tradeDate);
-    if (!Number.isNaN(hh) && !Number.isNaN(mm)) executedAt.setHours(hh, mm);
-    const amount = unitsNum * priceNum;
-
-    await insertTransaction(supabase, {
-      user_id: u.id, ticker, type: sheet, units: unitsNum, price: priceNum, amount, executed_at: executedAt.toISOString(),
-    });
-
-    if (sheet === 'buy') {
-      if (holding) {
-        const newUnits = holding.units + unitsNum;
-        const newAvg = (holding.units * holding.avg_price + unitsNum * priceNum) / newUnits;
-        await updateHolding(supabase, u.id, ticker, { units: newUnits, avg_price: newAvg });
-        setHolding({ units: newUnits, avg_price: newAvg });
-      } else {
-        await upsertHolding(supabase, u.id, ticker, unitsNum, priceNum);
-        setHolding({ units: unitsNum, avg_price: priceNum });
-      }
-    } else if (holding) {
-      const newUnits = holding.units - unitsNum;
-      if (newUnits <= 0) {
-        await deleteHolding(supabase, u.id, ticker);
-        setHolding(null);
-      } else {
-        await updateHolding(supabase, u.id, ticker, { units: newUnits });
-        setHolding({ ...holding, units: newUnits });
-      }
-    }
-
-    // Holdings changed → invalidate cached recommendations so for-you page re-fetches
-    sessionStorage.removeItem('rec-etag');
-
-    setSaving(false);
-    closeSheet();
-  }
 
   const tradeDateText = new Date(tradeDate).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB');
   const fieldStyle = { display: 'flex', alignItems: 'center', gap: 9, background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '0 13px' } as const;
@@ -335,7 +245,7 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
 
               {error && <div style={{ fontSize: 13, color: 'var(--loss)' }}>{error}</div>}
 
-              <button onClick={confirmTrade} disabled={saving} style={{
+              <button onClick={() => sheet && confirmTrade(sheet, shares, avgPrice, tradeDate, time, t.bsError, setError, closeSheet)} disabled={saving} style={{
                 background: sheet === 'buy' ? 'var(--gain-strong)' : 'var(--loss-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: saving ? 0.7 : 1,
               }}>
                 {sheet === 'buy' ? t.bsConfirm : t.bsSellConfirm}
