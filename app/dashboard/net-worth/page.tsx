@@ -7,12 +7,10 @@ import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote } from '@/lib/marketApi';
+import { type Holding } from '@/lib/portfolioMetrics';
 import { useUser } from '@/lib/hooks/useUser';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-type Holding = { ticker: string; units: number; avg_price: number };
-
 
 export default function NetWorthPage() {
   const router = useRouter();
