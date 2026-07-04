@@ -77,16 +77,34 @@ describe('qualityLabel', () => {
   });
 });
 
+function makePillar(score: number) {
+  return { score, weight: 0.33, verdict: '', description: '', metrics: [], plainEnglish: '' };
+}
+
 const MOCK_REPORT: RiskReport = {
-  score:      65,
-  scoreLabel: 'moderate',
-  risks:      ['Valuation stretched', 'Sem sinais de alerta adicional'],
-  catalysts:  ['Strong earnings growth', 'Market expansion'],
+  ticker:           'AAPL',
+  companyName:      'Apple Inc.',
+  price:            180,
+  currency:         'USD',
+  sector:           'Technology',
+  tagline:          '',
+  score:            65,
+  scoreLabel:       'moderate',
+  risks:            ['Valuation stretched', 'Sem sinais de alerta adicional'],
+  catalysts:        ['Strong earnings growth', 'Market expansion'],
   pillars: {
-    valuation: { score: 60, risks: [], catalysts: [] },
-    health:    { score: 70, risks: [], catalysts: [] },
-    growth:    { score: 75, risks: [], catalysts: [] },
+    valuation: makePillar(60),
+    health:    makePillar(70),
+    growth:    makePillar(75),
   },
+  chart:            [],
+  executiveSummary: '',
+  actionGuide: {
+    aggressiveEntry: 170, conservativeEntry: 160,
+    current: 180, trim: 200, stop: 150,
+    beta: 1.1, savingsPlanSuitable: true,
+  },
+  footer: { tags: [], source: 'Finnhub', nextEarnings: null },
 };
 
 const PROFILE: UserProfile = {
@@ -115,7 +133,7 @@ describe('calcQualityScoreFromReport', () => {
   it('wealth_growth goal benefits from strong growth pillar', () => {
     const growthReport: RiskReport = {
       ...MOCK_REPORT,
-      pillars: { ...MOCK_REPORT.pillars, growth: { score: 95, risks: [], catalysts: [] } },
+      pillars: { ...MOCK_REPORT.pillars, growth: makePillar(95) },
     };
     const wg      = calcQualityScoreFromReport(growthReport, { ...PROFILE, investment_goal: 'wealth_growth' });
     const income  = calcQualityScoreFromReport(growthReport, { ...PROFILE, investment_goal: 'income' });
