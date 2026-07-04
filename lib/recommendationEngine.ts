@@ -10,7 +10,7 @@
 
 import type { CandidateAsset, AssetClass } from '@/lib/assetUniverse';
 import { sectorMatchScore }                from '@/lib/sectorMap';
-import { calcRiskScore, calcPlan, type UserProfile } from '@/lib/planCalculator';
+import { calcPlan, type UserProfile } from '@/lib/planCalculator';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -243,7 +243,7 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
 
   const planResult = calcPlan(profile);
   const alloc      = planResult.allocation;
-  const riskScore  = calcRiskScore(profile);
+  const riskScore  = planResult.riskScore;
 
   // Valor total da carteira atual
   const totalPortfolioValue = holdings.reduce(
