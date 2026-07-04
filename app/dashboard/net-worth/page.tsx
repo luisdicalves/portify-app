@@ -6,6 +6,7 @@ import BottomNav from '@/components/ui/BottomNav';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { useUser } from '@/lib/hooks/useUser';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -26,15 +27,14 @@ export default function NetWorthPage() {
   const router = useRouter();
   const { lang } = useApp();
   const t = useDict(lang);
+  const { user } = useUser();
   const [totalValue, setTotalValue] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
-
       const { data: holdings } = await supabase
         .from('holdings')
         .select('ticker, units, avg_price')
@@ -46,7 +46,7 @@ export default function NetWorthPage() {
       setTotalValue(value);
       setLoading(false);
     })();
-  }, []);
+  }, [user]);
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>

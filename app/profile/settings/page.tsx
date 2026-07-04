@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { parseFile } from '@/lib/holdingsImport';
+import { useUser } from '@/lib/hooks/useUser';
 
 function SectionLabel({ label }: { label: string }) {
   return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
@@ -35,6 +36,7 @@ function Card({ children }: { children: React.ReactNode }) {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { user } = useUser();
   const { theme, toggleTheme, lang, setLang } = useApp();
   const t = useDict(lang);
 
@@ -87,10 +89,9 @@ export default function SettingsPage() {
   const [savingCash, setSavingCash] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
       const { data } = await supabase
         .from('profiles')
         .select('uninvested_cash, free_funds_annual_rate_pct')
@@ -101,7 +102,7 @@ export default function SettingsPage() {
         setFreeFundsRate(data.free_funds_annual_rate_pct ?? 0);
       }
     })();
-  }, []);
+  }, [user]);
 
   function openCashSheet(field: 'cash' | 'rate') {
     setCashInput(String(field === 'cash' ? uninvestedCash : freeFundsRate));
@@ -109,16 +110,14 @@ export default function SettingsPage() {
   }
 
   async function saveCashField() {
+    if (!user) return;
     const value = parseFloat(cashInput.replace(',', '.'));
     if (Number.isNaN(value) || value < 0) return;
     setSavingCash(true);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const column = cashSheetField === 'cash' ? 'uninvested_cash' : 'free_funds_annual_rate_pct';
-      await supabase.from('profiles').update({ [column]: value }).eq('id', user.id);
-      if (cashSheetField === 'cash') setUninvestedCash(value); else setFreeFundsRate(value);
-    }
+    const column = cashSheetField === 'cash' ? 'uninvested_cash' : 'free_funds_annual_rate_pct';
+    await supabase.from('profiles').update({ [column]: value }).eq('id', user.id);
+    if (cashSheetField === 'cash') setUninvestedCash(value); else setFreeFundsRate(value);
     setSavingCash(false);
     setCashSheetField(null);
   }
@@ -135,9 +134,8 @@ export default function SettingsPage() {
     setImporting(true);
     try {
       const { holdings, transactions } = await parseFile(importFile);
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('no user');
+      const supabase = createClient();
 
       // Upsert holdings (positions)
       if (holdings.length > 0) {
@@ -187,9 +185,8 @@ export default function SettingsPage() {
 
   async function downloadExport() {
     if (exportFormat === 'csv') {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      const supabase = createClient();
       const { data: holdings } = await supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id);
       const rows = [['ticker', 'units', 'avg_price'], ...(holdings ?? []).map(h => [h.ticker, String(h.units), String(h.avg_price)])];
       const csv = rows.map(r => r.join(',')).join('\n');
