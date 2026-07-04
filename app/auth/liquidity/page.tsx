@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
+import { getSessionUserId } from '@/lib/hooks/useUser';
 
 const OPTIONS = [
   { id: 'critical', label: 'É crítico',  desc: 'Posso precisar do dinheiro a qualquer momento.', icon: 'emergency' },
@@ -28,10 +29,10 @@ export default function LiquidityPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { error } = await supabase.from('profiles').update({ liquidity_need: OPTIONS[selected].id }).eq('id', user.id);
+      const userId = await getSessionUserId();
+      if (userId) {
+        const supabase = createClient();
+        const { error } = await supabase.from('profiles').update({ liquidity_need: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
       router.push('/auth/sectors');

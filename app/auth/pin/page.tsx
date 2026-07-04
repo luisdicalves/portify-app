@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { createClient } from '@/lib/supabase/client';
+import { getSessionUserId } from '@/lib/hooks/useUser';
 
 export default function PinPage() {
   const { lang } = useApp();
@@ -28,12 +29,12 @@ export default function PinPage() {
     const supabase = createClient();
     const { data: ok } = await supabase.rpc('verify_pin', { p_pin: value });
     if (ok) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
+      const userId = await getSessionUserId();
+      if (userId) {
         const { data: plan } = await supabase
           .from('investment_plans')
           .select('id')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .maybeSingle();
         if (!plan) {
           router.push('/auth/assets');
