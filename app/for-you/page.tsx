@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
@@ -184,6 +185,7 @@ function Skeleton() {
 export default function ForYouPage() {
   const { lang } = useApp();
   const t = useDict(lang);
+  const router = useRouter();
 
   const [result, setResult]   = useState<RecommendationResult | null>(null);
   const [loading, setLoading] = useState(true);
@@ -191,14 +193,15 @@ export default function ForYouPage() {
 
   useEffect(() => {
     fetch('/api/recommendations')
-      .then(r => r.json())
-      .then(data => {
-        if (data.error) setError(data.error);
+      .then(async r => {
+        if (r.status === 401) { router.replace('/auth/login'); return; }
+        const data = await r.json();
+        if (data.error) setError(data.error as string);
         else setResult(data as RecommendationResult);
       })
       .catch(() => setError('network_error'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   const recs = result?.recommendations ?? [];
 
