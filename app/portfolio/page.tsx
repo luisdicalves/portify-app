@@ -1,32 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
 import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
 import { SkeletonRow } from '@/components/ui/Skeleton';
-import { createClient } from '@/lib/supabase/client';
-import { getHoldings } from '@/lib/db/holdings';
-import { getTransactions, deleteTransaction as dbDeleteTransaction } from '@/lib/db/transactions';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
-import { fetchQuote } from '@/lib/marketApi';
-import { useUser, getUser } from '@/lib/hooks/useUser';
+import { useUser } from '@/lib/hooks/useUser';
+import { usePortfolioData } from '@/lib/hooks/usePortfolioData';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-type Asset = {
-  ticker: string;
-  letter: string;
-  units: number;
-  value: number;
-  cost: number;
-  dayChange: number;
-  gainPct: number;
-  gain: boolean;
-};
 
 const TAB_IDS = ['positions', 'dividends', 'history'] as const;
 
@@ -34,107 +20,11 @@ export default function PortfolioPage() {
   const router = useRouter();
   const { user } = useUser();
   const { lang } = useApp();
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
-  function getClient() {
-    if (!supabaseRef.current) supabaseRef.current = createClient();
-    return supabaseRef.current;
-  }
   const t = useDict(lang);
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { assets, loading, txns, dividends, cashSettings, removeTxn } = usePortfolioData(user?.id, lang);
   const [tab, setTab] = useState<typeof TAB_IDS[number]>('positions');
-  const [txns, setTxns] = useState<Transaction[]>([]);
-  const [dividends, setDividends] = useState<{ ticker: string; letter: string; amount: number; executed_at: string }[]>([]);
-  const [cashSettings, setCashSettings] = useState({ uninvestedCash: 0, freeFundsAnnualRatePct: 0 });
   const [openTxnId, setOpenTxnId] = useState<string | null>(null);
   const [sellPickerOpen, setSellPickerOpen] = useState(false);
-
-  async function fetchHoldings() {
-    setLoading(true);
-    const u = await getUser();
-    if (!u) { setLoading(false); return; }
-
-    const holdings = await getHoldings(getClient(), u.id);
-    const quotes = await Promise.all(holdings.map(h => fetchQuote(h.ticker)));
-
-    const mapped: Asset[] = holdings.map((h, i) => {
-      const quote = quotes[i];
-      const price = quote?.price ?? h.avg_price;
-      const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
-      return {
-        ticker: h.ticker,
-        letter: h.ticker.charAt(0),
-        units: h.units,
-        value: h.units * price,
-        cost: h.units * h.avg_price,
-        dayChange: h.units * (quote?.change ?? 0),
-        gainPct,
-        gain: gainPct >= 0,
-      };
-    });
-
-    setAssets(mapped);
-    setLoading(false);
-  }
-
-  async function fetchTransactions() {
-    const u = await getUser();
-    if (!u) return;
-
-    const { data } = await getTransactions(getClient(), u.id);
-
-    const POSITIVE_TYPES = new Set(['dividend', 'deposit', 'interest']);
-    const LABEL_BY_TYPE: Record<string, string> = {
-      deposit: 'Depósito',
-      interest: 'Juros',
-      withholding_tax: 'WHT',
-      interest_tax: 'Imposto',
-    };
-
-    const mapped: Transaction[] = (data ?? []).map(row => {
-      const gain = row.type === 'buy' ? false : POSITIVE_TYPES.has(row.type) || row.amount >= 0;
-      const hasTicker = row.ticker != null && row.ticker !== '';
-      const ticker = row.ticker ?? '';
-      const executedAt = row.executed_at ?? new Date().toISOString();
-      return {
-        id: row.id,
-        sym: hasTicker ? ticker : LABEL_BY_TYPE[row.type] ?? row.type,
-        avatar: hasTicker ? ticker.charAt(0) : '',
-        type: row.type as Transaction['type'],
-        dateText: new Date(executedAt).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
-        total: `${gain ? '+' : '-'}${eur.format(Math.abs(row.amount))} €`,
-        totalColor: gain ? 'var(--gain)' : 'var(--on-surface)',
-        units: row.units != null ? String(row.units) : undefined,
-        unitVal: row.price != null ? `${eur.format(row.price)} €` : undefined,
-        note: row.notes ?? undefined,
-      };
-    });
-    setTxns(mapped);
-
-    const divs = (data ?? [])
-      .filter(row => row.type === 'dividend' && row.ticker != null)
-      .map(row => ({ ticker: row.ticker!, letter: row.ticker!.charAt(0), amount: row.amount, executed_at: row.executed_at ?? new Date().toISOString() }));
-    setDividends(divs);
-  }
-
-  async function deleteTransaction(id: string) {
-    await dbDeleteTransaction(getClient(), id);
-    setTxns(prev => prev.filter(tx => tx.id !== id));
-  }
-
-  async function fetchCashSettings() {
-    const u = await getUser();
-    if (!u) return;
-    const { data } = await getClient()
-      .from('profiles').select('uninvested_cash, free_funds_annual_rate_pct').eq('id', u.id).single();
-    if (data) setCashSettings({ uninvestedCash: data.uninvested_cash ?? 0, freeFundsAnnualRatePct: data.free_funds_annual_rate_pct ?? 0 });
-  }
-
-  useEffect(() => {
-    if (!user) return;
-    fetchHoldings(); fetchTransactions(); fetchCashSettings();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
   const totalValue = assets.reduce((sum, a) => sum + a.value, 0);
   const totalInvested = assets.reduce((sum, a) => sum + a.cost, 0);
@@ -316,7 +206,7 @@ export default function PortfolioPage() {
                 tx={tx}
                 expanded={openTxnId === tx.id}
                 onToggle={() => setOpenTxnId(id => id === tx.id ? null : tx.id)}
-                onDelete={() => deleteTransaction(tx.id)}
+                onDelete={() => removeTxn(tx.id)}
                 labels={{
                   buy: t.txcBuy, sell: t.txcSell, dividend: t.txcDiv,
                   deposit: t.txcDeposit, interest: t.txcInterest,

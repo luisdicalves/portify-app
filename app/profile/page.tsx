@@ -1,28 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { useUser } from '@/lib/hooks/useUser';
+import { useProfileData } from '@/lib/hooks/useProfileData';
 import BottomNav from '@/components/ui/BottomNav';
 import { SelectList } from '@/components/ui/SelectList';
 import { calcPlan } from '@/lib/planCalculator';
 import type { UserProfile } from '@/lib/planCalculator';
 import type { DbProfile, DbPlan } from '@/lib/types/profile';
 import { RISK_OPTIONS, OBJECTIVE_OPTIONS, SECTOR_OPTIONS } from '@/lib/profileOptions';
+import { PLAN_AMOUNTS, PLAN_PERIODS, PLAN_HORIZONS, PLAN_AMOUNT_VALUES, PLAN_FREQUENCIES, PLAN_HORIZON_YEARS } from '@/lib/profileConstants';
 
 const RISK_LABELS: Record<string, string> = { very_conservative: 'Muito conservador', conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo', very_aggressive: 'Muito agressivo' };
 const GOAL_LABELS: Record<string, string> = { emergency_fund: 'Fundo de emergência', short_purchase: 'Compra a curto prazo', income: 'Rendimento passivo', wealth_growth: 'Crescimento', retirement: 'Reforma', legacy: 'Legado' };
 const FREQ_LABELS: Record<string, string> = { weekly: 'Semanal', monthly: 'Mensal', quarterly: 'Trimestral', annual: 'Anual' };
-
-const PLAN_AMOUNTS = ['100 €', '250 €', '300 €', '500 €', '1.000 €'];
-const PLAN_PERIODS = ['Semanal', 'Mensal', 'Trimestral', 'Anual'];
-const PLAN_HORIZONS = ['< 2 anos', '2 – 5 anos', '5 – 10 anos', '> 10 anos'];
-const PLAN_AMOUNT_VALUES = [100, 250, 300, 500, 1000];
-const PLAN_FREQUENCIES = ['weekly', 'monthly', 'quarterly', 'annual'] as const;
-const PLAN_HORIZON_YEARS = [1, 3, 7, 15];
 
 function PlanChip({ label, on, onClick }: { label: string; on: boolean; onClick: () => void }) {
   return (
@@ -46,9 +41,6 @@ function horizonLabel(years: number | null | undefined) {
   if (years <= 10) return '5 – 10 anos';
   return '> 10 anos';
 }
-
-type Profile = DbProfile;
-type Plan = DbPlan;
 
 function SectionLabel({ label }: { label: string }) {
   return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
@@ -78,8 +70,7 @@ export default function ProfilePage() {
   const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [plan, setPlan] = useState<Plan | null>(null);
+  const { profile, plan, saving: savingField, saveRisk, saveObjective, saveSectors, savePlan } = useProfileData(user?.id);
 
   const [riskSheetOpen, setRiskSheetOpen] = useState(false);
   const [riskSelected, setRiskSelected] = useState(1);
@@ -92,20 +83,6 @@ export default function ProfilePage() {
   const [planAmt, setPlanAmt] = useState(1);
   const [planPeriod, setPlanPeriod] = useState(1);
   const [planHorizon, setPlanHorizon] = useState(2);
-  const [savingField, setSavingField] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    (async () => {
-      const supabase = createClient();
-      const [{ data: p }, { data: pl }] = await Promise.all([
-        supabase.from('profiles').select('first_name, last_name, user_handle, risk_profile, investment_goal, experience_level, market_reaction, financial_status, liquidity_need, preferred_sectors, investor_since').eq('id', user.id).single(),
-        supabase.from('investment_plans').select('amount, frequency, horizon_years, goal_amount').eq('user_id', user.id).maybeSingle(),
-      ]);
-      if (p) setProfile(p);
-      if (pl) setPlan(pl);
-    })();
-  }, [user]);
 
   // Calcular riskScore e alocação sempre que o perfil ou plano mudar
   const planResult = (() => {
@@ -139,34 +116,10 @@ export default function ProfilePage() {
     setRiskSheetOpen(true);
   }
 
-  async function saveRisk() {
-    if (!user) return;
-    setSavingField(true);
-    const supabase = createClient();
-    const riskId = RISK_OPTIONS[riskSelected].id;
-    await supabase.from('profiles').update({ risk_profile: riskId }).eq('id', user.id);
-    setProfile(p => p ? { ...p, risk_profile: riskId } : p);
-    sessionStorage.removeItem('rec-etag');
-    setSavingField(false);
-    setRiskSheetOpen(false);
-  }
-
   function openObjectiveSheet() {
     const idx = OBJECTIVE_OPTIONS.findIndex(o => o.id === profile?.investment_goal);
     setObjectiveSelected(idx >= 0 ? idx : 1);
     setObjectiveSheetOpen(true);
-  }
-
-  async function saveObjective() {
-    if (!user) return;
-    setSavingField(true);
-    const supabase = createClient();
-    const goalId = OBJECTIVE_OPTIONS[objectiveSelected].id;
-    await supabase.from('profiles').update({ investment_goal: goalId }).eq('id', user.id);
-    setProfile(p => p ? { ...p, investment_goal: goalId } : p);
-    sessionStorage.removeItem('rec-etag');
-    setSavingField(false);
-    setObjectiveSheetOpen(false);
   }
 
   function openSectorsSheet() {
@@ -182,40 +135,12 @@ export default function ProfilePage() {
     });
   }
 
-  async function saveSectors() {
-    if (!user) return;
-    setSavingField(true);
-    const supabase = createClient();
-    const sectors = Array.from(sectorsSelected);
-    await supabase.from('profiles').update({ preferred_sectors: sectors }).eq('id', user.id);
-    setProfile(p => p ? { ...p, preferred_sectors: sectors } : p);
-    sessionStorage.removeItem('rec-etag');
-    setSavingField(false);
-    setSectorsSheetOpen(false);
-  }
-
   function openPlanSheet() {
     setPlanGoal(plan?.goal_amount != null ? String(plan.goal_amount) : '100000');
     setPlanAmt(plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : 1);
     setPlanPeriod(plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : 1);
     setPlanHorizon(plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2);
     setPlanSheetOpen(true);
-  }
-
-  async function savePlan() {
-    if (!user) return;
-    setSavingField(true);
-    const supabase = createClient();
-    const amount = PLAN_AMOUNT_VALUES[planAmt];
-    const frequency = PLAN_FREQUENCIES[planPeriod];
-    const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
-    const goal_amount = parseFloat(planGoal) || 0;
-    await supabase.from('investment_plans').upsert({
-      user_id: user.id, amount, frequency, horizon_years, goal_amount,
-    });
-    setPlan({ amount, frequency, horizon_years, goal_amount });
-    setSavingField(false);
-    setPlanSheetOpen(false);
   }
 
   async function signOut() {
@@ -352,7 +277,7 @@ export default function ProfilePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <SelectList options={RISK_OPTIONS} selected={riskSelected} onSelect={setRiskSelected} />
             </div>
-            <button onClick={saveRisk} disabled={savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+            <button onClick={() => { saveRisk(riskSelected); setRiskSheetOpen(false); }} disabled={savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
               {t.confirm}
             </button>
           </div>
@@ -371,7 +296,7 @@ export default function ProfilePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               <SelectList options={OBJECTIVE_OPTIONS} selected={objectiveSelected} onSelect={setObjectiveSelected} />
             </div>
-            <button onClick={saveObjective} disabled={savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+            <button onClick={() => { saveObjective(objectiveSelected); setObjectiveSheetOpen(false); }} disabled={savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
               {t.confirm}
             </button>
           </div>
@@ -404,7 +329,7 @@ export default function ProfilePage() {
                 );
               })}
             </div>
-            <button onClick={saveSectors} disabled={sectorsSelected.size === 0 || savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: sectorsSelected.size === 0 || savingField ? 0.5 : 1 }}>
+            <button onClick={() => { saveSectors(sectorsSelected); setSectorsSheetOpen(false); }} disabled={sectorsSelected.size === 0 || savingField} style={{ width: '100%', marginTop: 18, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: sectorsSelected.size === 0 || savingField ? 0.5 : 1 }}>
               {t.confirm}
             </button>
           </div>
@@ -451,7 +376,7 @@ export default function ProfilePage() {
               </div>
             </div>
 
-            <button onClick={savePlan} disabled={savingField} style={{ width: '100%', marginTop: 20, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+            <button onClick={() => { savePlan(planAmt, planPeriod, planHorizon, planGoal); setPlanSheetOpen(false); }} disabled={savingField} style={{ width: '100%', marginTop: 20, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
               {t.confirm}
             </button>
           </div>
