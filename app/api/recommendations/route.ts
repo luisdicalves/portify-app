@@ -6,12 +6,28 @@ import { recommend } from '@/lib/recommendationEngine';
 import type { UserProfile } from '@/lib/planCalculator';
 import { fetchRiskReport } from '@/lib/riskScore';
 import { calcQualityScoreFromReport } from '@/lib/qualityScore';
+import { checkRateLimit } from '@/lib/rateLimiter';
 
 const REC_CACHE_SECONDS = 24 * 60 * 60; // 24h
+// 2 calls per hour per user — recommendations are cached 24h on the client,
+// so legitimate use never approaches this limit; only scripts/loops do.
+const RATE_LIMIT_MAX   = 2;
+const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
 
 export async function GET() {
   const user = await getAuthedUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+
+  const rl = checkRateLimit(user.id, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'rate_limit_exceeded' },
+      {
+        status: 429,
+        headers: { 'Retry-After': String(rl.retryAfterSeconds ?? 3600) },
+      },
+    );
+  }
 
   const supabase = createClient();
 
