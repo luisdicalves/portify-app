@@ -26,6 +26,8 @@ export interface HistoryPoint {
 }
 
 // ── Client-side cache (TTL: 30s for quotes, 5min for history) ─────────────────
+// Stale entries are kept indefinitely and returned when a live fetch fails,
+// so the UI always shows the last known value instead of going blank.
 
 const QUOTE_TTL   = 30_000;
 const HISTORY_TTL = 5 * 60_000;
@@ -43,9 +45,9 @@ export async function fetchQuote(ticker: string): Promise<Quote | null> {
 
   try {
     const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (!res.ok) return null;
+    if (!res.ok) return cached?.data ?? null;
     const d = await res.json();
-    if (typeof d.price !== 'number') return null;
+    if (typeof d.price !== 'number') return cached?.data ?? null;
     const quote: Quote = {
       price:         d.price,
       change:        d.change        ?? 0,
@@ -61,7 +63,7 @@ export async function fetchQuote(ticker: string): Promise<Quote | null> {
     quoteCache.set(ticker, { data: quote, expiresAt: Date.now() + QUOTE_TTL });
     return quote;
   } catch {
-    return null;
+    return cached?.data ?? null;
   }
 }
 
@@ -77,12 +79,12 @@ export async function fetchHistory(
     const res = await fetch(
       `/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=${outputsize}`,
     );
-    if (!res.ok) return null;
+    if (!res.ok) return cached?.data ?? null;
     const d = await res.json();
     const points: HistoryPoint[] | null = Array.isArray(d.points) && d.points.length > 1 ? d.points : null;
     if (points) historyCache.set(key, { data: points, expiresAt: Date.now() + HISTORY_TTL });
-    return points;
+    return points ?? cached?.data ?? null;
   } catch {
-    return null;
+    return cached?.data ?? null;
   }
 }
