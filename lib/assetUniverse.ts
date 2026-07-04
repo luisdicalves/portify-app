@@ -66,10 +66,10 @@ const CURATED_ETFS: Omit<CandidateAsset, 'beta' | 'dividendYield' | 'marketCap'>
   { ticker: 'VOO.US',  name: 'Vanguard S&P 500 ETF',                  exchange: 'NYSE',   assetClass: 'etf',      sector: 'other', qualityScore: 92, currency: 'USD' },
   { ticker: 'VTI.US',  name: 'Vanguard Total Stock Market ETF',        exchange: 'NYSE',   assetClass: 'etf',      sector: 'other', qualityScore: 90, currency: 'USD' },
   { ticker: 'VXUS.US', name: 'Vanguard Total International Stock ETF', exchange: 'NASDAQ', assetClass: 'etf',      sector: 'other', qualityScore: 85, currency: 'USD' },
-  { ticker: 'QQQ.US',  name: 'Invesco QQQ Trust (Nasdaq 100)',         exchange: 'NASDAQ', assetClass: 'etf',      sector: 'tech',  qualityScore: 82, currency: 'USD' },
+  { ticker: 'QQQ.US',  name: 'Invesco QQQ Trust (Nasdaq 100)',         exchange: 'NASDAQ', assetClass: 'etf',      sector: 'technology',  qualityScore: 82, currency: 'USD' },
   { ticker: 'VIG.US',  name: 'Vanguard Dividend Appreciation ETF',     exchange: 'NYSE',   assetClass: 'etf',      sector: 'other', qualityScore: 80, currency: 'USD' },
   { ticker: 'SCHD.US', name: 'Schwab US Dividend Equity ETF',          exchange: 'NYSE',   assetClass: 'etf',      sector: 'other', qualityScore: 78, currency: 'USD' },
-  { ticker: 'VNQ.US',  name: 'Vanguard Real Estate ETF',               exchange: 'NYSE',   assetClass: 'etf',      sector: 'realestate', qualityScore: 68, currency: 'USD' },
+  { ticker: 'VNQ.US',  name: 'Vanguard Real Estate ETF',               exchange: 'NYSE',   assetClass: 'etf',      sector: 'real_estate', qualityScore: 68, currency: 'USD' },
   // ── Bond ETFs ─────────────────────────────────────────────────
   { ticker: 'VGSH.US', name: 'Vanguard Short-Term Treasury ETF',       exchange: 'NASDAQ', assetClass: 'bond_etf', sector: 'other', qualityScore: 88, currency: 'USD' },
   { ticker: 'BND.US',  name: 'Vanguard Total Bond Market ETF',         exchange: 'NASDAQ', assetClass: 'bond_etf', sector: 'other', qualityScore: 85, currency: 'USD' },

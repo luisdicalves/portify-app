@@ -16,7 +16,7 @@ export async function GET() {
   const supabase = createClient();
 
   // ── Carregar perfil do utilizador ────────────────────────────────────────
-  const { data: profile, error: profileErr } = await supabase
+  const { data: profileRaw, error: profileErr } = await supabase
     .from('profiles')
     .select(
       'risk_profile, investment_goal, experience_level, market_reaction, ' +
@@ -25,9 +25,20 @@ export async function GET() {
     .eq('id', user.id)
     .single();
 
-  if (profileErr || !profile) {
+  if (profileErr || !profileRaw) {
     return NextResponse.json({ error: 'profile_not_found' }, { status: 404 });
   }
+
+  const profile = (profileRaw as unknown) as {
+    risk_profile:     string | null;
+    investment_goal:  string | null;
+    experience_level: string | null;
+    market_reaction:  string | null;
+    financial_status: string | null;
+    liquidity_need:   string | null;
+    preferred_assets:  unknown;
+    preferred_sectors: unknown;
+  };
 
   // ── Carregar horizonte do plano de investimento ──────────────────────────
   const { data: plan } = await supabase
@@ -46,8 +57,8 @@ export async function GET() {
   }
 
   const userProfile: UserProfile = {
-    risk_profile:     profile.risk_profile,
-    investment_goal:  profile.investment_goal,
+    risk_profile:     profile.risk_profile as UserProfile['risk_profile'],
+    investment_goal:  profile.investment_goal as string,
     experience_level: profile.experience_level ?? 'beginner',
     market_reaction:  profile.market_reaction  ?? 'hold',
     financial_status: profile.financial_status ?? 'stable',
