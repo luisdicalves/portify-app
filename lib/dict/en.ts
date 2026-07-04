@@ -276,4 +276,5 @@ export const en: typeof pt = {
   recMonthlyPlan: 'Monthly plan',
   recSectionTitle: 'Recommended for you',
   recSectionSub: 'Based on your profile and current portfolio',
+    recInvestNow: 'Invest now',
 };
