@@ -1,128 +1,353 @@
 /**
  * lib/planCalculator.ts
  *
- * Calcula o perfil de risco numérico e alocação de ativos recomendada
- * com base nas respostas do questionário de onboarding.
+ * Motor de cálculo do plano de investimento.
+ * Três funções encadeadas:
+ *   1. calcRiskScore   — converte o perfil do onboarding num score 0–100
+ *   2. calcAllocation  — converte o score numa alocação por classe de ativo
+ *   3. calcRate        — converte a alocação numa taxa anual estimada
+ *
+ * Usado em plan-set e summary para tornar a projecção dinâmica e honesta.
  */
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Tipos
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface UserProfile {
-  risk_profile:     'very_conservative' | 'conservative' | 'moderate' | 'aggressive' | 'very_aggressive';
-  investment_goal:  'wealth_growth' | 'income' | 'capital_preservation' | 'retirement' | 'education' | string;
-  experience_level: 'beginner' | 'intermediate' | 'advanced' | string;
-  market_reaction:  'sell_all' | 'sell_some' | 'hold' | 'buy_more' | string;
-  financial_status: 'struggling' | 'stable' | 'comfortable' | 'wealthy' | string;
-  liquidity_need:   'very_likely' | 'likely' | 'unlikely' | 'very_unlikely' | string;
-  horizon_years:    number;
+  risk_profile:      'very_conservative' | 'conservative' | 'moderate' | 'aggressive' | 'very_aggressive';
+  investment_goal:   'emergency_fund' | 'short_purchase' | 'income' | 'wealth_growth' | 'retirement' | 'legacy';
+  experience_level:  'none' | 'beginner' | 'intermediate' | 'experienced' | 'professional';
+  market_reaction:   'sell_all' | 'sell_some' | 'hold' | 'buy_more';
+  financial_status:  'unstable' | 'stable' | 'comfortable' | 'wealthy';
+  liquidity_need:    'critical' | 'possible' | 'unlikely' | 'never';
+  horizon_years:     number;
 }
 
-export interface PlanResult {
-  riskScore:  number;              // 0–100
-  allocation: {
-    stock:    number;              // 0–1
-    etf:      number;              // 0–1
-    bond_etf: number;              // 0–1
-  };
-  rate:     number;                // expected annual return (fraction)
-  rateLow:  number;
-  rateHigh: number;
-  conflicts: string[];
+export interface Allocation {
+  stock:    number; // 0–1
+  etf:      number; // 0–1
+  bond_etf: number; // 0–1
 }
 
-const RISK_SCORE: Record<string, number> = {
+export interface PlanCalcResult {
+  riskScore:  number;     // 0–100
+  allocation: Allocation;
+  rate:       number;     // taxa anual estimada (ex: 0.07 = 7%)
+  rateLow:    number;     // intervalo pessimista (−1%)
+  rateHigh:   number;     // intervalo optimista (+1%)
+  conflicts:  string[];   // alertas de contradição detetados
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. calcRiskScore — score 0–100 a partir do perfil completo
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Pesos de cada dimensão no score final:
+ *   risk_profile    40% — escolha mais consciente do utilizador
+ *   investment_goal 20% — objetivo define o horizonte de risco
+ *   horizon_years   20% — quanto mais tempo, mais risco pode aceitar
+ *   market_reaction 15% — o que faz sob pressão revela mais do que diz
+ *   experience      10% — experiência reduz erros comportamentais
+ *   financial_status 5% — situação financeira limita o risco real
+ *   liquidity_need   5% — necessidade de liquidez limita a alocação
+ *                  ----
+ *                  115% → normalizado para 100%
+ */
+const WEIGHTS = {
+  risk_profile:    0.35,
+  investment_goal: 0.20,
+  horizon_years:   0.20,
+  market_reaction: 0.13,
+  experience:      0.07,
+  financial_status: 0.03,
+  liquidity_need:  0.02,
+};
+
+const RISK_PROFILE_SCORE: Record<UserProfile['risk_profile'], number> = {
   very_conservative: 10,
   conservative:      30,
   moderate:          50,
-  aggressive:        70,
-  very_aggressive:   90,
+  aggressive:        75,
+  very_aggressive:   95,
 };
 
-const EXPERIENCE_BOOST: Record<string, number> = {
-  beginner:     -5,
-  intermediate:  0,
-  advanced:      5,
+const GOAL_SCORE: Record<UserProfile['investment_goal'], number> = {
+  emergency_fund: 10,  // precisa de liquidez total — mínimo risco
+  short_purchase: 20,  // < 3 anos — pouco tempo para recuperar
+  income:         35,  // dividendos — foco em estabilidade
+  wealth_growth:  65,  // crescimento — aceita volatilidade
+  retirement:     55,  // reforma — longo prazo mas com cautela crescente
+  legacy:         70,  // legado — horizonte máximo, aceita risco
 };
 
-const REACTION_BOOST: Record<string, number> = {
-  sell_all:  -10,
-  sell_some:  -5,
-  hold:        0,
-  buy_more:   10,
+const REACTION_SCORE: Record<UserProfile['market_reaction'], number> = {
+  sell_all:  15,  // comportamento conservador real — penaliza fortemente
+  sell_some: 35,
+  hold:      60,
+  buy_more:  90,  // comportamento agressivo real
 };
 
-const LIQUIDITY_PENALTY: Record<string, number> = {
-  very_likely:   -15,
-  likely:         -8,
-  unlikely:        0,
-  very_unlikely:   5,
+const EXPERIENCE_SCORE: Record<UserProfile['experience_level'], number> = {
+  none:         20,
+  beginner:     35,
+  intermediate: 55,
+  experienced:  75,
+  professional: 90,
 };
 
-export function calcPlan(profile: UserProfile): PlanResult {
-  const base = RISK_SCORE[profile.risk_profile] ?? 50;
-  const boost =
-    (EXPERIENCE_BOOST[profile.experience_level] ?? 0) +
-    (REACTION_BOOST[profile.market_reaction]    ?? 0) +
-    (LIQUIDITY_PENALTY[profile.liquidity_need]  ?? 0);
+const FINANCIAL_SCORE: Record<UserProfile['financial_status'], number> = {
+  unstable:    20,  // rendimento instável — não deve arriscar muito
+  stable:      50,
+  comfortable: 70,
+  wealthy:     90,
+};
 
-  const riskScore = Math.min(100, Math.max(0, base + boost));
+const LIQUIDITY_SCORE: Record<UserProfile['liquidity_need'], number> = {
+  critical: 10,  // pode precisar a qualquer momento — forçar conservadorismo
+  possible: 35,
+  unlikely: 65,
+  never:    90,
+};
 
-  // Horizon modifier: longer horizon → more equities
-  const horizonBonus = Math.min(10, Math.floor((profile.horizon_years - 5) / 2));
-  const effectiveScore = Math.min(100, Math.max(0, riskScore + horizonBonus));
+function horizonScore(years: number): number {
+  if (years < 2)  return 15;
+  if (years < 5)  return 30;
+  if (years < 10) return 55;
+  if (years < 20) return 75;
+  return 90;
+}
 
-  // Alocação base por score
-  let stock:    number;
-  let etf:      number;
-  let bond_etf: number;
+export function calcRiskScore(p: UserProfile): number {
+  const raw =
+    RISK_PROFILE_SCORE[p.risk_profile]    * WEIGHTS.risk_profile +
+    GOAL_SCORE[p.investment_goal]         * WEIGHTS.investment_goal +
+    horizonScore(p.horizon_years)         * WEIGHTS.horizon_years +
+    REACTION_SCORE[p.market_reaction]     * WEIGHTS.market_reaction +
+    EXPERIENCE_SCORE[p.experience_level]  * WEIGHTS.experience +
+    FINANCIAL_SCORE[p.financial_status]   * WEIGHTS.financial_status +
+    LIQUIDITY_SCORE[p.liquidity_need]     * WEIGHTS.liquidity_need;
 
-  if (effectiveScore <= 20) {
-    stock = 0.05; etf = 0.15; bond_etf = 0.80;
-  } else if (effectiveScore <= 35) {
-    stock = 0.10; etf = 0.25; bond_etf = 0.65;
-  } else if (effectiveScore <= 50) {
-    stock = 0.20; etf = 0.40; bond_etf = 0.40;
-  } else if (effectiveScore <= 65) {
-    stock = 0.35; etf = 0.45; bond_etf = 0.20;
-  } else if (effectiveScore <= 80) {
-    stock = 0.50; etf = 0.40; bond_etf = 0.10;
-  } else {
-    stock = 0.65; etf = 0.30; bond_etf = 0.05;
+  return Math.round(Math.min(100, Math.max(0, raw)));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. calcAllocation — alocação por classe a partir do riskScore
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Tabela de alocação base por banda de riskScore.
+ * Ajustada depois por objetivo e liquidez.
+ */
+function baseAllocation(score: number): Allocation {
+  if (score <= 20)  return { stock: 0.05, etf: 0.45, bond_etf: 0.50 };
+  if (score <= 35)  return { stock: 0.15, etf: 0.55, bond_etf: 0.30 };
+  if (score <= 50)  return { stock: 0.30, etf: 0.50, bond_etf: 0.20 };
+  if (score <= 65)  return { stock: 0.45, etf: 0.45, bond_etf: 0.10 };
+  if (score <= 80)  return { stock: 0.60, etf: 0.35, bond_etf: 0.05 };
+  return              { stock: 0.75, etf: 0.25, bond_etf: 0.00 };
+}
+
+/**
+ * Ajustes por objetivo de investimento.
+ * Modificam o mix base deslocando peso entre classes.
+ */
+function applyGoalAdjustment(alloc: Allocation, goal: UserProfile['investment_goal']): Allocation {
+  const a = { ...alloc };
+
+  switch (goal) {
+    case 'emergency_fund':
+      // Forçar máximo conservadorismo independente do score
+      return { stock: 0.00, etf: 0.30, bond_etf: 0.70 };
+
+    case 'short_purchase':
+      // Reduzir ações, aumentar bond ETFs para proteger capital a curto prazo
+      a.bond_etf = Math.min(1, a.bond_etf + 0.15);
+      a.stock    = Math.max(0, a.stock - 0.10);
+      a.etf      = Math.max(0, a.etf   - 0.05);
+      break;
+
+    case 'income':
+      // Aumentar ETFs de dividendos (tratados como etf), reduzir ações growth
+      a.etf   = Math.min(1, a.etf   + 0.10);
+      a.stock = Math.max(0, a.stock - 0.10);
+      break;
+
+    case 'wealth_growth':
+      // Aumentar ações, reduzir bond ETFs
+      a.stock    = Math.min(1, a.stock    + 0.08);
+      a.bond_etf = Math.max(0, a.bond_etf - 0.08);
+      break;
+
+    case 'legacy':
+      // Horizonte máximo — mais ações
+      a.stock    = Math.min(1, a.stock    + 0.10);
+      a.bond_etf = Math.max(0, a.bond_etf - 0.10);
+      break;
+
+    case 'retirement':
+      // Moderado por natureza — sem ajuste grande
+      break;
   }
 
-  // Income goal → shift towards dividend ETFs
-  if (profile.investment_goal === 'income') {
-    bond_etf = Math.min(bond_etf + 0.10, 0.40);
-    stock    = Math.max(stock    - 0.05, 0.05);
+  return normalise(a);
+}
+
+/**
+ * Ajuste por necessidade de liquidez.
+ * Se o utilizador pode precisar do dinheiro, aumentar bond ETFs.
+ */
+function applyLiquidityAdjustment(alloc: Allocation, liquidity: UserProfile['liquidity_need']): Allocation {
+  const a = { ...alloc };
+
+  switch (liquidity) {
+    case 'critical':
+      a.bond_etf = Math.min(1, a.bond_etf + 0.20);
+      a.stock    = Math.max(0, a.stock    - 0.12);
+      a.etf      = Math.max(0, a.etf     - 0.08);
+      break;
+    case 'possible':
+      a.bond_etf = Math.min(1, a.bond_etf + 0.08);
+      a.stock    = Math.max(0, a.stock    - 0.05);
+      a.etf      = Math.max(0, a.etf     - 0.03);
+      break;
+    case 'unlikely':
+    case 'never':
+      // sem ajuste
+      break;
   }
 
-  // Capital preservation → more bonds
-  if (profile.investment_goal === 'capital_preservation') {
-    bond_etf = Math.min(bond_etf + 0.15, 0.60);
-    stock    = Math.max(stock    - 0.10, 0.05);
-    etf      = Math.max(etf      - 0.05, 0.10);
-  }
+  return normalise(a);
+}
 
-  // Normalise to sum = 1
-  const total = stock + etf + bond_etf;
-  stock    = parseFloat((stock    / total).toFixed(4));
-  etf      = parseFloat((etf      / total).toFixed(4));
-  bond_etf = parseFloat((1 - stock - etf).toFixed(4));
+/** Normaliza a alocação para que a soma seja sempre 1.0 */
+function normalise(a: Allocation): Allocation {
+  const total = a.stock + a.etf + a.bond_etf;
+  if (total === 0) return { stock: 0, etf: 0.5, bond_etf: 0.5 };
+  return {
+    stock:    Math.round((a.stock    / total) * 100) / 100,
+    etf:      Math.round((a.etf      / total) * 100) / 100,
+    bond_etf: Math.round((a.bond_etf / total) * 100) / 100,
+  };
+}
 
-  // Expected returns (rough annualised estimates)
-  const rate     = stock * 0.09 + etf * 0.07 + bond_etf * 0.035;
-  const rateLow  = stock * 0.05 + etf * 0.04 + bond_etf * 0.02;
-  const rateHigh = stock * 0.14 + etf * 0.11 + bond_etf * 0.05;
+export function calcAllocation(score: number, p: UserProfile): Allocation {
+  let alloc = baseAllocation(score);
+  alloc = applyGoalAdjustment(alloc, p.investment_goal);
+  alloc = applyLiquidityAdjustment(alloc, p.liquidity_need);
+  return normalise(alloc);
+}
 
-  const conflicts: string[] = [];
-  if (profile.liquidity_need === 'very_likely' && effectiveScore > 60) {
-    conflicts.push('high_liquidity_with_high_risk');
-  }
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. calcRate — taxa anual estimada a partir da alocação
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Retornos históricos anuais estimados por classe de ativo.
+ * Baseados em médias de longo prazo (20+ anos):
+ *   stock:    ~10% (S&P 500 histórico nominal)
+ *   etf:      ~8%  (ETFs diversificados globais, ex: MSCI World)
+ *   bond_etf: ~3.5% (bond ETFs investment grade, mix curto/longo prazo)
+ */
+const ASSET_RETURNS = {
+  stock:    0.100,
+  etf:      0.080,
+  bond_etf: 0.035,
+};
+
+/**
+ * Penalização comportamental por reação a quedas.
+ * Quem vende em pânico realiza perdas — o retorno real é menor.
+ */
+const REACTION_PENALTY: Record<UserProfile['market_reaction'], number> = {
+  sell_all:  -0.025, // −2.5% — vende no pior momento
+  sell_some: -0.010, // −1.0%
+  hold:       0.000, // sem penalização
+  buy_more:  +0.005, // +0.5% — aproveita as quedas
+};
+
+export function calcRate(alloc: Allocation, p: UserProfile): number {
+  const baseRate =
+    alloc.stock    * ASSET_RETURNS.stock +
+    alloc.etf      * ASSET_RETURNS.etf +
+    alloc.bond_etf * ASSET_RETURNS.bond_etf;
+
+  const behaviorPenalty = REACTION_PENALTY[p.market_reaction];
+
+  return Math.round((baseRate + behaviorPenalty) * 10000) / 10000; // 4 casas decimais
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Deteção de contradições
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function detectConflicts(p: UserProfile): string[] {
+  const warnings: string[] = [];
+
+  if ((p.risk_profile === 'aggressive' || p.risk_profile === 'very_aggressive') && p.market_reaction === 'sell_all')
+    warnings.push('Disseste ser agressivo, mas vendias tudo numa queda — o teu perfil real foi ajustado para moderado.');
+
+  if ((p.risk_profile === 'conservative' || p.risk_profile === 'very_conservative') && p.horizon_years >= 15)
+    warnings.push(`Com ${p.horizon_years} anos de horizonte podes aceitar mais risco e obter maior retorno.`);
+
+  if (p.investment_goal === 'emergency_fund')
+    warnings.push('Para um fundo de emergência recomendamos uma conta poupança, não um portfólio de investimento.');
+
+  if (p.liquidity_need === 'critical' && (p.risk_profile === 'aggressive' || p.risk_profile === 'very_aggressive'))
+    warnings.push('Com necessidade crítica de liquidez, um perfil agressivo pode forçar-te a vender em mau momento.');
+
+  if (p.financial_status === 'unstable' && (p.risk_profile === 'aggressive' || p.risk_profile === 'very_aggressive'))
+    warnings.push('Com rendimento instável, um perfil agressivo aumenta o risco de perdas permanentes.');
+
+  if (p.investment_goal === 'short_purchase' && p.horizon_years < 2)
+    warnings.push('Com menos de 2 anos, o mercado pode estar em baixa quando precisares do dinheiro.');
+
+  return warnings;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Função principal — calcula tudo de uma vez
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function calcPlan(p: UserProfile): PlanCalcResult {
+  const riskScore  = calcRiskScore(p);
+  const allocation = calcAllocation(riskScore, p);
+  const rate       = calcRate(allocation, p);
 
   return {
-    riskScore: effectiveScore,
-    allocation: { stock, etf, bond_etf },
-    rate:     parseFloat(rate.toFixed(4)),
-    rateLow:  parseFloat(rateLow.toFixed(4)),
-    rateHigh: parseFloat(rateHigh.toFixed(4)),
-    conflicts,
+    riskScore,
+    allocation,
+    rate,
+    rateLow:   Math.max(0, Math.round((rate - 0.01) * 10000) / 10000),
+    rateHigh:  Math.round((rate + 0.01) * 10000) / 10000,
+    conflicts: detectConflicts(p),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Funções de projecção financeira
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Valor futuro de contribuições mensais (juro composto) */
+export function calcFV(monthlyPmt: number, annualRate: number, years: number): number {
+  if (annualRate === 0) return monthlyPmt * 12 * years;
+  const r = annualRate / 12;
+  const n = years * 12;
+  return Math.round(monthlyPmt * ((Math.pow(1 + r, n) - 1) / r));
+}
+
+/** Montante mensal necessário para atingir um objetivo */
+export function calcPMT(goalAmount: number, annualRate: number, years: number): number {
+  if (annualRate === 0) return goalAmount / (12 * years);
+  const r = annualRate / 12;
+  const n = years * 12;
+  return Math.round(goalAmount * r / (Math.pow(1 + r, n) - 1));
+}
+
+/** Número de anos para atingir um objetivo com contribuição mensal fixa */
+export function calcYears(goalAmount: number, monthlyPmt: number, annualRate: number): number {
+  if (annualRate === 0) return Math.ceil(goalAmount / (monthlyPmt * 12));
+  const r = annualRate / 12;
+  return Math.ceil(Math.log(goalAmount * r / monthlyPmt + 1) / Math.log(1 + r) / 12);
 }

@@ -13,7 +13,13 @@ export default function SplashPage() {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        router.replace('/auth/pin');
+        // Verificar se o onboarding foi concluído (investment_plans criado no Finalizar)
+        const { data: plan } = await supabase
+          .from('investment_plans')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        router.replace(plan ? '/auth/pin' : '/auth/assets');
       } else {
         setChecking(false);
       }

@@ -56,15 +56,15 @@ export async function GET() {
     return NextResponse.json({ error: 'incomplete_profile' }, { status: 422 });
   }
 
-  const userProfile: UserProfile = {
-    risk_profile:     profile.risk_profile as UserProfile['risk_profile'],
-    investment_goal:  profile.investment_goal as string,
-    experience_level: profile.experience_level ?? 'beginner',
-    market_reaction:  profile.market_reaction  ?? 'hold',
-    financial_status: profile.financial_status ?? 'stable',
-    liquidity_need:   profile.liquidity_need   ?? 'unlikely',
+  const userProfile = {
+    risk_profile:     (profile.risk_profile  ?? 'moderate') as UserProfile['risk_profile'],
+    investment_goal:  (profile.investment_goal ?? 'wealth_growth') as UserProfile['investment_goal'],
+    experience_level: (profile.experience_level ?? 'beginner') as UserProfile['experience_level'],
+    market_reaction:  (profile.market_reaction  ?? 'hold') as UserProfile['market_reaction'],
+    financial_status: (profile.financial_status ?? 'stable') as UserProfile['financial_status'],
+    liquidity_need:   (profile.liquidity_need   ?? 'unlikely') as UserProfile['liquidity_need'],
     horizon_years:    horizonYears,
-  };
+  } satisfies UserProfile;
 
   // Preferred asset classes: vêm de preferred_assets (onboarding step 1)
   // Fallback: todas as classes se não configurado
