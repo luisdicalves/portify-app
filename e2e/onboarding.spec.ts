@@ -91,7 +91,7 @@ test.describe('Onboarding flow', () => {
     await page.getByRole('button', { name: /Sim, quero/ }).click();
     await expect(page).toHaveURL('/auth/plan-set');
 
-    await page.getByRole('button', { name: 'Continuar' }).click();
+    await page.getByRole('button', { name: 'Ver resumo' }).click();
     await expect(page).toHaveURL('/auth/summary');
 
     // ── 13. Summary → dashboard ───────────────────────────────────────────────
