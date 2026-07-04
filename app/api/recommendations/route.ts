@@ -101,18 +101,45 @@ export async function GET() {
       riskProfile:           userProfile.risk_profile,
     });
 
-    // ── qualityScore personalizado para stocks (RiskReport cached 24h) ────────
-    const enriched = await Promise.all(
-      filtered.map(async asset => {
-        if (asset.assetClass !== 'stock') return asset;
-        const report = await fetchRiskReport(asset.ticker, 'pt');
-        if (!report) return asset;
-        return {
-          ...asset,
-          qualityScore: calcQualityScoreFromReport(report, userProfile),
-        };
+    // ── Enriquecer stocks com RiskReport (cached 24h) ────────────────────────
+    // Aproveita os reports para: (a) qualityScore personalizado, (b) filtro duro
+    const CONSERVATIVE_PROFILES = new Set(['very_conservative', 'conservative', 'moderate']);
+
+    const enriched = (
+      await Promise.all(
+        filtered.map(async asset => {
+          if (asset.assetClass !== 'stock') return { asset, report: null };
+          const report = await fetchRiskReport(asset.ticker, 'pt');
+          return { asset, report };
+        })
+      )
+    )
+      // ── Filtro duro baseado em RiskReport ──────────────────────────────────
+      .filter(({ asset, report }) => {
+        if (!report) return true; // sem report → não excluir (benefício da dúvida)
+
+        // Saúde financeira crítica → excluir sempre
+        if (report.pillars.health.score < 40) return false;
+
+        // Ativo de alto risco para perfis não agressivos
+        if (
+          report.scoreLabel === 'high' &&
+          CONSERVATIVE_PROFILES.has(userProfile.risk_profile)
+        ) return false;
+
+        // Valuation esticada para perfil muito conservador
+        if (
+          userProfile.risk_profile === 'very_conservative' &&
+          report.pillars.valuation.score < 50
+        ) return false;
+
+        return true;
       })
-    );
+      // ── Qualidade score personalizado ──────────────────────────────────────
+      .map(({ asset, report }) => {
+        if (!report) return asset;
+        return { ...asset, qualityScore: calcQualityScoreFromReport(report, userProfile) };
+      });
 
     const result = recommend({
       universe:         enriched,
