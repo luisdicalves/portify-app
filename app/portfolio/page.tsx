@@ -11,6 +11,7 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
 import { fetchQuote } from '@/lib/marketApi';
+import { useUser, getUser } from '@/lib/hooks/useUser';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -29,6 +30,7 @@ const TAB_IDS = ['positions', 'dividends', 'history'] as const;
 
 export default function PortfolioPage() {
   const router = useRouter();
+  const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -42,14 +44,14 @@ export default function PortfolioPage() {
 
   async function fetchHoldings() {
     setLoading(true);
+    const u = await getUser();
+    if (!u) { setLoading(false); return; }
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
 
     const { data: holdings } = await supabase
       .from('holdings')
       .select('ticker, units, avg_price')
-      .eq('user_id', user.id);
+      .eq('user_id', u.id);
 
     const quotes = await Promise.all((holdings ?? []).map(h => fetchQuote(h.ticker)));
 
@@ -74,14 +76,14 @@ export default function PortfolioPage() {
   }
 
   async function fetchTransactions() {
+    const u = await getUser();
+    if (!u) return;
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
 
     const { data } = await supabase
       .from('transactions')
       .select('id, ticker, type, units, price, amount, executed_at, notes')
-      .eq('user_id', user.id)
+      .eq('user_id', u.id)
       .order('executed_at', { ascending: false });
 
     const POSITIVE_TYPES = new Set(['dividend', 'deposit', 'interest']);
@@ -123,19 +125,22 @@ export default function PortfolioPage() {
   }
 
   async function fetchCashSettings() {
+    const u = await getUser();
+    if (!u) return;
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
     const { data } = await supabase
       .from('profiles')
       .select('uninvested_cash, free_funds_annual_rate_pct')
-      .eq('id', user.id)
+      .eq('id', u.id)
       .single();
     if (data) setCashSettings({ uninvestedCash: data.uninvested_cash ?? 0, freeFundsAnnualRatePct: data.free_funds_annual_rate_pct ?? 0 });
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount only
-  useEffect(() => { fetchHoldings(); fetchTransactions(); fetchCashSettings(); }, []);
+  useEffect(() => {
+    if (!user) return;
+    fetchHoldings(); fetchTransactions(); fetchCashSettings();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const totalValue = assets.reduce((sum, a) => sum + a.value, 0);
   const totalInvested = assets.reduce((sum, a) => sum + a.cost, 0);

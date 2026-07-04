@@ -10,6 +10,7 @@ import {
   calcWeightedAvgDaysHeld, calcAnnualizedReturn,
 } from '@/lib/portfolioMetrics';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
+import { useUser } from '@/lib/hooks/useUser';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
@@ -20,6 +21,7 @@ type Holding = { ticker: string; units: number; avg_price: number };
 
 export default function PerformancePage() {
   const router = useRouter();
+  const { user } = useUser();
   const [tf, setTf] = useState(4);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
@@ -28,10 +30,9 @@ export default function PerformancePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
 
       const [{ data: holdingsData }, { data: buys }] = await Promise.all([
         supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
@@ -51,7 +52,7 @@ export default function PerformancePage() {
       setQuotes(quoteMap);
       setLoading(false);
     })();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (holdings.length === 0) { setChartValues(null); return; }

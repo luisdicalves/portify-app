@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { useUser } from '@/lib/hooks/useUser';
 import BottomNav from '@/components/ui/BottomNav';
 import { SelectList, SelectOption } from '@/components/ui/SelectList';
 import { calcPlan } from '@/lib/planCalculator';
@@ -118,6 +119,7 @@ function Card({ children }: { children: React.ReactNode }) {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -137,10 +139,9 @@ export default function ProfilePage() {
   const [savingField, setSavingField] = useState(false);
 
   useEffect(() => {
+    if (!user) return;
     (async () => {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
       const [{ data: p }, { data: pl }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name, user_handle, risk_profile, investment_goal, experience_level, market_reaction, financial_status, liquidity_need, preferred_sectors, investor_since').eq('id', user.id).single(),
         supabase.from('investment_plans').select('amount, frequency, horizon_years, goal_amount').eq('user_id', user.id).maybeSingle(),
@@ -148,7 +149,7 @@ export default function ProfilePage() {
       if (p) setProfile(p);
       if (pl) setPlan(pl);
     })();
-  }, []);
+  }, [user]);
 
   // Calcular riskScore e alocação sempre que o perfil ou plano mudar
   const planResult = (() => {
@@ -183,15 +184,13 @@ export default function ProfilePage() {
   }
 
   async function saveRisk() {
+    if (!user) return;
     setSavingField(true);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const riskId = RISK_OPTIONS[riskSelected].id;
-      await supabase.from('profiles').update({ risk_profile: riskId }).eq('id', user.id);
-      setProfile(p => p ? { ...p, risk_profile: riskId } : p);
-      sessionStorage.removeItem('rec-etag');
-    }
+    const riskId = RISK_OPTIONS[riskSelected].id;
+    await supabase.from('profiles').update({ risk_profile: riskId }).eq('id', user.id);
+    setProfile(p => p ? { ...p, risk_profile: riskId } : p);
+    sessionStorage.removeItem('rec-etag');
     setSavingField(false);
     setRiskSheetOpen(false);
   }
@@ -203,15 +202,13 @@ export default function ProfilePage() {
   }
 
   async function saveObjective() {
+    if (!user) return;
     setSavingField(true);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const goalId = OBJECTIVE_OPTIONS[objectiveSelected].id;
-      await supabase.from('profiles').update({ investment_goal: goalId }).eq('id', user.id);
-      setProfile(p => p ? { ...p, investment_goal: goalId } : p);
-      sessionStorage.removeItem('rec-etag');
-    }
+    const goalId = OBJECTIVE_OPTIONS[objectiveSelected].id;
+    await supabase.from('profiles').update({ investment_goal: goalId }).eq('id', user.id);
+    setProfile(p => p ? { ...p, investment_goal: goalId } : p);
+    sessionStorage.removeItem('rec-etag');
     setSavingField(false);
     setObjectiveSheetOpen(false);
   }
@@ -230,15 +227,13 @@ export default function ProfilePage() {
   }
 
   async function saveSectors() {
+    if (!user) return;
     setSavingField(true);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const sectors = Array.from(sectorsSelected);
-      await supabase.from('profiles').update({ preferred_sectors: sectors }).eq('id', user.id);
-      setProfile(p => p ? { ...p, preferred_sectors: sectors } : p);
-      sessionStorage.removeItem('rec-etag');
-    }
+    const sectors = Array.from(sectorsSelected);
+    await supabase.from('profiles').update({ preferred_sectors: sectors }).eq('id', user.id);
+    setProfile(p => p ? { ...p, preferred_sectors: sectors } : p);
+    sessionStorage.removeItem('rec-etag');
     setSavingField(false);
     setSectorsSheetOpen(false);
   }
@@ -252,19 +247,17 @@ export default function ProfilePage() {
   }
 
   async function savePlan() {
+    if (!user) return;
     setSavingField(true);
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const amount = PLAN_AMOUNT_VALUES[planAmt];
-      const frequency = PLAN_FREQUENCIES[planPeriod];
-      const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
-      const goal_amount = parseFloat(planGoal) || 0;
-      await supabase.from('investment_plans').upsert({
-        user_id: user.id, amount, frequency, horizon_years, goal_amount,
-      });
-      setPlan({ amount, frequency, horizon_years, goal_amount });
-    }
+    const amount = PLAN_AMOUNT_VALUES[planAmt];
+    const frequency = PLAN_FREQUENCIES[planPeriod];
+    const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
+    const goal_amount = parseFloat(planGoal) || 0;
+    await supabase.from('investment_plans').upsert({
+      user_id: user.id, amount, frequency, horizon_years, goal_amount,
+    });
+    setPlan({ amount, frequency, horizon_years, goal_amount });
     setSavingField(false);
     setPlanSheetOpen(false);
   }
