@@ -189,6 +189,9 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
       }
     }
 
+    // Holdings changed → invalidate cached recommendations so for-you page re-fetches
+    sessionStorage.removeItem('rec-etag');
+
     setSaving(false);
     closeSheet();
   }

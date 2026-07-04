@@ -17,6 +17,7 @@ const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximum
 type Holding = { ticker: string; units: number; avg_price: number };
 type Quote = { price: number; changePercent: number; companyName: string | null };
 type HistoryPoint = { date: string; close: number };
+type UpcomingDividend = { ticker: string; expectedDate: string; netAmount: number; confidence: 'high' | 'low' };
 
 async function fetchQuote(ticker: string): Promise<Quote | null> {
   try {
@@ -52,6 +53,7 @@ export default function DashboardPage() {
   const [chartValues, setChartValues] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [monthlyPlan, setMonthlyPlan] = useState<number | null>(null);
+  const [upcomingDividends, setUpcomingDividends] = useState<UpcomingDividend[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -70,10 +72,21 @@ export default function DashboardPage() {
       const hs = holdingsData ?? [];
       setHoldings(hs);
 
-      const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
+      const [quoteResults, divRes] = await Promise.all([
+        Promise.all(hs.map(h => fetchQuote(h.ticker))),
+        fetch('/api/dividends').then(r => r.ok ? r.json() : { dividends: [] }).catch(() => ({ dividends: [] })),
+      ]);
       const quoteMap: Record<string, Quote> = {};
       hs.forEach((h, i) => { if (quoteResults[i]) quoteMap[h.ticker] = quoteResults[i]!; });
       setQuotes(quoteMap);
+
+      // Only show dividends in the next 7 days as "upcoming"
+      const today = new Date();
+      const week  = new Date(today); week.setDate(week.getDate() + 7);
+      const upcoming: UpcomingDividend[] = ((divRes.dividends ?? []) as UpcomingDividend[])
+        .filter(d => { const dt = new Date(d.expectedDate); return dt >= today && dt <= week; });
+      setUpcomingDividends(upcoming);
+
       setLoading(false);
     })();
   }, []);
@@ -121,7 +134,20 @@ export default function DashboardPage() {
             <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.01em' }}>{fullName || '...'}</div>
           </div>
         </div>
-        <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)' }}>notifications</span>
+        <div style={{ position: 'relative' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--on-surface-variant)' }}>notifications</span>
+          {upcomingDividends.length > 0 && (
+            <span style={{
+              position: 'absolute', top: -3, right: -3,
+              minWidth: 14, height: 14, borderRadius: 7,
+              background: 'var(--primary)', color: 'var(--bg)',
+              fontSize: 9, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '0 3px',
+            }}>
+              {upcomingDividends.length}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Scroll content */}
@@ -232,6 +258,31 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Upcoming dividends insight — only shown when there are dividends in the next 7 days */}
+        {!loading && upcomingDividends.length > 0 && (
+          <div
+            onClick={() => router.push('/portfolio?tab=dividends')}
+            style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}
+          >
+            <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--gain-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--gain)' }}>payments</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>
+                {upcomingDividends.length === 1
+                  ? `${upcomingDividends[0].ticker.split('.')[0]} paga dividendo esta semana`
+                  : `${upcomingDividends.length} dividendos esta semana`}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>
+                {upcomingDividends.map(d => d.ticker.split('.')[0]).join(', ')}
+                {' · '}
+                +{eur.format(upcomingDividends.reduce((s, d) => s + d.netAmount, 0))} € líq.
+              </div>
+            </div>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
+          </div>
+        )}
 
         {/* Investment plan insight */}
         {!loading && monthlyPlan !== null && (
