@@ -11,6 +11,7 @@ import BottomNav from '@/components/ui/BottomNav';
 import { SelectList } from '@/components/ui/SelectList';
 import { calcPlan } from '@/lib/planCalculator';
 import type { UserProfile } from '@/lib/planCalculator';
+import type { DbProfile, DbPlan } from '@/lib/types/profile';
 import { RISK_OPTIONS, OBJECTIVE_OPTIONS, SECTOR_OPTIONS } from '@/lib/profileOptions';
 import { PLAN_AMOUNTS, PLAN_PERIODS, PLAN_HORIZONS, PLAN_AMOUNT_VALUES, PLAN_FREQUENCIES, PLAN_HORIZON_YEARS } from '@/lib/profileConstants';
 

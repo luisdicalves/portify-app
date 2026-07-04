@@ -1,6 +1,6 @@
 'use client';
 
-export type SelectOption = { id: string; label: string; desc: string; icon: string };
+export type SelectOption = { id: string; label: string; desc?: string; icon: string };
 
 export function SelectList({ options, selected, onSelect }: { options: SelectOption[]; selected: number | null; onSelect: (i: number) => void }) {
   return (

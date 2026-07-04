@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
 import {
   calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath,
-  calcWeightedAvgDaysHeld, calcAnnualizedReturn,
+  calcWeightedAvgDaysHeld, calcAnnualizedReturn, type Holding,
 } from '@/lib/portfolioMetrics';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 import { useUser } from '@/lib/hooks/useUser';
@@ -18,7 +18,6 @@ const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
-type Holding = { ticker: string; units: number; avg_price: number };
 
 export default function PerformancePage() {
   const router = useRouter();
