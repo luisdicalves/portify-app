@@ -57,7 +57,7 @@ export async function GET(req: Request) {
     );
   }
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   // ── Perfil ────────────────────────────────────────────────────────────────
   const { data: profileRaw, error: profileErr } = await supabase
