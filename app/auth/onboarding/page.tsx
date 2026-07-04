@@ -36,10 +36,10 @@ export default function OnboardingPage() {
 
         {/* Text */}
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: 25, fontWeight: 700, letterSpacing: '-0.02em', maxWidth: 270, textWrap: 'pretty' as never, lineHeight: 1.2 }}>
+          <div style={{ fontSize: 25, fontWeight: 700, letterSpacing: '-0.02em', maxWidth: 270, textWrap: 'pretty', lineHeight: 1.2 }}>
             {steps[step].title}
           </div>
-          <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 12, maxWidth: 260, textWrap: 'pretty' as never, lineHeight: 1.45 }}>
+          <div style={{ fontSize: 15, color: 'var(--on-surface-variant)', marginTop: 12, maxWidth: 260, textWrap: 'pretty', lineHeight: 1.45 }}>
             {steps[step].text}
           </div>
         </div>

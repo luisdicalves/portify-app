@@ -17,8 +17,8 @@ export default function PlanAskPage() {
         <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer', display: 'block', marginBottom: 8 }}>
           arrow_back_ios_new
         </span>
-        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, textWrap: 'pretty' as never }}>Queres definir um plano?</div>
-        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 4, textWrap: 'pretty' as never }}>Um plano ajuda-te a saber quanto investir e quando atinges os teus objetivos.</div>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, textWrap: 'pretty' }}>Queres definir um plano?</div>
+        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 4, textWrap: 'pretty' }}>Um plano ajuda-te a saber quanto investir e quando atinges os teus objetivos.</div>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '14px 20px 20px', display: 'flex', flexDirection: 'column' }}>
