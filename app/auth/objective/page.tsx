@@ -6,15 +6,7 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
-
-const OPTIONS = [
-  { id: 'emergency_fund',  label: 'Fundo de emergência',  desc: 'Reserva segura e acessível.',                    icon: 'health_and_safety' },
-  { id: 'short_purchase',  label: 'Compra a curto prazo', desc: 'Casa, carro ou viagem (menos de 3 anos).',       icon: 'speed' },
-  { id: 'income',          label: 'Rendimento passivo',   desc: 'Gerar rendimento com dividendos regulares.',     icon: 'payments' },
-  { id: 'wealth_growth',   label: 'Crescimento',          desc: 'Fazer crescer o meu património.',                icon: 'trending_up' },
-  { id: 'retirement',      label: 'Reforma',              desc: 'Construir capital para a reforma.',              icon: 'beach_access' },
-  { id: 'legacy',          label: 'Legado',               desc: 'Deixar património para os meus herdeiros.',      icon: 'family_restroom' },
-];
+import { OBJECTIVE_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 
 export default function ObjectivePage() {
   const router = useRouter();
