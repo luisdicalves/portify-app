@@ -6,13 +6,18 @@
 // Next.js dev mode relies on eval() for react-refresh/HMR, so the CSP needs
 // 'unsafe-eval' only in development — production builds don't need it.
 const isDev = process.env.NODE_ENV !== 'production';
+// Derive the configured Supabase origin so non-supabase.co URLs (e.g. the
+// http://supabase.test stub used in E2E tests) are allowed by connect-src.
+const supabaseOrigin = (() => {
+  try { return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || '').origin; } catch { return ''; }
+})();
 const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''}`,
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: https:",
-  "connect-src 'self' https://*.supabase.co https://finnhub.io https://api.twelvedata.com https://query1.finance.yahoo.com https://open.er-api.com",
+  `connect-src 'self' https://*.supabase.co${supabaseOrigin ? ` ${supabaseOrigin}` : ''} https://finnhub.io https://api.twelvedata.com https://query1.finance.yahoo.com https://open.er-api.com`,
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
