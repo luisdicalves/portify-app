@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath } from '@/lib/portfolioMetrics';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 
@@ -15,32 +16,7 @@ const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFr
 const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximumFractionDigits: 1 });
 
 type Holding = { ticker: string; units: number; avg_price: number };
-type Quote = { price: number; changePercent: number; companyName: string | null };
-type HistoryPoint = { date: string; close: number };
 type UpcomingDividend = { ticker: string; expectedDate: string; netAmount: number; confidence: 'high' | 'low' };
-
-async function fetchQuote(ticker: string): Promise<Quote | null> {
-  try {
-    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (typeof data.price !== 'number') return null;
-    return { price: data.price, changePercent: data.changePercent ?? 0, companyName: data.companyName ?? null };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchHistory(ticker: string, outputsize: number): Promise<HistoryPoint[] | null> {
-  try {
-    const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=${outputsize}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data.points) && data.points.length > 1 ? data.points : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function DashboardPage() {
   const router = useRouter();

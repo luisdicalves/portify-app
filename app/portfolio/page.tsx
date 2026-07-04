@@ -10,20 +10,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
+import { fetchQuote } from '@/lib/marketApi';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-
-async function fetchQuote(ticker: string): Promise<{ price: number; change: number } | null> {
-  try {
-    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (typeof data.price !== 'number') return null;
-    return { price: data.price, change: typeof data.change === 'number' ? data.change : 0 };
-  } catch {
-    return null;
-  }
-}
 
 type Asset = {
   ticker: string;

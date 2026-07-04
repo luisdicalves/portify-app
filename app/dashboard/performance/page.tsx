@@ -9,6 +9,7 @@ import {
   calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath,
   calcWeightedAvgDaysHeld, calcAnnualizedReturn,
 } from '@/lib/portfolioMetrics';
+import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
@@ -16,31 +17,6 @@ const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 
 type Holding = { ticker: string; units: number; avg_price: number };
-type Quote = { price: number; companyName: string | null };
-type HistoryPoint = { date: string; close: number };
-
-async function fetchQuote(ticker: string): Promise<Quote | null> {
-  try {
-    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (typeof data.price !== 'number') return null;
-    return { price: data.price, companyName: data.companyName ?? null };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchHistory(ticker: string, outputsize: number): Promise<HistoryPoint[] | null> {
-  try {
-    const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=${outputsize}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data.points) && data.points.length > 1 ? data.points : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function PerformancePage() {
   const router = useRouter();

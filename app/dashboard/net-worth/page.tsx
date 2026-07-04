@@ -6,21 +6,12 @@ import BottomNav from '@/components/ui/BottomNav';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { fetchQuote } from '@/lib/marketApi';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 type Holding = { ticker: string; units: number; avg_price: number };
 
-async function fetchPrice(ticker: string): Promise<number | null> {
-  try {
-    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return typeof data.price === 'number' ? data.price : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function NetWorthPage() {
   const router = useRouter();
@@ -41,8 +32,8 @@ export default function NetWorthPage() {
         .eq('user_id', user.id);
 
       const hs: Holding[] = holdings ?? [];
-      const prices = await Promise.all(hs.map(h => fetchPrice(h.ticker)));
-      const value = hs.reduce((sum, h, i) => sum + h.units * (prices[i] ?? h.avg_price), 0);
+      const quotes = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
+      const value = hs.reduce((sum, h, i) => sum + h.units * (quotes[i]?.price ?? h.avg_price), 0);
       setTotalValue(value);
       setLoading(false);
     })();
