@@ -29,6 +29,7 @@ export default function DashboardPage() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [chartValues, setChartValues] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingChart, setLoadingChart] = useState(true);
   const [monthlyPlan, setMonthlyPlan] = useState<number | null>(null);
   const [upcomingDividends, setUpcomingDividends] = useState<UpcomingDividend[]>([]);
 
@@ -68,11 +69,13 @@ export default function DashboardPage() {
   }, [user]);
 
   useEffect(() => {
-    if (holdings.length === 0) { setChartValues(null); return; }
+    if (holdings.length === 0) { setChartValues(null); setLoadingChart(false); return; }
+    setLoadingChart(true);
     (async () => {
       const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
       const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
       setChartValues(buildPortfolioSeries(holdings, histories));
+      setLoadingChart(false);
     })();
   }, [holdings, tf]);
 
@@ -156,7 +159,9 @@ export default function DashboardPage() {
             ))}
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
-            {chartValues && chartValues.length > 1 ? (
+            {loadingChart ? (
+              <SkeletonChart height={88} />
+            ) : chartValues && chartValues.length > 1 ? (
               <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
                 <defs>
                   <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
@@ -167,8 +172,6 @@ export default function DashboardPage() {
                 <path d={area} fill="url(#pHomeG)" />
                 <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
               </svg>
-            ) : loading ? (
-              <SkeletonChart height={88} />
             ) : (
               <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
                 {t.noHistoricalData}
