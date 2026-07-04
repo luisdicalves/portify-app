@@ -8,7 +8,7 @@ export async function GET() {
   const user = await getAuthedUser();
   if (!user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  const supabase = createClient();
+  const supabase = await createClient();
 
   const [holdingsRaw, { data: txRaw }] = await Promise.all([
     getHoldings(supabase, user.id),

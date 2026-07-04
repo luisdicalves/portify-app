@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/server';
 // only serve read-only market data, not anything sensitive, so the extra
 // revalidation isn't worth paying for on every single ticker request.
 export async function getAuthedUser() {
-  const supabase = createClient();
+  const supabase = await createClient();
   const { data: { session } } = await supabase.auth.getSession();
   return session?.user ?? null;
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
@@ -40,13 +40,14 @@ function buildLinePath(values: number[]) {
   return { line, area };
 }
 
-export default function AssetDetailPage({ params }: { params: { id: string } }) {
+export default function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
-  const ticker = params.id.toUpperCase();
+  const { id } = use(params);
+  const ticker = id.toUpperCase();
 
   const { holding, quote, quoteLoading, history, riskReport, riskLoading, riskRequested, saving, loadRiskReport, confirmTrade } = useAssetDetail(ticker, user?.id, lang);
   const [sheet, setSheet] = useState<'buy' | 'sell' | null>(null);
