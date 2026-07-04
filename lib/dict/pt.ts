@@ -282,4 +282,5 @@ export const pt = {
   recMonthlyPlan: 'Plano mensal',
   recSectionTitle: 'Recomendado para ti',
   recSectionSub: 'Com base no teu perfil e carteira atual',
+  recInvestNow: 'Investir agora',
 };
