@@ -5,11 +5,10 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
-import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath } from '@/lib/portfolioMetrics';
+import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
-import { type Holding } from '@/lib/portfolioMetrics';
 import { useUser } from '@/lib/hooks/useUser';
 
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
