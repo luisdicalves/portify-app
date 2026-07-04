@@ -153,34 +153,37 @@ async function fetchExchangeTickers(
   exchange: { suffix: string; finnhub: string },
   apiKey: string,
 ): Promise<RawTicker[]> {
+  const url = `https://finnhub.io/api/v1/stock/symbol?exchange=${exchange.finnhub}&token=${apiKey}`;
   try {
-    const res = await fetch(
-      `https://finnhub.io/api/v1/stock/symbol?exchange=${exchange.finnhub}&token=${apiKey}`
-    );
-    if (!res.ok) return [];
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.error(`[assetUniverse] ${exchange.finnhub} HTTP ${res.status} ${res.statusText}`);
+      return [];
+    }
     const data: { symbol: string; description: string; type: string }[] = await res.json();
-
-    return data
-      .filter(t =>
-        // Só ações comuns e ETPs (ETFs)
-        t.type === 'Common Stock' || t.type === 'ETP' || t.type === 'ETF'
-      )
-      .map(t => ({
-        symbol:      t.symbol,
-        description: t.description,
-        type:        t.type,
-        suffix:      exchange.suffix,
-        exchange:    exchange.finnhub,
-      }));
-  } catch {
+    if (!Array.isArray(data)) {
+      console.error(`[assetUniverse] ${exchange.finnhub} resposta inesperada (tipo: ${typeof data})`);
+      return [];
+    }
+    const filtered = data.filter(t => t.type === 'Common Stock' || t.type === 'ETP' || t.type === 'ETF');
+    console.log(`[assetUniverse] exchange ${exchange.finnhub}: ${data.length} total → ${filtered.length} stocks/ETPs`);
+    return filtered.map(t => ({
+      symbol:      t.symbol,
+      description: t.description,
+      type:        t.type,
+      suffix:      exchange.suffix,
+      exchange:    exchange.finnhub,
+    }));
+  } catch (err) {
+    console.error(`[assetUniverse] ${exchange.finnhub} fetch falhou:`, err);
     return [];
   }
 }
 
 async function fetchCandidates(apiKey: string): Promise<RawTicker[]> {
+  console.log(`[assetUniverse] fetchCandidates — ${EXCHANGES.length} exchanges`);
   const allTickers: RawTicker[] = [];
 
-  // Processar exchanges em sequência para respeitar rate limits
   for (const exchange of EXCHANGES) {
     const tickers = await getCached(
       `universe:raw:${exchange.finnhub}`,
@@ -188,9 +191,10 @@ async function fetchCandidates(apiKey: string): Promise<RawTicker[]> {
       () => fetchExchangeTickers(exchange, apiKey),
     );
     allTickers.push(...(tickers ?? []));
-    await sleep(300); // pequeno delay entre exchanges
+    await sleep(300);
   }
 
+  console.log(`[assetUniverse] fetchCandidates — ${allTickers.length} tickers brutos total`);
   return allTickers;
 }
 
@@ -216,17 +220,24 @@ interface FinnhubMetric {
 }
 
 async function fetchMetrics(
-  symbol: string,  // símbolo nativo Finnhub (sem sufixo XTB)
+  symbol: string,
   apiKey: string,
 ): Promise<FinnhubMetric | null> {
   try {
     const res = await fetch(
       `https://finnhub.io/api/v1/stock/metric?symbol=${encodeURIComponent(symbol)}&metric=all&token=${apiKey}`
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[assetUniverse] metrics ${symbol} HTTP ${res.status}`);
+      return null;
+    }
     const data = await res.json();
+    if (!data?.metric) {
+      console.warn(`[assetUniverse] metrics ${symbol} — campo metric ausente na resposta`);
+    }
     return data?.metric ?? null;
-  } catch {
+  } catch (err) {
+    console.error(`[assetUniverse] metrics ${symbol} erro:`, err);
     return null;
   }
 }
@@ -239,9 +250,17 @@ async function fetchProfile(
     const res = await fetch(
       `https://finnhub.io/api/v1/stock/profile2?symbol=${encodeURIComponent(symbol)}&token=${apiKey}`
     );
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
+    if (!res.ok) {
+      console.warn(`[assetUniverse] profile2 ${symbol} HTTP ${res.status}`);
+      return null;
+    }
+    const data = await res.json();
+    if (!data?.name) {
+      console.warn(`[assetUniverse] profile2 ${symbol} — nome ausente (ticker inválido ou sem cobertura)`);
+    }
+    return data;
+  } catch (err) {
+    console.error(`[assetUniverse] profile2 ${symbol} erro:`, err);
     return null;
   }
 }
@@ -275,7 +294,10 @@ async function enrichStock(
     getCached(`universe:profile:${finnhubSymbol}`, ASSET_TTL, () => fetchProfile(finnhubSymbol, apiKey)),
   ]);
 
-  if (!metrics || !profile?.name) return null;
+  if (!metrics || !profile?.name) {
+    console.log(`[assetUniverse] enrich ${finnhubSymbol} descartado — metrics:${!!metrics} name:${!!profile?.name}`);
+    return null;
+  }
 
   // Market cap em EUR
   const currency = profile.currency ?? 'USD';
@@ -284,18 +306,27 @@ async function enrichStock(
 
   // Filtro de qualidade mínima
   const t = QUALITY_THRESHOLDS.stock;
-  if (marketCapEur < t.minMarketCapEur) return null;
+  if (marketCapEur < t.minMarketCapEur) {
+    console.log(`[assetUniverse] enrich ${finnhubSymbol} descartado — marketCap ${(marketCapEur / 1e9).toFixed(1)}B€ < ${(t.minMarketCapEur / 1e9).toFixed(0)}B€`);
+    return null;
+  }
 
   // Verificar se tem IPO há mais de 1 ano
   if (profile.ipo) {
     const ipoDate = new Date(profile.ipo);
     const oneYearAgo = new Date();
     oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-    if (ipoDate > oneYearAgo) return null;
+    if (ipoDate > oneYearAgo) {
+      console.log(`[assetUniverse] enrich ${finnhubSymbol} descartado — IPO recente (${profile.ipo})`);
+      return null;
+    }
   }
 
   const sector = mapSector(profile.finnhubIndustry);
-  if (sector === 'other') return null; // sem classificação → não recomendar
+  if (sector === 'other') {
+    console.log(`[assetUniverse] enrich ${finnhubSymbol} descartado — setor não mapeável (${profile.finnhubIndustry ?? 'n/a'})`);
+    return null;
+  }
 
   const beta         = metrics.beta ?? 1;
   const dividendYield = metrics.dividendYieldIndicatedAnnual ?? 0;
@@ -372,39 +403,50 @@ async function enrichCuratedEtf(
 async function buildUniverse(): Promise<CandidateAsset[]> {
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey) {
-    console.warn('[assetUniverse] FINNHUB_API_KEY não configurado — devolvendo só ETFs curados');
+    console.warn('[assetUniverse] FINNHUB_API_KEY não configurado — devolvendo só ETFs curados (13 ativos)');
     return Promise.all(CURATED_ETFS.map(enrichCuratedEtf));
   }
 
+  console.log('[assetUniverse] buildUniverse — início do pipeline dinâmico');
+  const t0 = Date.now();
+
   // 1. Obter tickers brutos por exchange
   const rawTickers = await fetchCandidates(apiKey);
-  console.log(`[assetUniverse] ${rawTickers.length} tickers brutos obtidos`);
+  console.log(`[assetUniverse] fase 1 concluída — ${rawTickers.length} tickers brutos em ${Date.now() - t0}ms`);
 
   // 2. Enriquecer em batches de 40 com delay de 1.5s (respeitar rate limit Finnhub)
+  let batchNum = 0;
   const enriched = await batchProcess(
     rawTickers,
     40,
     1500,
     async (batch) => {
+      batchNum++;
       const results = await Promise.allSettled(
         batch.map(raw => enrichStock(raw, apiKey))
       );
-      return results
-        .filter((r): r is PromiseFulfilledResult<CandidateAsset> =>
-          r.status === 'fulfilled' && r.value !== null
-        )
-        .map(r => r.value);
+      const ok = results.filter((r): r is PromiseFulfilledResult<CandidateAsset> =>
+        r.status === 'fulfilled' && r.value !== null
+      );
+      const rejected = results.filter(r => r.status === 'rejected');
+      if (rejected.length > 0) {
+        console.warn(`[assetUniverse] batch ${batchNum}: ${rejected.length} rejeições inesperadas`);
+        rejected.forEach(r => {
+          if (r.status === 'rejected') console.warn('  ↳', r.reason);
+        });
+      }
+      console.log(`[assetUniverse] batch ${batchNum}/${Math.ceil(rawTickers.length / 40)}: ${batch.length} in → ${ok.length} ok`);
+      return ok.map(r => r.value);
     },
   );
 
-  console.log(`[assetUniverse] ${enriched.length} stocks após filtro de qualidade`);
+  console.log(`[assetUniverse] fase 2 concluída — ${enriched.length} stocks após filtros em ${Date.now() - t0}ms`);
 
   // 3. Adicionar ETFs e bond ETFs curados
   const etfs = await Promise.all(CURATED_ETFS.map(enrichCuratedEtf));
-
   const universe = [...enriched, ...etfs];
-  console.log(`[assetUniverse] Universo final: ${universe.length} ativos`);
 
+  console.log(`[assetUniverse] buildUniverse concluído — ${universe.length} ativos (${enriched.length} stocks + ${etfs.length} ETFs) em ${Date.now() - t0}ms`);
   return universe;
 }
 
