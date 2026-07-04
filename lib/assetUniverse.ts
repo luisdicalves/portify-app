@@ -18,6 +18,7 @@
 
 import { getCached } from '@/lib/cache';
 import { mapSector, type PortifySector } from '@/lib/sectorMap';
+import { qualityScoreFromMetrics } from '@/lib/qualityScore';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -198,13 +199,20 @@ async function fetchCandidates(apiKey: string): Promise<RawTicker[]> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface FinnhubMetric {
-  marketCapitalization?: number;  // em milhões USD
-  beta?:                 number;
-  '52WeekHigh'?:         number;
-  '52WeekLow'?:          number;
+  marketCapitalization?:       number;  // em milhões USD
+  beta?:                       number;
+  '52WeekHigh'?:               number;
+  '52WeekLow'?:                number;
   dividendYieldIndicatedAnnual?: number;
-  revenueGrowthTTMYoy?:  number;
-  currentRatioAnnual?:   number;
+  currentRatioAnnual?:         number;
+  debtToEquityAnnual?:         number;
+  freeCashFlowPerShareAnnual?: number;
+  revenueGrowthTTMYoy?:        number;
+  epsGrowthTTMYoy?:            number;
+  revenueGrowth3Y?:            number;
+  roeTTM?:                     number;
+  netProfitMarginTTM?:         number;
+  grossMarginTTM?:             number;
 }
 
 async function fetchMetrics(
@@ -292,14 +300,20 @@ async function enrichStock(
   const beta         = metrics.beta ?? 1;
   const dividendYield = metrics.dividendYieldIndicatedAnnual ?? 0;
 
-  // Score base simplificado (o qualityScore.ts usa o RiskReport completo)
-  const healthBase = metrics.currentRatioAnnual
-    ? metrics.currentRatioAnnual >= 1.5 ? 70 : metrics.currentRatioAnnual >= 1 ? 50 : 30
-    : 50;
-  const growthBase = metrics.revenueGrowthTTMYoy !== undefined
-    ? metrics.revenueGrowthTTMYoy > 15 ? 80 : metrics.revenueGrowthTTMYoy > 0 ? 60 : 30
-    : 50;
-  const qualityScore = Math.round((healthBase + growthBase) / 2);
+  const qualityScore = qualityScoreFromMetrics({
+    currentRatioAnnual:        metrics.currentRatioAnnual,
+    debtToEquityAnnual:        metrics.debtToEquityAnnual,
+    freeCashFlowPerShareAnnual: metrics.freeCashFlowPerShareAnnual,
+    revenueGrowthTTMYoy:       metrics.revenueGrowthTTMYoy,
+    epsGrowthTTMYoy:           metrics.epsGrowthTTMYoy,
+    revenueGrowth3Y:           metrics.revenueGrowth3Y,
+    roeTTM:                    metrics.roeTTM,
+    netProfitMarginTTM:        metrics.netProfitMarginTTM,
+    grossMarginTTM:            metrics.grossMarginTTM,
+    beta:                      metrics.beta,
+    '52WeekHigh':              metrics['52WeekHigh'],
+    '52WeekLow':               metrics['52WeekLow'],
+  });
 
   return {
     ticker:        `${raw.symbol}.${raw.suffix}`,
