@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
@@ -32,6 +32,7 @@ export default function PortfolioPage() {
   const router = useRouter();
   const { user } = useUser();
   const { lang } = useApp();
+  const supabase = useMemo(() => createClient(), []);
   const t = useDict(lang);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +47,6 @@ export default function PortfolioPage() {
     setLoading(true);
     const u = await getUser();
     if (!u) { setLoading(false); return; }
-    const supabase = createClient();
 
     const { data: holdings } = await supabase
       .from('holdings')
@@ -78,7 +78,6 @@ export default function PortfolioPage() {
   async function fetchTransactions() {
     const u = await getUser();
     if (!u) return;
-    const supabase = createClient();
 
     const { data } = await supabase
       .from('transactions')
@@ -121,7 +120,6 @@ export default function PortfolioPage() {
   }
 
   async function deleteTransaction(id: string) {
-    const supabase = createClient();
     await supabase.from('transactions').delete().eq('id', id);
     setTxns(prev => prev.filter(tx => tx.id !== id));
   }
@@ -129,7 +127,6 @@ export default function PortfolioPage() {
   async function fetchCashSettings() {
     const u = await getUser();
     if (!u) return;
-    const supabase = createClient();
     const { data } = await supabase
       .from('profiles')
       .select('uninvested_cash, free_funds_annual_rate_pct')
