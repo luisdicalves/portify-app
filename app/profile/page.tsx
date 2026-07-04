@@ -10,6 +10,7 @@ import BottomNav from '@/components/ui/BottomNav';
 import { SelectList, SelectOption } from '@/components/ui/SelectList';
 import { calcPlan } from '@/lib/planCalculator';
 import type { UserProfile } from '@/lib/planCalculator';
+import type { DbProfile, DbPlan } from '@/lib/types/profile';
 
 const RISK_LABELS: Record<string, string> = { conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo' };
 const GOAL_LABELS: Record<string, string> = { short: 'Curto prazo', long: 'Longo prazo', income: 'Rendimento', retirement: 'Reforma' };
@@ -73,26 +74,8 @@ function horizonLabel(years: number | null | undefined) {
   return '> 10 anos';
 }
 
-type Profile = {
-  first_name: string | null;
-  last_name: string | null;
-  user_handle: string | null;
-  risk_profile: string | null;
-  investment_goal: string | null;
-  experience_level: string | null;
-  market_reaction: string | null;
-  financial_status: string | null;
-  liquidity_need: string | null;
-  preferred_sectors: string[] | null;
-  investor_since: number | null;
-};
-
-type Plan = {
-  amount: number;
-  frequency: string;
-  horizon_years: number;
-  goal_amount: number | null;
-};
+type Profile = DbProfile;
+type Plan = DbPlan;
 
 function SectionLabel({ label }: { label: string }) {
   return <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 6px 8px' }}>{label}</div>;
