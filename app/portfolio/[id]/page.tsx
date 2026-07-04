@@ -9,6 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import type { RiskReport as RiskReportData } from '@/lib/riskScore';
+import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 import { useUser, getUser } from '@/lib/hooks/useUser';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -22,21 +23,6 @@ function nowTime() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
-
-type Quote = {
-  price: number;
-  change: number;
-  changePercent: number;
-  open: number;
-  high: number;
-  low: number;
-  prevClose: number;
-  companyName: string | null;
-  industry: string | null;
-  exchange: string | null;
-};
-
-type HistoryPoint = { date: string; close: number };
 
 // Builds an SVG line/area path from a series of values, scaled to the viewBox.
 // Used both for the real Twelve Data history and, as a fallback, for a
@@ -90,31 +76,12 @@ export default function AssetDetailPage({ params }: { params: { id: string } }) 
   }, [user, ticker]);
 
   useEffect(() => {
-    (async () => {
-      setQuoteLoading(true);
-      try {
-        const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-        if (!res.ok) throw new Error('quote_failed');
-        setQuote(await res.json());
-      } catch {
-        setQuote(null);
-      } finally {
-        setQuoteLoading(false);
-      }
-    })();
+    setQuoteLoading(true);
+    fetchQuote(ticker).then(q => { setQuote(q); setQuoteLoading(false); });
   }, [ticker]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=30`);
-        if (!res.ok) throw new Error('history_failed');
-        const data = await res.json();
-        setHistory(Array.isArray(data.points) && data.points.length > 1 ? data.points : null);
-      } catch {
-        setHistory(null);
-      }
-    })();
+    fetchHistory(ticker, 30).then(pts => setHistory(pts));
   }, [ticker]);
 
   async function loadRiskReport() {

@@ -8,6 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath } from '@/lib/portfolioMetrics';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
+import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 import { useUser } from '@/lib/hooks/useUser';
 
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
@@ -16,32 +17,7 @@ const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFr
 const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximumFractionDigits: 1 });
 
 type Holding = { ticker: string; units: number; avg_price: number };
-type Quote = { price: number; changePercent: number; companyName: string | null };
-type HistoryPoint = { date: string; close: number };
 type UpcomingDividend = { ticker: string; expectedDate: string; netAmount: number; confidence: 'high' | 'low' };
-
-async function fetchQuote(ticker: string): Promise<Quote | null> {
-  try {
-    const res = await fetch(`/api/quote?symbol=${encodeURIComponent(ticker)}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (typeof data.price !== 'number') return null;
-    return { price: data.price, changePercent: data.changePercent ?? 0, companyName: data.companyName ?? null };
-  } catch {
-    return null;
-  }
-}
-
-async function fetchHistory(ticker: string, outputsize: number): Promise<HistoryPoint[] | null> {
-  try {
-    const res = await fetch(`/api/history?symbol=${encodeURIComponent(ticker)}&outputsize=${outputsize}`);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return Array.isArray(data.points) && data.points.length > 1 ? data.points : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -54,6 +30,7 @@ export default function DashboardPage() {
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [chartValues, setChartValues] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [monthlyPlan, setMonthlyPlan] = useState<number | null>(null);
   const [upcomingDividends, setUpcomingDividends] = useState<UpcomingDividend[]>([]);
 
   useEffect(() => {
@@ -61,10 +38,12 @@ export default function DashboardPage() {
     (async () => {
       const supabase = createClient();
 
-      const [{ data: profile }, { data: holdingsData }] = await Promise.all([
+      const [{ data: profile }, { data: holdingsData }, { data: plan }] = await Promise.all([
         supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
         supabase.from('holdings').select('ticker, units, avg_price').eq('user_id', user.id),
+        supabase.from('investment_plans').select('monthly_amount').eq('user_id', user.id).maybeSingle(),
       ]);
+      if (plan) setMonthlyPlan((plan as { monthly_amount?: number }).monthly_amount ?? null);
       if (profile) setFullName([profile.first_name, profile.last_name].filter(Boolean).join(' '));
 
       const hs = holdingsData ?? [];
@@ -276,6 +255,25 @@ export default function DashboardPage() {
                 {upcomingDividends.map(d => d.ticker.split('.')[0]).join(', ')}
                 {' · '}
                 +{eur.format(upcomingDividends.reduce((s, d) => s + d.netAmount, 0))} € líq.
+              </div>
+            </div>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
+          </div>
+        )}
+
+        {/* Investment plan insight */}
+        {!loading && monthlyPlan !== null && (
+          <div
+            onClick={() => router.push('/profile')}
+            style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}
+          >
+            <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+              <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--primary)' }}>autorenew</span>
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{t.insightPlanTitle}</div>
+              <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>
+                {eur.format(monthlyPlan)} € {lang === 'pt' ? 'serão investidos a 1 de cada mês' : 'will be invested on the 1st each month'}
               </div>
             </div>
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
