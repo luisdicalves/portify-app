@@ -6,7 +6,7 @@ import { createClient as createAdminClient } from '@supabase/supabase-js';
 // getSession) instead of trusting the local cookie, unlike the read-only
 // market-data routes in lib/apiAuth.ts.
 export async function POST() {
-  const supabase = createServerClient();
+  const supabase = await createServerClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
