@@ -46,6 +46,7 @@ test.describe('Onboarding flow', () => {
     await expect(page).toHaveURL('/auth/assets');
 
     // ── 3. Assets ────────────────────────────────────────────────────────────
+    await page.getByText('Ações').click(); // select at least one asset to enable the button
     await page.getByRole('button', { name: 'Continuar' }).click();
     await expect(page).toHaveURL('/auth/experience');
 
