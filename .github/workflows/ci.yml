@@ -7,6 +7,18 @@ on:
     branches: [main]
 
 jobs:
+  e2e-guard:
+    name: E2E coverage guard
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-e2e')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check E2E coverage
+        run: bash ci/check-e2e-coverage.sh
+
   checks:
     runs-on: ubuntu-latest
     steps:
