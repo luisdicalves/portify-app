@@ -25,7 +25,7 @@ export default function ObjectivePage() {
         const { error } = await supabase.from('profiles').update({ investment_goal: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
-      router.push('/auth/horizon');
+      router.push('/auth/risk');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');
       setSaving(false);
@@ -34,7 +34,7 @@ export default function ObjectivePage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={2} total={8} back={() => router.back()} title="Objetivo ao investir" sub="O que procuras ao investir o teu dinheiro?" />
+      <StepHeader step={2} total={7} back={() => router.back()} title="Objetivo ao investir" sub="O que procuras ao investir o teu dinheiro?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />

@@ -40,7 +40,7 @@ export default function ReactionPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={5} total={8} back={() => router.back()} title="Reação a uma queda" sub="O mercado cai 20% de repente. O que fazes?" />
+      <StepHeader step={4} total={7} back={() => router.back()} title="Reação a uma queda" sub="O mercado cai 20% de repente. O que fazes?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <div style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
