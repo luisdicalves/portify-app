@@ -36,7 +36,7 @@ export default function RiskPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={5} total={9} back={() => router.back()} title="Perfil de risco" sub="Quanto risco estás disposto a aceitar?" />
+      <StepHeader step={4} total={8} back={() => router.back()} title="Perfil de risco" sub="Quanto risco estás disposto a aceitar?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />

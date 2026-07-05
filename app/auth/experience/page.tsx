@@ -41,7 +41,7 @@ export default function ExperiencePage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={2} total={9} back={() => router.back()} title="Experiência a investir" sub="Ajudamos a personalizar as tuas recomendações." />
+      <StepHeader step={1} total={8} back={() => router.back()} title="Experiência a investir" sub="Ajudamos a personalizar as tuas recomendações." />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />
