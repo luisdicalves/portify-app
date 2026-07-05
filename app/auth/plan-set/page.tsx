@@ -28,14 +28,12 @@ export default function PlanSetPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px 4px' }}>
-        <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 6, color: 'var(--on-surface)', display: 'flex', alignItems: 'center', borderRadius: 'var(--radius-full)' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 22 }}>arrow_back</span>
-        </button>
-        <div>
-          <div style={{ fontSize: 19, fontWeight: 700, letterSpacing: '-0.02em' }}>Define o teu plano</div>
-          <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>Podes alterar estes valores a qualquer momento.</div>
-        </div>
+      <div style={{ padding: '14px 24px 8px' }}>
+        <span onClick={() => router.back()} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)', cursor: 'pointer', display: 'block', marginBottom: 8 }}>
+          arrow_back_ios_new
+        </span>
+        <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1, textWrap: 'pretty' as never }}>Define o teu plano</div>
+        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginTop: 4, textWrap: 'pretty' as never }}>Podes alterar estes valores a qualquer momento.</div>
       </div>
 
       <div style={{ flex: 1, overflow: 'auto', padding: '12px 20px 24px' }}>
