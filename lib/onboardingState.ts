@@ -8,7 +8,6 @@ export interface OnbPlan {
 
 const KEYS = {
   riskProfile: 'onb_risk_profile',
-  horizon:     'onb_horizon',
   plan:        'onb_plan',
 } as const;
 
@@ -18,16 +17,6 @@ export const onbState = {
   },
   setRiskProfile(value: string): void {
     sessionStorage.setItem(KEYS.riskProfile, value);
-  },
-
-  getHorizon(): number | null {
-    const raw = sessionStorage.getItem(KEYS.horizon);
-    if (!raw) return null;
-    const n = parseInt(raw, 10);
-    return Number.isFinite(n) ? n : null;
-  },
-  setHorizon(years: number): void {
-    sessionStorage.setItem(KEYS.horizon, String(years));
   },
 
   getPlan(): OnbPlan | null {
@@ -41,7 +30,6 @@ export const onbState = {
 
   clear(): void {
     sessionStorage.removeItem(KEYS.riskProfile);
-    sessionStorage.removeItem(KEYS.horizon);
     sessionStorage.removeItem(KEYS.plan);
   },
 };

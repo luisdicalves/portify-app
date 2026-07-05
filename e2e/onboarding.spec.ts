@@ -48,14 +48,9 @@ test.describe('Onboarding flow', () => {
     // ── 5. Objective ─────────────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: 'Continuar' }).click();
-    await expect(page).toHaveURL('/auth/horizon');
-
-    // ── 6. Horizon ───────────────────────────────────────────────────────────
-    await page.getByRole('button', { name: '10 anos' }).click();
-    await page.getByRole('button', { name: 'Continuar' }).click();
     await expect(page).toHaveURL('/auth/risk');
 
-    // ── 7. Risk ──────────────────────────────────────────────────────────────
+    // ── 6. Risk ──────────────────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: 'Continuar' }).click();
     await expect(page).toHaveURL('/auth/reaction');

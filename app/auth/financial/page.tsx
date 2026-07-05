@@ -40,7 +40,7 @@ export default function FinancialPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={6} total={8} back={() => router.back()} title="Situação financeira" sub="Como descreves a tua situação financeira atual?" />
+      <StepHeader step={5} total={7} back={() => router.back()} title="Situação financeira" sub="Como descreves a tua situação financeira atual?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />

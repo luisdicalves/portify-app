@@ -38,7 +38,7 @@ export default function SectorsPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={8} total={8} back={() => router.back()} title="Setores de interesse" sub="Escolhe as áreas que queres acompanhar." />
+      <StepHeader step={7} total={7} back={() => router.back()} title="Setores de interesse" sub="Escolhe as áreas que queres acompanhar." />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '14px 20px 0' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
