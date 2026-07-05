@@ -1,4 +1,13 @@
 import { defineConfig, devices } from '@playwright/test';
+import { readFileSync } from 'fs';
+
+// Load NEXT_PUBLIC_ vars so page.route() mocks intercept the correct Supabase URL
+try {
+  for (const line of readFileSync('.env.local', 'utf8').split('\n')) {
+    const m = line.match(/^([^#=]+)=(.*)$/);
+    if (m && !process.env[m[1].trim()]) process.env[m[1].trim()] = m[2].trim();
+  }
+} catch { /* file may not exist */ }
 
 export default defineConfig({
   testDir: './e2e',

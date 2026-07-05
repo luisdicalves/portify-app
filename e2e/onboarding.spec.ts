@@ -7,13 +7,8 @@ async function pressPin(page: import('@playwright/test').Page, digits: string) {
   }
 }
 
-/**
- * Clicks the first option in a SelectList.
- * SelectList renders divs (not buttons) each containing a span.icf icon.
- * This distinguishes them from navigation <button> elements.
- */
 async function selectFirst(page: import('@playwright/test').Page) {
-  await page.locator('div:has(span.icf)').first().click();
+  await page.locator('[data-testid="select-item"]').first().click();
 }
 
 test.describe('Onboarding flow', () => {
@@ -73,14 +68,17 @@ test.describe('Onboarding flow', () => {
     // ── 8. Market reaction ───────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page).toHaveURL('/auth/financial');
 
     // ── 9. Financial status ───────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page).toHaveURL('/auth/liquidity');
 
     // ── 10. Liquidity need ────────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: /Continuar/ }).click();
+    await expect(page).toHaveURL('/auth/sectors');
 
     // ── 11. Sectors ───────────────────────────────────────────────────────────
     await page.getByRole('button', { name: 'Tecnologia' }).click();
@@ -103,10 +101,14 @@ test.describe('Onboarding flow', () => {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
     let planUpsertCalled = false;
 
-    // Intercept the investment_plans upsert to verify it is called
+    // Intercept investment_plans: track upsert (POST) and return a plan on GET so the
+    // PIN page can confirm onboarding is complete and redirect to /dashboard
     await page.route(`${supabaseUrl}/rest/v1/investment_plans**`, route => {
       if (route.request().method() === 'POST') planUpsertCalled = true;
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      const body = route.request().method() === 'GET'
+        ? JSON.stringify([{ id: 'plan-1', amount: 250, frequency: 'monthly', horizon_years: 10, goal_amount: 50000 }])
+        : JSON.stringify([]);
+      route.fulfill({ status: 200, contentType: 'application/json', body });
     });
 
     // Navigate directly to summary with plan state in sessionStorage

@@ -74,5 +74,20 @@ export function useProfileData(userId: string | undefined) {
     setSaving(false);
   }
 
-  return { profile, plan, saving, saveRisk, saveObjective, saveSectors, savePlan };
+  async function saveHorizonYears(years: number) {
+    if (!userId || !plan) return;
+    setSaving(true);
+    const supabase = createClient();
+    await upsertPlan(supabase, {
+      user_id:       userId,
+      amount:        plan.amount,
+      frequency:     plan.frequency,
+      horizon_years: years,
+      goal_amount:   plan.goal_amount,
+    });
+    setPlan(prev => prev ? { ...prev, horizon_years: years } : prev);
+    setSaving(false);
+  }
+
+  return { profile, plan, saving, saveRisk, saveObjective, saveSectors, savePlan, saveHorizonYears };
 }

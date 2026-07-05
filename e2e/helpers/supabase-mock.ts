@@ -30,31 +30,35 @@ const FAKE_PROFILE = {
   investor_since:    2024,
 };
 
-/** Intercepts all Supabase API calls so tests don't hit the real backend. */
+/** Intercepts all Supabase API calls so tests don't hit the real backend.
+ *  Uses regex patterns so the mock works regardless of whether NEXT_PUBLIC_SUPABASE_URL
+ *  resolves to the real project URL or the local fallback. */
 export async function mockSupabase(page: Page) {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+  // Match any Supabase host: real project (*.supabase.co) or CI stub (http://supabase.test)
+  const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
+  const url = (path: string) => new RegExp(sb.source + path);
 
   // ── Auth ───────────────────────────────────────────────────────────────────
 
-  await page.route(`${supabaseUrl}/auth/v1/signup`, route =>
+  await page.route(url('/auth/v1/signup'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_SESSION) }),
   );
 
-  await page.route(`${supabaseUrl}/auth/v1/token**`, route =>
+  await page.route(url('/auth/v1/token'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_SESSION) }),
   );
 
-  await page.route(`${supabaseUrl}/auth/v1/logout**`, route =>
+  await page.route(url('/auth/v1/logout'), route =>
     route.fulfill({ status: 204 }),
   );
 
-  await page.route(`${supabaseUrl}/auth/v1/user`, route =>
+  await page.route(url('/auth/v1/user'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(FAKE_USER) }),
   );
 
   // ── REST (profiles, investment_plans, holdings, transactions) ─────────────
 
-  await page.route(`${supabaseUrl}/rest/v1/profiles**`, route => {
+  await page.route(url('/rest/v1/profiles'), route => {
     if (route.request().method() === 'GET') {
       return route.fulfill({
         status: 200,
@@ -65,36 +69,36 @@ export async function mockSupabase(page: Page) {
     return route.fulfill({ status: 204 });
   });
 
-  await page.route(`${supabaseUrl}/rest/v1/investment_plans**`, route => {
+  await page.route(url('/rest/v1/investment_plans'), route => {
     if (route.request().method() === 'GET') {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([{ amount: 250, frequency: 'monthly', horizon_years: 10, goal_amount: 50000 }]),
+        body: JSON.stringify([{ id: 'plan-1', amount: 250, frequency: 'monthly', horizon_years: 10, goal_amount: 50000 }]),
       });
     }
-    return route.fulfill({ status: 204 });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
   });
 
-  await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+  await page.route(url('/rest/v1/holdings'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
   );
 
-  await page.route(`${supabaseUrl}/rest/v1/transactions**`, route =>
+  await page.route(url('/rest/v1/transactions'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) }),
   );
 
   // ── RPC (is_username_available, set_pin, verify_pin) ─────────────────────
 
-  await page.route(`${supabaseUrl}/rest/v1/rpc/is_username_available`, route =>
+  await page.route(url('/rest/v1/rpc/is_username_available'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: 'true' }),
   );
 
-  await page.route(`${supabaseUrl}/rest/v1/rpc/set_pin`, route =>
+  await page.route(url('/rest/v1/rpc/set_pin'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: 'null' }),
   );
 
-  await page.route(`${supabaseUrl}/rest/v1/rpc/verify_pin`, route =>
+  await page.route(url('/rest/v1/rpc/verify_pin'), route =>
     route.fulfill({ status: 200, contentType: 'application/json', body: 'true' }),
   );
 }

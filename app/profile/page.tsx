@@ -70,7 +70,7 @@ export default function ProfilePage() {
   const { user } = useUser();
   const { lang } = useApp();
   const t = useDict(lang);
-  const { profile, plan, saving: savingField, saveRisk, saveObjective, saveSectors, savePlan } = useProfileData(user?.id);
+  const { profile, plan, saving: savingField, saveRisk, saveObjective, saveSectors, savePlan, saveHorizonYears } = useProfileData(user?.id);
 
   const [riskSheetOpen, setRiskSheetOpen] = useState(false);
   const [riskSelected, setRiskSelected] = useState(1);
@@ -84,7 +84,7 @@ export default function ProfilePage() {
   const [planPeriod, setPlanPeriod] = useState(1);
   const [planHorizon, setPlanHorizon] = useState(2);
   const [horizonSheetOpen, setHorizonSheetOpen] = useState(false);
-  const [horizonSelected, setHorizonSelected] = useState(2);
+  const [horizonYears, setHorizonYears] = useState(10);
 
   // Calcular riskScore e alocação sempre que o perfil ou plano mudar
   const planResult = (() => {
@@ -130,17 +130,8 @@ export default function ProfilePage() {
   }
 
   function openHorizonSheet() {
-    const idx = plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2;
-    setHorizonSelected(idx >= 0 ? idx : 2);
+    setHorizonYears(plan?.horizon_years ?? 10);
     setHorizonSheetOpen(true);
-  }
-
-  async function saveHorizon() {
-    // Use current plan values for all fields except horizon
-    const amt     = plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : planAmt;
-    const period  = plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : planPeriod;
-    const goal    = plan?.goal_amount != null ? String(plan.goal_amount) : planGoal;
-    await savePlan(amt, period, horizonSelected, goal);
   }
 
   function toggleSector(id: string) {
@@ -400,19 +391,32 @@ export default function ProfilePage() {
       )}
 
       {horizonSheetOpen && (
-        <div onClick={() => setHorizonSheetOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+        <div onClick={() => setHorizonSheetOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
           <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
             <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
               <span style={{ fontSize: 20, fontWeight: 700 }}>{t.horizonLabel}</span>
               <span onClick={() => setHorizonSheetOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-              {PLAN_HORIZONS.map((h, i) => (
-                <PlanChip key={i} label={h} on={horizonSelected === i} onClick={() => setHorizonSelected(i)} />
-              ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+              <button onClick={() => setHorizonYears(y => Math.max(1, y - 1))} style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', border: '1px solid var(--card-border)', background: 'var(--surface-low)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', fontFamily: 'inherit' }}>−</button>
+              <span style={{ fontSize: 26, fontWeight: 700, minWidth: 70, textAlign: 'center', letterSpacing: '-0.02em' }}>
+                {horizonYears} <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--on-surface-variant)' }}>anos</span>
+              </span>
+              <button onClick={() => setHorizonYears(y => Math.min(50, y + 1))} style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', border: '1px solid var(--card-border)', background: 'var(--surface-low)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', fontFamily: 'inherit' }}>+</button>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                {[5, 10, 15, 20, 30].map(y => (
+                  <button key={y} onClick={() => setHorizonYears(y)} style={{
+                    padding: '5px 10px', borderRadius: 'var(--radius-full)',
+                    border: `1px solid ${horizonYears === y ? 'var(--primary-strong)' : 'var(--card-border)'}`,
+                    background: horizonYears === y ? 'var(--primary-container)' : 'var(--surface-low)',
+                    color: horizonYears === y ? 'var(--primary-strong)' : 'var(--on-surface-variant)',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                  }}>{y}</button>
+                ))}
+              </div>
             </div>
-            <button onClick={() => { saveHorizon(); setHorizonSheetOpen(false); }} disabled={savingField} style={{ width: '100%', marginTop: 20, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+            <button onClick={() => { saveHorizonYears(horizonYears); setHorizonSheetOpen(false); }} disabled={savingField} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
               {t.confirm}
             </button>
           </div>
