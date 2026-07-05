@@ -34,8 +34,8 @@ test.describe('Portfolio buy/sell sheets', () => {
     await loginAndReachPortfolio(page);
 
     // Open FAB
-    await page.getByRole('button', { name: 'add' }).click();
-    await page.getByRole('button', { name: 'Comprar' }).click();
+    await page.getByTestId('fab-toggle').click();
+    await page.getByRole('button', { name: 'Comprar', exact: true }).click();
 
     // Buy sheet should be visible with search input
     await expect(page.getByText('Registar compra')).toBeVisible();
@@ -56,8 +56,8 @@ test.describe('Portfolio buy/sell sheets', () => {
     await loginAndReachPortfolio(page);
 
     // Open FAB
-    await page.getByRole('button', { name: 'add' }).click();
-    await page.getByRole('button', { name: 'Vender' }).click();
+    await page.getByTestId('fab-toggle').click();
+    await page.getByRole('button', { name: 'Vender', exact: true }).click();
 
     // Sell sheet should show portfolio holdings
     await expect(page.getByText('Registar venda')).toBeVisible();
@@ -70,8 +70,8 @@ test.describe('Portfolio buy/sell sheets', () => {
     // Mock the quote API to return 404 for unknown tickers
     await page.route('/api/quote**', route => route.fulfill({ status: 404 }));
 
-    await page.getByRole('button', { name: 'add' }).click();
-    await page.getByRole('button', { name: 'Comprar' }).click();
+    await page.getByTestId('fab-toggle').click();
+    await page.getByRole('button', { name: 'Comprar', exact: true }).click();
 
     await page.getByPlaceholder(/AAPL.*NVDA/i).fill('XXXINVALID');
     await page.waitForTimeout(800); // debounce
