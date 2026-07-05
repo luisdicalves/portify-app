@@ -325,7 +325,7 @@ export default function PortfolioPage() {
                   {buyQuoteState === 'loading' && <span style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>…</span>}
                   {buyQuoteState === 'found' && <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>check_circle</span>}
                   {buyQuoteState === 'error' && <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--loss)' }}>error</span>}
-                  {buyQuoteState === 'idle' && buyInput.length >= 1 && (
+                  {buyQuoteState === 'idle' && (
                     <button onClick={searchTicker} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                       {lang === 'pt' ? 'Pesquisar' : 'Search'}
                     </button>
