@@ -34,8 +34,8 @@ const FAKE_PROFILE = {
  *  Uses regex patterns so the mock works regardless of whether NEXT_PUBLIC_SUPABASE_URL
  *  resolves to the real project URL or the local fallback. */
 export async function mockSupabase(page: Page) {
-  // Match any Supabase host (real project URL or local test fallback)
-  const sb = /https?:\/\/[^/]+supabase\.(co|test|io)/;
+  // Match any Supabase host: real project (*.supabase.co) or CI stub (http://supabase.test)
+  const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
   const url = (path: string) => new RegExp(sb.source + path);
 
   // ── Auth ───────────────────────────────────────────────────────────────────
