@@ -6,14 +6,7 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
-
-const OPTIONS = [
-  { id: 'none',         label: 'Nenhuma',       desc: 'Nunca investi.',                               icon: 'person' },
-  { id: 'beginner',     label: 'Iniciante',      desc: 'Investi pontualmente.',                        icon: 'school' },
-  { id: 'intermediate', label: 'Intermédio',     desc: 'Invisto regularmente há 1–3 anos.',            icon: 'trending_up' },
-  { id: 'experienced',  label: 'Experiente',     desc: 'Invisto há mais de 3 anos.',                   icon: 'workspace_premium' },
-  { id: 'professional', label: 'Profissional',   desc: 'Trabalho ou trabalhei na área financeira.',    icon: 'business_center' },
-];
+import { EXPERIENCE_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 
 export default function ExperiencePage() {
   const router = useRouter();

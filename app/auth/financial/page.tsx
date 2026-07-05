@@ -4,15 +4,10 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
+import { FINANCIAL_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
 
-const OPTIONS = [
-  { id: 'unstable',    label: 'Instável',    desc: 'Rendimento variável ou incerto.',          icon: 'warning' },
-  { id: 'stable',      label: 'Estável',     desc: 'Rendimento fixo, despesas cobertas.',      icon: 'check_circle' },
-  { id: 'comfortable', label: 'Confortável', desc: 'Poupo regularmente sem esforço.',          icon: 'savings' },
-  { id: 'wealthy',     label: 'Elevada',     desc: 'Grande capacidade de poupança mensal.',    icon: 'diamond' },
-];
 
 export default function FinancialPage() {
   const router = useRouter();

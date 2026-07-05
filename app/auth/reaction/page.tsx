@@ -6,13 +6,7 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
-
-const OPTIONS = [
-  { id: 'sell_all',  label: 'Vendo tudo',  desc: 'Prefiro sair e evitar mais perdas.',            icon: 'trending_down' },
-  { id: 'sell_some', label: 'Vendo parte', desc: 'Reduzo a exposição para ficar mais tranquilo.',  icon: 'remove_circle' },
-  { id: 'hold',      label: 'Aguardo',     desc: 'Não faço nada. Espero que o mercado recupere.',  icon: 'pause_circle' },
-  { id: 'buy_more',  label: 'Compro mais', desc: 'É uma oportunidade. Aumento a minha posição.',   icon: 'add_shopping_cart' },
-];
+import { REACTION_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 
 export default function ReactionPage() {
   const router = useRouter();
