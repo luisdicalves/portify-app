@@ -25,6 +25,61 @@ async function loginAndReachPortfolio(page: import('@playwright/test').Page) {
   await page.goto('/portfolio');
 }
 
+test.describe('Portfolio buy/sell sheets', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+  });
+
+  test('FAB Comprar opens buy sheet with ticker search field', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+
+    // Open FAB
+    await page.getByRole('button', { name: 'add' }).click();
+    await page.getByRole('button', { name: 'Comprar' }).click();
+
+    // Buy sheet should be visible with search input
+    await expect(page.getByText('Registar compra')).toBeVisible();
+    await expect(page.getByPlaceholder(/AAPL.*NVDA/i)).toBeVisible();
+  });
+
+  test('FAB Vender opens sell sheet with portfolio holdings', async ({ page }) => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+
+    // Add a holding so sell sheet has something to show
+    await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ id: 'h1', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'AAPL', units: 5, avg_price: 180, currency: 'EUR' }]),
+      }),
+    );
+
+    await loginAndReachPortfolio(page);
+
+    // Open FAB
+    await page.getByRole('button', { name: 'add' }).click();
+    await page.getByRole('button', { name: 'Vender' }).click();
+
+    // Sell sheet should show portfolio holdings
+    await expect(page.getByText('Registar venda')).toBeVisible();
+    await expect(page.getByText('AAPL').first()).toBeVisible();
+  });
+
+  test('buy sheet shows error for invalid ticker', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+
+    // Mock the quote API to return 404 for unknown tickers
+    await page.route('/api/quote**', route => route.fulfill({ status: 404 }));
+
+    await page.getByRole('button', { name: 'add' }).click();
+    await page.getByRole('button', { name: 'Comprar' }).click();
+
+    await page.getByPlaceholder(/AAPL.*NVDA/i).fill('XXXINVALID');
+    await page.waitForTimeout(800); // debounce
+
+    await expect(page.getByText(/Ativo não encontrado/i)).toBeVisible();
+  });
+});
+
 test.describe('Portfolio dividends tab', () => {
   test.beforeEach(async ({ page }) => {
     await mockSupabase(page);
