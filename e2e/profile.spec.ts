@@ -29,9 +29,9 @@ test.describe('Profile page', () => {
     // Click the "Horizonte temporal" settings row
     await page.getByText('Horizonte temporal').click();
 
-    // Horizon chips should be visible
-    await expect(page.getByText('5 – 10 anos')).toBeVisible();
-    await expect(page.getByText('> 10 anos')).toBeVisible();
+    // Horizon chips should be visible — use chips that can't match the settings row value
+    await expect(page.getByText('< 2 anos', { exact: true })).toBeVisible();
+    await expect(page.getByText('> 10 anos', { exact: true })).toBeVisible();
 
     // The full plan sheet field ("Objetivo financeiro") must NOT appear
     await expect(page.getByText('Objetivo financeiro')).not.toBeVisible();
