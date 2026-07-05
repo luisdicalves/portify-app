@@ -70,7 +70,7 @@ export function useProfileData(userId: string | undefined) {
     const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
     const goal_amount  = parseFloat(planGoal) || 0;
     await upsertPlan(supabase, { user_id: userId, amount, frequency, horizon_years, goal_amount });
-    setPlan({ amount, frequency, horizon_years, goal_amount });
+    setPlan(prev => ({ amount, frequency, horizon_years, goal_amount, asset_classes: prev?.asset_classes }));
     setSaving(false);
   }
 
