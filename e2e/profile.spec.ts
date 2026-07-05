@@ -23,18 +23,38 @@ test.describe('Profile page', () => {
     await mockSupabase(page);
   });
 
-  test('horizonte temporal opens its own sheet, not the full plan sheet', async ({ page }) => {
+  test('horizonte temporal opens stepper sheet, not the full plan sheet', async ({ page }) => {
     await loginAndReachProfile(page);
 
-    // Click the "Horizonte temporal" settings row
     await page.getByText('Horizonte temporal').click();
 
-    // Horizon chips should be visible — use chips that can't match the settings row value
-    await expect(page.getByText('< 2 anos', { exact: true })).toBeVisible();
-    await expect(page.getByText('> 10 anos', { exact: true })).toBeVisible();
+    // Stepper sheet: shortcut buttons and +/− controls should be visible
+    await expect(page.getByRole('button', { name: '10', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '30', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '−', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '+', exact: true })).toBeVisible();
 
     // The full plan sheet field ("Objetivo financeiro") must NOT appear
     await expect(page.getByText('Objetivo financeiro')).not.toBeVisible();
+  });
+
+  test('horizonte temporal stepper updates value and confirms', async ({ page }) => {
+    await loginAndReachProfile(page);
+
+    await page.getByText('Horizonte temporal').click();
+
+    // Click shortcut "20"
+    await page.getByRole('button', { name: '20', exact: true }).click();
+    await expect(page.getByText('20', { exact: true })).toBeVisible();
+
+    // Use − to go to 19
+    await page.getByRole('button', { name: '−', exact: true }).click();
+    await expect(page.getByText('19')).toBeVisible();
+
+    // Confirm closes the sheet
+    await page.getByRole('button', { name: 'Confirmar' }).click();
+    await expect(page.getByText('Objetivo financeiro')).not.toBeVisible();
+    await expect(page.getByRole('button', { name: '−', exact: true })).not.toBeVisible();
   });
 
   test('plano ativo opens the full plan sheet', async ({ page }) => {
