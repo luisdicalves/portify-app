@@ -7,13 +7,8 @@ async function pressPin(page: import('@playwright/test').Page, digits: string) {
   }
 }
 
-/**
- * Clicks the first option in a SelectList.
- * SelectList renders divs (not buttons) each containing a span.icf icon.
- * This distinguishes them from navigation <button> elements.
- */
 async function selectFirst(page: import('@playwright/test').Page) {
-  await page.locator('div:has(span.icf)').first().click();
+  await page.locator('[data-testid="select-item"]').first().click();
 }
 
 test.describe('Onboarding flow', () => {
@@ -73,14 +68,17 @@ test.describe('Onboarding flow', () => {
     // ── 8. Market reaction ───────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page).toHaveURL('/auth/financial');
 
     // ── 9. Financial status ───────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page).toHaveURL('/auth/liquidity');
 
     // ── 10. Liquidity need ────────────────────────────────────────────────────
     await selectFirst(page);
     await page.getByRole('button', { name: /Continuar/ }).click();
+    await expect(page).toHaveURL('/auth/sectors');
 
     // ── 11. Sectors ───────────────────────────────────────────────────────────
     await page.getByRole('button', { name: 'Tecnologia' }).click();
