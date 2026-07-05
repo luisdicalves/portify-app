@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { calcPlan, calcFV, calcPMT, calcYears, type UserProfile } from '@/lib/planCalculator';
+import { calcPlan, calcFV, calcPMT, calcYears, type UserProfile, type AssetClass } from '@/lib/planCalculator';
 import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/lib/hooks/useUser';
 import { onbState } from '@/lib/onboardingState';
@@ -55,6 +55,7 @@ export default function PlanSetPage() {
   });
   const [goal, setGoal]       = useState('');
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [preferredClasses, setPreferredClasses] = useState<AssetClass[]>(['stock', 'etf', 'bond_etf']);
 
   useEffect(() => {
     if (!user) return;
@@ -70,7 +71,7 @@ export default function PlanSetPage() {
   }, [user]);
 
   // ── Cálculo dinâmico ──────────────────────────────────────────
-  const plan      = profile ? calcPlan({ ...profile, horizon_years: years }) : null;
+  const plan      = profile ? calcPlan({ ...profile, horizon_years: years }, preferredClasses) : null;
   const rate      = plan?.rate      ?? 0.07;
   const rateLow   = plan?.rateLow   ?? 0.06;
   const rateHigh  = plan?.rateHigh  ?? 0.08;
@@ -93,8 +94,18 @@ export default function PlanSetPage() {
     : projectedGoal;
 
   function handleContinue() {
-    onbState.setPlan({ amount: monthlyAmt, frequency: FREQUENCIES[freqIdx], horizon_years: years, goal_amount: finalGoal });
+    onbState.setPlan({ amount: monthlyAmt, frequency: FREQUENCIES[freqIdx], horizon_years: years, goal_amount: finalGoal, asset_classes: preferredClasses });
     router.push('/auth/summary');
+  }
+
+  function toggleClass(cls: AssetClass) {
+    setPreferredClasses(prev => {
+      if (prev.includes(cls)) {
+        const next = prev.filter(c => c !== cls);
+        return next.length === 0 ? prev : next; // never allow empty selection
+      }
+      return [...prev, cls];
+    });
   }
 
   return (
@@ -193,6 +204,25 @@ export default function PlanSetPage() {
             </div>
           </div>
         )}
+
+        {/* Classes de ativo preferidas */}
+        <div>
+          <div style={lbl}>O que queres incluir no portfólio?</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {([
+              { cls: 'stock'    as AssetClass, label: 'Ações' },
+              { cls: 'etf'      as AssetClass, label: 'ETFs' },
+              { cls: 'bond_etf' as AssetClass, label: 'Bond ETFs' },
+            ]).map(({ cls, label }) => (
+              <Chip key={cls} label={label} on={preferredClasses.includes(cls)} onClick={() => toggleClass(cls)} />
+            ))}
+          </div>
+          {preferredClasses.length === 1 && (
+            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
+              Tens de manter pelo menos uma classe ativa.
+            </div>
+          )}
+        </div>
 
         {/* Projecção */}
         <div style={{ background: 'var(--gain-container)', border: '1px solid var(--gain)', borderRadius: 'var(--radius-lg)', padding: '16px 18px' }}>

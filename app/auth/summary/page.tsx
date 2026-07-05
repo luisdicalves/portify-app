@@ -137,7 +137,10 @@ export default function SummaryPage() {
 
   // ── Projecção via calcPlan ─────────────────────────────────────
   const planResult = (profile && plan)
-    ? calcPlan({ ...(profile as unknown as UserProfile), horizon_years: plan.horizon_years })
+    ? calcPlan(
+        { ...(profile as unknown as UserProfile), horizon_years: plan.horizon_years },
+        (plan.asset_classes ?? []) as import('@/lib/planCalculator').AssetClass[],
+      )
     : null;
   const rate      = planResult?.rate      ?? 0.07;
   const rateLow   = planResult?.rateLow   ?? Math.max(0, rate - 0.01);

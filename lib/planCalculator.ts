@@ -24,6 +24,8 @@ export interface UserProfile {
   horizon_years:     number;
 }
 
+export type AssetClass = 'stock' | 'etf' | 'bond_etf';
+
 export interface Allocation {
   stock:    number; // 0–1
   etf:      number; // 0–1
@@ -232,10 +234,20 @@ function normalise(a: Allocation): Allocation {
   };
 }
 
-export function calcAllocation(score: number, p: UserProfile): Allocation {
+export function calcAllocation(
+  score: number,
+  p: UserProfile,
+  preferredClasses: AssetClass[] = ['stock', 'etf', 'bond_etf'],
+): Allocation {
   let alloc = baseAllocation(score);
   alloc = applyGoalAdjustment(alloc, p.investment_goal);
   alloc = applyLiquidityAdjustment(alloc, p.liquidity_need);
+
+  // Zero out classes the user excluded, then renormalise so weights sum to 1.
+  if (!preferredClasses.includes('stock'))    alloc = { ...alloc, stock: 0 };
+  if (!preferredClasses.includes('etf'))      alloc = { ...alloc, etf: 0 };
+  if (!preferredClasses.includes('bond_etf')) alloc = { ...alloc, bond_etf: 0 };
+
   return normalise(alloc);
 }
 
@@ -310,9 +322,12 @@ export function detectConflicts(p: UserProfile): string[] {
 // 5. Função principal — calcula tudo de uma vez
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function calcPlan(p: UserProfile): PlanCalcResult {
+export function calcPlan(
+  p: UserProfile,
+  preferredClasses: AssetClass[] = ['stock', 'etf', 'bond_etf'],
+): PlanCalcResult {
   const riskScore  = calcRiskScore(p);
-  const allocation = calcAllocation(riskScore, p);
+  const allocation = calcAllocation(riskScore, p, preferredClasses);
   const rate       = calcRate(allocation, p);
 
   return {
