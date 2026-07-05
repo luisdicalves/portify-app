@@ -11,7 +11,10 @@ import { RISK_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 
 export default function RiskPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const saved = onbState.getRiskProfile();
+    return saved !== null ? OPTIONS.findIndex(o => o.id === saved) : null;
+  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 

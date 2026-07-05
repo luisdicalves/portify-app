@@ -123,4 +123,52 @@ test.describe('Onboarding flow', () => {
     await expect(page).toHaveURL('/dashboard', { timeout: 5000 });
     expect(planUpsertCalled).toBe(true);
   });
+
+  test('navigating back restores previously selected option', async ({ page }) => {
+    await mockSupabase(page);
+
+    // Go to experience, pick the second option
+    await page.goto('/auth/experience');
+    const secondOption = page.locator('[data-testid="select-item"]').nth(1);
+    await secondOption.click();
+    const selectedText = await secondOption.textContent();
+
+    // Advance to objective
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page).toHaveURL('/auth/objective');
+
+    // Go back to experience
+    await page.goBack();
+    await expect(page).toHaveURL('/auth/experience');
+
+    // The previously selected option should still be highlighted
+    const restored = page.locator('[data-testid="select-item"]').nth(1);
+    await expect(restored).toHaveAttribute('data-selected', 'true');
+    expect(await restored.textContent()).toBe(selectedText);
+  });
+
+  test('navigating back restores sectors selection', async ({ page }) => {
+    await mockSupabase(page);
+
+    await page.goto('/auth/sectors');
+
+    // Select two sectors
+    await page.getByRole('button', { name: 'Tecnologia' }).click();
+    await page.getByRole('button', { name: 'Saúde' }).click();
+
+    // Advance to plan-ask
+    await page.getByRole('button', { name: 'Continuar' }).click();
+    await expect(page).toHaveURL('/auth/plan-ask');
+
+    // Go back to sectors
+    await page.goBack();
+    await expect(page).toHaveURL('/auth/sectors');
+
+    // Both sectors should still be selected (active background colour, not the surface-low default)
+    const tech  = page.getByRole('button', { name: 'Tecnologia' });
+    const saude = page.getByRole('button', { name: 'Saúde' });
+    // When selected, the button has white text; when unselected it has on-surface text
+    await expect(tech).toHaveCSS('color', 'rgb(255, 255, 255)');
+    await expect(saude).toHaveCSS('color', 'rgb(255, 255, 255)');
+  });
 });

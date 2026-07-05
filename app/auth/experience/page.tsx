@@ -7,10 +7,14 @@ import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
 import { EXPERIENCE_OPTIONS as OPTIONS } from '@/lib/profileOptions';
+import { onbState } from '@/lib/onboardingState';
 
 export default function ExperiencePage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const saved = onbState.getExperienceLevel();
+    return saved !== null ? OPTIONS.findIndex(o => o.id === saved) : null;
+  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -25,6 +29,7 @@ export default function ExperiencePage() {
         const { error } = await supabase.from('profiles').update({ experience_level: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
+      onbState.setExperienceLevel(OPTIONS[selected].id);
       router.push('/auth/objective');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');

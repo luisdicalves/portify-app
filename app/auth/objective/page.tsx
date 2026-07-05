@@ -7,10 +7,14 @@ import { SelectList } from '@/components/ui/SelectList';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
 import { OBJECTIVE_OPTIONS as OPTIONS } from '@/lib/profileOptions';
+import { onbState } from '@/lib/onboardingState';
 
 export default function ObjectivePage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const saved = onbState.getInvestmentGoal();
+    return saved !== null ? OPTIONS.findIndex(o => o.id === saved) : null;
+  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -25,6 +29,7 @@ export default function ObjectivePage() {
         const { error } = await supabase.from('profiles').update({ investment_goal: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
+      onbState.setInvestmentGoal(OPTIONS[selected].id);
       router.push('/auth/risk');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');
