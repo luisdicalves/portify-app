@@ -46,7 +46,7 @@ export default function LiquidityPage() {
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />
         {isCritical && (
-          <div style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, animation: 'fadeIn .2s ease' }}>
+          <div data-testid="critical-warning" style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12, animation: 'fadeIn .2s ease' }}>
             <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>info</span>
             <span style={{ fontSize: 14, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{CRITICAL_WARNING}</span>
           </div>
@@ -55,7 +55,7 @@ export default function LiquidityPage() {
 
       <div style={{ padding: '12px 20px 34px' }}>
         {saveError && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
+          <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
             <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
             <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{saveError}</span>
           </div>

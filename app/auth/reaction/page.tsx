@@ -42,7 +42,7 @@ export default function ReactionPage() {
       <StepHeader step={4} total={7} back={() => router.back()} title="Reação a uma queda" sub="O mercado cai 20% de repente. O que fazes?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
-        <div style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
+        <div data-testid="scenario-banner" style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'center', marginBottom: 12 }}>
           <span className="material-symbols-outlined icf" style={{ fontSize: 22, color: 'var(--loss)', flexShrink: 0 }}>trending_down</span>
           <span style={{ fontSize: 14, color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
             Imagina que investiste <strong>10.000€</strong> e em 2 semanas o teu portfólio vale <strong>8.000€</strong>.
@@ -53,7 +53,7 @@ export default function ReactionPage() {
 
       <div style={{ padding: '12px 20px 34px' }}>
         {saveError && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
+          <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
             <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
             <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{saveError}</span>
           </div>

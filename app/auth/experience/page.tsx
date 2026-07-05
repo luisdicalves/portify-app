@@ -47,7 +47,7 @@ export default function ExperiencePage() {
 
       <div style={{ padding: '12px 20px 34px' }}>
         {saveError && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
+          <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
             <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
             <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{saveError}</span>
           </div>
