@@ -134,14 +134,18 @@ export default function PortfolioPage() {
 
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>{t.upcoming}</div>
-              {forecast.dividends.length === 0 ? (
+              {(() => {
+                const threeMonthsFromNow = new Date();
+                threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+                const upcomingDividends = forecast.dividends.filter(d => new Date(d.expectedDate) <= threeMonthsFromNow);
+                return upcomingDividends.length === 0 ? (
                 <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
                   {t.noUpcomingDividends}
                 </div>
               ) : (
                 <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-                  {forecast.dividends.map((d, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderBottom: i < forecast.dividends.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
+                  {upcomingDividends.map((d, i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderBottom: i < upcomingDividends.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
                       <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>
                         {d.ticker.charAt(0)}
                       </div>
@@ -165,31 +169,42 @@ export default function PortfolioPage() {
                     </div>
                   ))}
                 </div>
-              )}
+              );
+              })()}
             </div>
 
             <div>
               <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)', margin: '0 4px 8px' }}>{t.received}</div>
-              {dividends.length === 0 ? (
+              {(() => {
+                const grouped = Object.values(
+                  dividends.reduce((acc, d) => {
+                    if (!acc[d.ticker]) acc[d.ticker] = { ticker: d.ticker, letter: d.letter, total: 0, count: 0 };
+                    acc[d.ticker].total += d.amount;
+                    acc[d.ticker].count += 1;
+                    return acc;
+                  }, {} as Record<string, { ticker: string; letter: string; total: number; count: number }>)
+                ).sort((a, b) => b.total - a.total);
+                return grouped.length === 0 ? (
                 <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
                   {t.noDividendsReceived}
                 </div>
               ) : (
                 <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-                  {dividends.map((d, i) => (
-                    <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderBottom: i < dividends.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
+                  {grouped.map((d, i) => (
+                    <div key={d.ticker} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderBottom: i < grouped.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
                       <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 14 }}>{d.letter}</div>
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: 14, fontWeight: 700 }}>{d.ticker}</div>
                         <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>
-                          {new Date(d.executed_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                          {d.count} {d.count === 1 ? (lang === 'pt' ? 'pagamento' : 'payment') : (lang === 'pt' ? 'pagamentos' : 'payments')}
                         </div>
                       </div>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+{eur.format(d.amount)} €</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--gain)', fontVariantNumeric: 'tabular-nums' }}>+{eur.format(d.total)} €</span>
                     </div>
                   ))}
                 </div>
-              )}
+              );
+              })()}
             </div>
           </div>
         )}
