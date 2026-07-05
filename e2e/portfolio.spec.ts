@@ -74,7 +74,8 @@ test.describe('Portfolio buy/sell sheets', () => {
     await page.getByRole('button', { name: 'Comprar', exact: true }).click();
 
     await page.getByPlaceholder(/AAPL.*NVDA/i).fill('XXXINVALID');
-    await page.waitForTimeout(800); // debounce
+    // Search is triggered explicitly (no auto-debounce) — click the search button
+    await page.getByRole('button', { name: /Pesquisar/i }).click();
 
     await expect(page.getByText(/Ativo não encontrado/i)).toBeVisible();
   });
