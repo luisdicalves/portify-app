@@ -54,7 +54,12 @@ export default function LiquidityPage() {
       </div>
 
       <div style={{ padding: '12px 20px 34px' }}>
-        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center', marginBottom: 8 }}>{saveError}</div>}
+        {saveError && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+            <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{saveError}</span>
+          </div>
+        )}
         <button onClick={handleContinue} disabled={selected === null || saving} style={{ width: '100%', background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: selected === null ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: selected === null || saving ? 0.5 : 1 }}>
           {isCritical ? 'Continuar mesmo assim' : 'Continuar'}
         </button>

@@ -381,7 +381,12 @@ export default function PortfolioPage() {
                       </div>
                     </div>
                   </div>
-                  {formError && <div style={{ fontSize: 13, color: 'var(--loss)' }}>{formError}</div>}
+                  {formError && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+                      <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                      <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{formError}</span>
+                    </div>
+                  )}
                   <button
                     onClick={() => confirmTrade('buy', buyInput.trim().toUpperCase(), formShares, formPrice, formDate, formTime, t.bsError, setFormError, closeBuy)}
                     disabled={saving}
@@ -489,7 +494,12 @@ export default function PortfolioPage() {
                       </div>
                     </div>
                   </div>
-                  {formError && <div style={{ fontSize: 13, color: 'var(--loss)' }}>{formError}</div>}
+                  {formError && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+                      <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                      <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{formError}</span>
+                    </div>
+                  )}
                   <button
                     onClick={() => {
                       const units = parseFloat(formShares.replace(',', '.'));
