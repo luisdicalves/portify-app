@@ -6,7 +6,7 @@ import { getPlan, upsertPlan } from '@/lib/db/plans';
 import { updateProfile } from '@/lib/db/profiles';
 import type { DbProfile, DbPlan } from '@/lib/types/profile';
 import { RISK_OPTIONS, OBJECTIVE_OPTIONS } from '@/lib/profileOptions';
-import { PLAN_AMOUNT_VALUES, PLAN_FREQUENCIES, PLAN_HORIZON_YEARS } from '@/lib/profileConstants';
+import type { PlanEditorResult } from '@/components/ui/PlanEditor';
 
 export function useProfileData(userId: string | undefined) {
   const [profile, setProfile] = useState<DbProfile | null>(null);
@@ -61,16 +61,53 @@ export function useProfileData(userId: string | undefined) {
     setSaving(false);
   }
 
-  async function savePlan(planAmt: number, planPeriod: number, planHorizon: number, planGoal: string) {
+  async function saveExperience(experienceId: string) {
     if (!userId) return;
     setSaving(true);
     const supabase = createClient();
-    const amount       = PLAN_AMOUNT_VALUES[planAmt];
-    const frequency    = PLAN_FREQUENCIES[planPeriod];
-    const horizon_years = PLAN_HORIZON_YEARS[planHorizon];
-    const goal_amount  = parseFloat(planGoal) || 0;
+    await updateProfile(supabase, userId, { experience_level: experienceId });
+    setProfile(p => p ? { ...p, experience_level: experienceId } : p);
+    sessionStorage.removeItem('rec-etag');
+    setSaving(false);
+  }
+
+  async function saveReaction(reactionId: string) {
+    if (!userId) return;
+    setSaving(true);
+    const supabase = createClient();
+    await updateProfile(supabase, userId, { market_reaction: reactionId });
+    setProfile(p => p ? { ...p, market_reaction: reactionId } : p);
+    sessionStorage.removeItem('rec-etag');
+    setSaving(false);
+  }
+
+  async function saveFinancial(financialId: string) {
+    if (!userId) return;
+    setSaving(true);
+    const supabase = createClient();
+    await updateProfile(supabase, userId, { financial_status: financialId });
+    setProfile(p => p ? { ...p, financial_status: financialId } : p);
+    sessionStorage.removeItem('rec-etag');
+    setSaving(false);
+  }
+
+  async function saveLiquidity(liquidityId: string) {
+    if (!userId) return;
+    setSaving(true);
+    const supabase = createClient();
+    await updateProfile(supabase, userId, { liquidity_need: liquidityId });
+    setProfile(p => p ? { ...p, liquidity_need: liquidityId } : p);
+    sessionStorage.removeItem('rec-etag');
+    setSaving(false);
+  }
+
+  async function savePlan(result: PlanEditorResult) {
+    if (!userId) return;
+    setSaving(true);
+    const supabase = createClient();
+    const { amount, frequency, horizon_years, goal_amount, preferred_asset_classes } = result;
     await upsertPlan(supabase, { user_id: userId, amount, frequency, horizon_years, goal_amount });
-    setPlan(prev => ({ amount, frequency, horizon_years, goal_amount, preferred_asset_classes: prev?.preferred_asset_classes }));
+    setPlan(prev => ({ amount, frequency, horizon_years, goal_amount, preferred_asset_classes: preferred_asset_classes ?? prev?.preferred_asset_classes }));
     setSaving(false);
   }
 
@@ -89,5 +126,5 @@ export function useProfileData(userId: string | undefined) {
     setSaving(false);
   }
 
-  return { profile, plan, saving, saveRisk, saveObjective, saveSectors, savePlan, saveHorizonYears };
+  return { profile, plan, saving, saveRisk, saveObjective, saveSectors, saveExperience, saveReaction, saveFinancial, saveLiquidity, savePlan, saveHorizonYears };
 }

@@ -4,17 +4,11 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { StepHeader } from '@/components/ui/StepHeader';
 import { SelectList } from '@/components/ui/SelectList';
+import { LIQUIDITY_OPTIONS as OPTIONS, LIQUIDITY_CRITICAL_WARNING as CRITICAL_WARNING } from '@/lib/profileOptions';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
 
-const OPTIONS = [
-  { id: 'critical', label: 'É crítico',  desc: 'Posso precisar do dinheiro a qualquer momento.', icon: 'emergency' },
-  { id: 'possible', label: 'É possível', desc: 'Pode acontecer em situação de emergência.',       icon: 'warning_amber' },
-  { id: 'unlikely', label: 'Improvável', desc: 'Tenho reservas. Dificilmente vou precisar.',      icon: 'check' },
-  { id: 'never',    label: 'Nunca',      desc: 'Este dinheiro é intocável até ao fim do prazo.',  icon: 'lock' },
-];
 
-const CRITICAL_WARNING = 'Se podes precisar deste dinheiro a qualquer momento, considera uma conta poupança em vez de investimento. O mercado pode estar em baixa quando precisares de sacar.';
 
 export default function LiquidityPage() {
   const router = useRouter();
