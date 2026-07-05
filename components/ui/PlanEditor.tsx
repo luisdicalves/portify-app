@@ -72,7 +72,23 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
   const rate      = plan?.rate      ?? 0.07;
   const rateLow   = plan?.rateLow   ?? 0.06;
   const rateHigh  = plan?.rateHigh  ?? 0.08;
-  const alloc     = plan?.allocation ?? { stock: 0.45, etf: 0.45, bond_etf: 0.10 };
+
+  // Alocação sempre calculada a partir das classes selecionadas,
+  // mesmo quando profile ainda não carregou.
+  const alloc = plan?.allocation ?? (() => {
+    const base = { stock: 0.45, etf: 0.45, bond_etf: 0.10 };
+    const filtered = {
+      stock:    preferredClasses.includes('stock')    ? base.stock    : 0,
+      etf:      preferredClasses.includes('etf')      ? base.etf      : 0,
+      bond_etf: preferredClasses.includes('bond_etf') ? base.bond_etf : 0,
+    };
+    const total = filtered.stock + filtered.etf + filtered.bond_etf || 1;
+    return {
+      stock:    Math.round(filtered.stock    / total * 100) / 100,
+      etf:      Math.round(filtered.etf      / total * 100) / 100,
+      bond_etf: Math.round(filtered.bond_etf / total * 100) / 100,
+    };
+  })();
 
   const monthlyAmt = PLAN_AMOUNT_VALUES[amtIdx];
   const goalNum    = parseInt(goal.replace(/\D/g, ''), 10) || 0;
@@ -254,20 +270,18 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
         {goalNum === 0 && mode !== 'calc_goal' && (
           <div style={{ fontSize: 14, color: 'var(--on-surface-variant)' }}>Introduz o teu objetivo para ver a projecção.</div>
         )}
-        {plan && (
-          <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gain)', display: 'flex', gap: 8 }}>
-            {[
-              { label: 'Ações',     value: alloc.stock,    color: 'var(--primary-strong)' },
-              { label: 'ETFs',      value: alloc.etf,      color: 'var(--gain)' },
-              { label: 'Bond ETFs', value: alloc.bond_etf, color: 'var(--on-surface-variant)' },
-            ].filter(a => a.value > 0).map(a => (
-              <div key={a.label} style={{ flex: 1, textAlign: 'center' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: a.color }}>{Math.round(a.value * 100)}%</div>
-                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{a.label}</div>
-              </div>
-            ))}
-          </div>
-        )}
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--gain)', display: 'flex', gap: 8 }}>
+          {[
+            { label: 'Ações',     value: alloc.stock,    color: 'var(--primary-strong)' },
+            { label: 'ETFs',      value: alloc.etf,      color: 'var(--gain)' },
+            { label: 'Bond ETFs', value: alloc.bond_etf, color: 'var(--on-surface-variant)' },
+          ].filter(a => a.value > 0).map(a => (
+            <div key={a.label} style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: a.color }}>{Math.round(a.value * 100)}%</div>
+              <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{a.label}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <button
