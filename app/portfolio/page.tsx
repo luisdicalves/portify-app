@@ -42,7 +42,7 @@ export default function PortfolioPage() {
   const [buyInput, setBuyInput] = useState('');
   const [buyQuote, setBuyQuote] = useState<Quote | null>(null);
   const [buyQuoteState, setBuyQuoteState] = useState<'idle' | 'loading' | 'found' | 'error'>('idle');
-  const buyDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const buyDebounce = useRef<ReturnType<typeof setTimeout> | null>(null); // kept for cancel on close
 
   // ── Sell sheet ───────────────────────────────────────────────────────────────
   const [sellOpen, setSellOpen] = useState(false);
@@ -72,17 +72,15 @@ export default function PortfolioPage() {
   }
   function closeSell() { setSellOpen(false); }
 
-  useEffect(() => {
+  async function searchTicker() {
     const raw = buyInput.trim().toUpperCase();
-    if (!raw) { setBuyQuote(null); setBuyQuoteState('idle'); return; }
-    setBuyQuoteState('loading');
+    if (!raw) return;
     if (buyDebounce.current) clearTimeout(buyDebounce.current);
-    buyDebounce.current = setTimeout(async () => {
-      const q = await fetchQuote(raw);
-      if (q) { setBuyQuote(q); setBuyQuoteState('found'); }
-      else { setBuyQuote(null); setBuyQuoteState('error'); }
-    }, 600);
-  }, [buyInput]);
+    setBuyQuoteState('loading');
+    const q = await fetchQuote(raw);
+    if (q) { setBuyQuote(q); setBuyQuoteState('found'); }
+    else { setBuyQuote(null); setBuyQuoteState('error'); }
+  }
 
   const totalValue = assets.reduce((sum, a) => sum + a.value, 0);
   const totalInvested = assets.reduce((sum, a) => sum + a.cost, 0);
@@ -303,7 +301,7 @@ export default function PortfolioPage() {
         const inputStyle = { flex: 1, background: 'transparent', border: 'none', outline: 'none', padding: '13px 0', fontSize: 15, color: 'var(--on-surface)', fontFamily: 'inherit', fontVariantNumeric: 'tabular-nums' } as const;
         const tradeDateText = new Date(formDate).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB');
         return (
-          <div onClick={closeBuy} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={closeBuy} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
             <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)', maxHeight: '90dvh', overflowY: 'auto' }}>
               <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
@@ -318,7 +316,8 @@ export default function PortfolioPage() {
                   <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>search</span>
                   <input
                     value={buyInput}
-                    onChange={e => setBuyInput(e.target.value.toUpperCase())}
+                    onChange={e => { setBuyInput(e.target.value.toUpperCase()); setBuyQuoteState('idle'); setBuyQuote(null); }}
+                    onKeyDown={e => e.key === 'Enter' && searchTicker()}
                     placeholder="Ex: AAPL, NVDA, VWCE"
                     autoFocus
                     style={{ ...inputStyle, textTransform: 'uppercase' }}
@@ -326,6 +325,11 @@ export default function PortfolioPage() {
                   {buyQuoteState === 'loading' && <span style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>…</span>}
                   {buyQuoteState === 'found' && <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--gain)' }}>check_circle</span>}
                   {buyQuoteState === 'error' && <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--loss)' }}>error</span>}
+                  {buyQuoteState === 'idle' && (
+                    <button onClick={searchTicker} style={{ background: 'var(--primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-sm)', padding: '4px 10px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                      {lang === 'pt' ? 'Pesquisar' : 'Search'}
+                    </button>
+                  )}
                 </div>
                 {buyQuoteState === 'error' && (
                   <div style={{ fontSize: 12, color: 'var(--loss)', marginTop: 4 }}>{lang === 'pt' ? 'Ativo não encontrado. Verifica o ticker.' : 'Asset not found. Check the ticker.'}</div>
@@ -399,7 +403,7 @@ export default function PortfolioPage() {
         const tradeDateText = new Date(formDate).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB');
         const selectedAsset = assets.find(a => a.ticker === sellTicker);
         return (
-          <div onClick={closeSell} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={closeSell} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
             <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)', maxHeight: '90dvh', overflowY: 'auto' }}>
               <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
