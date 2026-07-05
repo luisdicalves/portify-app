@@ -34,7 +34,7 @@ export default function ObjectivePage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={3} total={9} back={() => router.back()} title="Objetivo ao investir" sub="O que procuras ao investir o teu dinheiro?" />
+      <StepHeader step={2} total={8} back={() => router.back()} title="Objetivo ao investir" sub="O que procuras ao investir o teu dinheiro?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />

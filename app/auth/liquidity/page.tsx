@@ -44,7 +44,7 @@ export default function LiquidityPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={8} total={9} back={() => router.back()} title="Acesso ao dinheiro" sub="E se precisares do dinheiro antes do prazo?" />
+      <StepHeader step={7} total={8} back={() => router.back()} title="Acesso ao dinheiro" sub="E se precisares do dinheiro antes do prazo?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '10px 20px 0' }}>
         <SelectList options={OPTIONS} selected={selected} onSelect={setSelected} />

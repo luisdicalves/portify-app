@@ -37,7 +37,7 @@ export default function PinPage() {
           .eq('user_id', userId)
           .maybeSingle();
         if (!plan) {
-          router.push('/auth/assets');
+          router.push('/auth/experience');
           return;
         }
       }

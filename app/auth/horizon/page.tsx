@@ -35,7 +35,7 @@ export default function HorizonPage() {
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
-      <StepHeader step={4} total={9} back={() => router.back()} title="Horizonte de investimento" sub="Durante quantos anos planeias investir?" />
+      <StepHeader step={3} total={8} back={() => router.back()} title="Horizonte de investimento" sub="Durante quantos anos planeias investir?" />
 
       <div style={{ flex: 1, overflow: 'auto', padding: '24px 20px 0' }}>
 
