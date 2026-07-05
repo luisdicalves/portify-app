@@ -138,7 +138,7 @@ export default function ProfilePage() {
   async function saveHorizon() {
     // Use current plan values for all fields except horizon
     const amt     = plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : planAmt;
-    const period  = plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency)) : planPeriod;
+    const period  = plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency as typeof PLAN_FREQUENCIES[number])) : planPeriod;
     const goal    = plan?.goal_amount != null ? String(plan.goal_amount) : planGoal;
     await savePlan(amt, period, horizonSelected, goal);
   }
