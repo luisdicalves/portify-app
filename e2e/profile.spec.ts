@@ -61,6 +61,39 @@ test.describe('Profile page', () => {
 
   // ── Plano ativo (PlanEditor) ───────────────────────────────────────────────
 
+  test('PlanEditor allocation updates immediately when toggling asset class', async ({ page }) => {
+    await loginAndReachProfile(page);
+    await page.getByText('Plano ativo').click();
+
+    // All 3 classes selected by default — 3 allocation columns visible
+    await expect(page.getByTestId('alloc-item')).toHaveCount(3);
+
+    // Deselect Bond ETFs — allocation drops to 2 columns immediately
+    await page.getByText('Bond ETFs').first().click();
+    await expect(page.getByTestId('alloc-item')).toHaveCount(2);
+
+    // Re-select Bond ETFs — 3 columns return
+    await page.getByText('Bond ETFs').first().click();
+    await expect(page.getByTestId('alloc-item')).toHaveCount(3);
+  });
+
+  test('PlanEditor allocation stays reactive when only one class remains', async ({ page }) => {
+    await loginAndReachProfile(page);
+    await page.getByText('Plano ativo').click();
+
+    // Deselect ETFs → 2 columns
+    await page.getByText('ETFs', { exact: true }).first().click();
+    await expect(page.getByTestId('alloc-item')).toHaveCount(2);
+
+    // Deselect Bond ETFs → 1 column
+    await page.getByText('Bond ETFs').first().click();
+    await expect(page.getByTestId('alloc-item')).toHaveCount(1);
+
+    // Try to deselect last class — must stay at 1 (protection against empty selection)
+    await page.getByText('Ações', { exact: true }).first().click();
+    await expect(page.getByTestId('alloc-item')).toHaveCount(1);
+  });
+
   test('plano ativo opens PlanEditor with mode selector and projection card', async ({ page }) => {
     await loginAndReachProfile(page);
 

@@ -276,7 +276,7 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
             { label: 'ETFs',      value: alloc.etf,      color: 'var(--gain)' },
             { label: 'Bond ETFs', value: alloc.bond_etf, color: 'var(--on-surface-variant)' },
           ].filter(a => a.value > 0).map(a => (
-            <div key={a.label} style={{ flex: 1, textAlign: 'center' }}>
+            <div key={a.label} data-testid="alloc-item" style={{ flex: 1, textAlign: 'center' }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: a.color }}>{Math.round(a.value * 100)}%</div>
               <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{a.label}</div>
             </div>
