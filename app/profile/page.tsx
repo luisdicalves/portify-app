@@ -83,6 +83,8 @@ export default function ProfilePage() {
   const [planAmt, setPlanAmt] = useState(1);
   const [planPeriod, setPlanPeriod] = useState(1);
   const [planHorizon, setPlanHorizon] = useState(2);
+  const [horizonSheetOpen, setHorizonSheetOpen] = useState(false);
+  const [horizonSelected, setHorizonSelected] = useState(2);
 
   // Calcular riskScore e alocação sempre que o perfil ou plano mudar
   const planResult = (() => {
@@ -125,6 +127,20 @@ export default function ProfilePage() {
   function openSectorsSheet() {
     setSectorsSelected(new Set(profile?.preferred_sectors ?? []));
     setSectorsSheetOpen(true);
+  }
+
+  function openHorizonSheet() {
+    const idx = plan ? Math.max(0, PLAN_HORIZON_YEARS.indexOf(plan.horizon_years)) : 2;
+    setHorizonSelected(idx >= 0 ? idx : 2);
+    setHorizonSheetOpen(true);
+  }
+
+  async function saveHorizon() {
+    // Use current plan values for all fields except horizon
+    const amt     = plan ? Math.max(0, PLAN_AMOUNT_VALUES.indexOf(plan.amount)) : planAmt;
+    const period  = plan ? Math.max(0, PLAN_FREQUENCIES.indexOf(plan.frequency)) : planPeriod;
+    const goal    = plan?.goal_amount != null ? String(plan.goal_amount) : planGoal;
+    await savePlan(amt, period, horizonSelected, goal);
   }
 
   function toggleSector(id: string) {
@@ -235,7 +251,7 @@ export default function ProfilePage() {
           <SectionLabel label={t.investorProfileSection} />
           <Card>
             <SettingsRow icon="local_fire_department" label={t.riskProfileLabel} value={riskLabel} onPress={openRiskSheet} />
-            <SettingsRow icon="schedule" label={t.horizonLabel} value={horizonLabel(plan?.horizon_years)} onPress={openPlanSheet} />
+            <SettingsRow icon="schedule" label={t.horizonLabel} value={horizonLabel(plan?.horizon_years)} onPress={openHorizonSheet} />
             <SettingsRow icon="target" label={t.objective} value={goalLabel} onPress={openObjectiveSheet} />
             <SettingsRow icon="sell" label={t.sectorsLabel} value={sectorsLabel} onPress={openSectorsSheet} border={false} />
           </Card>
@@ -377,6 +393,26 @@ export default function ProfilePage() {
             </div>
 
             <button onClick={() => { savePlan(planAmt, planPeriod, planHorizon, planGoal); setPlanSheetOpen(false); }} disabled={savingField} style={{ width: '100%', marginTop: 20, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
+              {t.confirm}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {horizonSheetOpen && (
+        <div onClick={() => setHorizonSheetOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.horizonLabel}</span>
+              <span onClick={() => setHorizonSheetOpen(false)} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {PLAN_HORIZONS.map((h, i) => (
+                <PlanChip key={i} label={h} on={horizonSelected === i} onClick={() => setHorizonSelected(i)} />
+              ))}
+            </div>
+            <button onClick={() => { saveHorizon(); setHorizonSheetOpen(false); }} disabled={savingField} style={{ width: '100%', marginTop: 20, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: savingField ? 0.7 : 1 }}>
               {t.confirm}
             </button>
           </div>
