@@ -137,7 +137,10 @@ export default function SummaryPage() {
 
   // ── Projecção via calcPlan ─────────────────────────────────────
   const planResult = (profile && plan)
-    ? calcPlan({ ...(profile as unknown as UserProfile), horizon_years: plan.horizon_years })
+    ? calcPlan(
+        { ...(profile as unknown as UserProfile), horizon_years: plan.horizon_years },
+        (plan.preferred_asset_classes ?? []) as import('@/lib/planCalculator').AssetClass[],
+      )
     : null;
   const rate      = planResult?.rate      ?? 0.07;
   const rateLow   = planResult?.rateLow   ?? Math.max(0, rate - 0.01);
@@ -158,11 +161,12 @@ export default function SummaryPage() {
       const supabase = createClient();
 
       const { error: planError } = await supabase.from('investment_plans').upsert({
-        user_id:       userId,
-        amount:        plan.amount,
-        frequency:     plan.frequency,
-        horizon_years: plan.horizon_years,
-        goal_amount:   plan.goal_amount,
+        user_id:                 userId,
+        amount:                  plan.amount,
+        frequency:               plan.frequency,
+        horizon_years:           plan.horizon_years,
+        goal_amount:             plan.goal_amount,
+        preferred_asset_classes: plan.preferred_asset_classes ?? ['stock', 'etf', 'bond_etf'],
       });
       if (planError) throw planError;
 

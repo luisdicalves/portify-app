@@ -178,6 +178,7 @@ create table if not exists public.investment_plans (
   frequency text not null check (frequency in ('weekly','monthly','quarterly','annual')),
   horizon_years int not null,
   goal_amount numeric,
+  preferred_asset_classes text[] default array['stock','etf','bond_etf'],
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

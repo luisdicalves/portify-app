@@ -3,6 +3,7 @@ export interface OnbPlan {
   frequency: string;
   horizon_years: number;
   goal_amount: number;
+  preferred_asset_classes: string[];
 }
 
 const KEYS = {
