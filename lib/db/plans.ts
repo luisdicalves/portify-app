@@ -13,5 +13,5 @@ export async function getPlan(db: Client, userId: string) {
 }
 
 export async function upsertPlan(db: Client, row: PlanUpsert) {
-  return db.from('investment_plans').upsert(row);
+  return db.from('investment_plans').upsert(row, { onConflict: 'user_id' });
 }

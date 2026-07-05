@@ -98,4 +98,37 @@ test.describe('Onboarding flow', () => {
     await page.getByRole('button', { name: 'Finalizar e entrar' }).click();
     await expect(page).toHaveURL('/dashboard', { timeout: 5000 });
   });
+
+  test('summary page saves plan to DB and redirects to dashboard', async ({ page }) => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    let planUpsertCalled = false;
+
+    // Intercept the investment_plans upsert to verify it is called
+    await page.route(`${supabaseUrl}/rest/v1/investment_plans**`, route => {
+      if (route.request().method() === 'POST') planUpsertCalled = true;
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    });
+
+    // Navigate directly to summary with plan state in sessionStorage
+    await page.goto('/auth/login');
+    await page.getByPlaceholder('nome@exemplo.com').fill('e2e@test.portify.app');
+    await page.getByPlaceholder('••••••••').fill('Teste1234!');
+    await page.getByRole('button', { name: 'Entrar', exact: true }).click();
+    await expect(page).toHaveURL('/auth/pin');
+    for (const d of '123456') await page.getByRole('button', { name: d, exact: true }).first().click();
+    await expect(page).toHaveURL('/dashboard', { timeout: 5000 });
+
+    // Seed sessionStorage with a valid onboarding plan and profile, then go to summary
+    await page.evaluate(() => {
+      sessionStorage.setItem('onb_plan', JSON.stringify({ amount: 100, frequency: 'monthly', horizon_years: 10, goal_amount: 50000, preferred_asset_classes: ['stock', 'etf'] }));
+      sessionStorage.setItem('onb_profile', JSON.stringify({ risk_profile: 'moderate', investment_goal: 'wealth_growth', experience_level: 'beginner', market_reaction: 'hold', financial_status: 'stable', liquidity_need: 'unlikely' }));
+    });
+
+    await page.goto('/auth/summary');
+    await expect(page.getByRole('button', { name: 'Finalizar e entrar' })).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Finalizar e entrar' }).click();
+
+    await expect(page).toHaveURL('/dashboard', { timeout: 5000 });
+    expect(planUpsertCalled).toBe(true);
+  });
 });

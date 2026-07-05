@@ -167,7 +167,7 @@ export default function SummaryPage() {
         horizon_years:           plan.horizon_years,
         goal_amount:             plan.goal_amount,
         preferred_asset_classes: plan.preferred_asset_classes ?? ['stock', 'etf', 'bond_etf'],
-      });
+      }, { onConflict: 'user_id' });
       if (planError) throw planError;
 
       if (planResult) {
