@@ -7,12 +7,14 @@ import { SelectList } from '@/components/ui/SelectList';
 import { LIQUIDITY_OPTIONS as OPTIONS, LIQUIDITY_CRITICAL_WARNING as CRITICAL_WARNING } from '@/lib/profileOptions';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
-
-
+import { onbState } from '@/lib/onboardingState';
 
 export default function LiquidityPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const saved = onbState.getLiquidityNeed();
+    return saved !== null ? OPTIONS.findIndex(o => o.id === saved) : null;
+  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -29,6 +31,7 @@ export default function LiquidityPage() {
         const { error } = await supabase.from('profiles').update({ liquidity_need: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
+      onbState.setLiquidityNeed(OPTIONS[selected].id);
       router.push('/auth/sectors');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');

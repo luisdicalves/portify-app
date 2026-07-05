@@ -7,11 +7,14 @@ import { SelectList } from '@/components/ui/SelectList';
 import { FINANCIAL_OPTIONS as OPTIONS } from '@/lib/profileOptions';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
-
+import { onbState } from '@/lib/onboardingState';
 
 export default function FinancialPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelected] = useState<number | null>(() => {
+    const saved = onbState.getFinancialStatus();
+    return saved !== null ? OPTIONS.findIndex(o => o.id === saved) : null;
+  });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -26,6 +29,7 @@ export default function FinancialPage() {
         const { error } = await supabase.from('profiles').update({ financial_status: OPTIONS[selected].id }).eq('id', userId);
         if (error) throw error;
       }
+      onbState.setFinancialStatus(OPTIONS[selected].id);
       router.push('/auth/liquidity');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');

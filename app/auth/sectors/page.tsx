@@ -6,10 +6,11 @@ import { StepHeader } from '@/components/ui/StepHeader';
 import { createClient } from '@/lib/supabase/client';
 import { getSessionUserId } from '@/lib/hooks/useUser';
 import { SECTOR_OPTIONS as SECTORS } from '@/lib/profileOptions';
+import { onbState } from '@/lib/onboardingState';
 
 export default function SectorsPage() {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set(onbState.getSectors()));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export default function SectorsPage() {
         const { error } = await supabase.from('profiles').update({ preferred_sectors: Array.from(selected) }).eq('id', userId);
         if (error) throw error;
       }
+      onbState.setSectors(Array.from(selected));
       router.push('/auth/plan-ask');
     } catch {
       setSaveError('Erro ao guardar. Tenta novamente.');

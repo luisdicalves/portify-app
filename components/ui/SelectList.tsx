@@ -8,7 +8,7 @@ export function SelectList({ options, selected, onSelect }: { options: SelectOpt
       {options.map((o, i) => {
         const on = selected === i;
         return (
-          <div key={o.id} data-testid="select-item" onClick={() => onSelect(i)} style={{
+          <div key={o.id} data-testid="select-item" data-selected={on ? 'true' : 'false'} onClick={() => onSelect(i)} style={{
             display: 'flex', alignItems: 'center', gap: 14, padding: 15, cursor: 'pointer', transition: 'all .15s',
             borderRadius: 'var(--radius-lg)',
             background: on ? 'var(--primary-container)' : 'var(--surface-low)',
