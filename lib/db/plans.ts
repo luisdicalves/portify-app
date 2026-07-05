@@ -7,7 +7,7 @@ type PlanUpsert = AppDatabase['public']['Tables']['investment_plans']['Insert'];
 export async function getPlan(db: Client, userId: string) {
   return db
     .from('investment_plans')
-    .select('amount, frequency, horizon_years, goal_amount')
+    .select('amount, frequency, horizon_years, goal_amount, preferred_asset_classes')
     .eq('user_id', userId)
     .maybeSingle();
 }

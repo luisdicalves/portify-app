@@ -24,5 +24,5 @@ export interface DbPlan {
   frequency:     string;
   horizon_years: number;
   goal_amount:   number | null;
-  asset_classes?: string[] | null;
+  preferred_asset_classes?: string[] | null;
 }

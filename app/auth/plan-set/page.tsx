@@ -94,7 +94,7 @@ export default function PlanSetPage() {
     : projectedGoal;
 
   function handleContinue() {
-    onbState.setPlan({ amount: monthlyAmt, frequency: FREQUENCIES[freqIdx], horizon_years: years, goal_amount: finalGoal, asset_classes: preferredClasses });
+    onbState.setPlan({ amount: monthlyAmt, frequency: FREQUENCIES[freqIdx], horizon_years: years, goal_amount: finalGoal, preferred_asset_classes: preferredClasses });
     router.push('/auth/summary');
   }
 
