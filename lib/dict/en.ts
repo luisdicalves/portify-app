@@ -21,6 +21,8 @@ export const en: typeof pt = {
   noTransactions: 'No transactions yet.',
   loginTitle: 'Welcome back',
   loginSubtitle: 'Sign in to manage your wealth.',
+  loginIdLabel: 'User ID',
+  loginIdPh: 'your_username',
   emailLabel: 'Email',
   emailPh: 'name@example.com',
   passwordLabel: 'Password',

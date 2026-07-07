@@ -286,6 +286,7 @@ export type Database = {
     }
     Functions: {
       is_username_available: { Args: { p_handle: string }; Returns: boolean }
+      get_email_by_handle: { Args: { p_handle: string }; Returns: string | null }
       set_pin: { Args: { p_pin: string }; Returns: undefined }
       verify_pin: { Args: { p_pin: string }; Returns: boolean }
     }

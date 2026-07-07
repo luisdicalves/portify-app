@@ -10,10 +10,12 @@ export default function LoginPage() {
   const { lang } = useApp();
   const t = useDict(lang);
   const router = useRouter();
-  const [email, setEmail] = useState('');
+  const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const GENERIC_ERROR = 'ID de utilizador ou palavra-passe incorretos.';
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -21,11 +23,18 @@ export default function LoginPage() {
     setError('');
     try {
       const supabase = createClient();
+
+      // signInWithPassword needs an email, but the user only ever sees/types their
+      // user_handle — resolve it server-side first. A null email (handle not found)
+      // gets the exact same generic message as a wrong password, below.
+      const { data: email, error: lookupError } = await supabase.rpc('get_email_by_handle', { p_handle: userId });
+      if (lookupError || !email) { setError(GENERIC_ERROR); return; }
+
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
+      if (error) { setError(GENERIC_ERROR); return; }
       router.push('/auth/pin');
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Erro ao entrar.');
+    } catch {
+      setError(GENERIC_ERROR);
     } finally {
       setLoading(false);
     }
@@ -56,12 +65,12 @@ export default function LoginPage() {
       </div>
 
       <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {/* Email */}
+        {/* User ID */}
         <div>
-          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.emailLabel}</div>
+          <div style={{ fontSize: 12, fontWeight: 500, color: 'var(--on-surface-variant)', marginBottom: 6 }}>{t.loginIdLabel}</div>
           <div style={field}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>mail</span>
-            <input style={input} type="email" placeholder={t.emailPh} value={email} onChange={e => setEmail(e.target.value)} required autoComplete="email" />
+            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>alternate_email</span>
+            <input style={input} type="text" placeholder={t.loginIdPh} value={userId} onChange={e => setUserId(e.target.value)} required autoComplete="username" />
           </div>
         </div>
 

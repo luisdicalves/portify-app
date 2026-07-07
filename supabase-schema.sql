@@ -81,6 +81,27 @@ $$;
 revoke all on function public.is_username_available(text) from public;
 grant execute on function public.is_username_available(text) to anon, authenticated;
 
+-- Login uses the user_handle (not email) as the identifier, but Supabase Auth's
+-- signInWithPassword requires an email — this resolves handle -> email so the
+-- client can look it up before calling signInWithPassword. Returns null (not an
+-- error) when the handle doesn't exist, so the client shows the same generic
+-- "invalid credentials" message either way and never reveals which ID exists.
+create or replace function public.get_email_by_handle(p_handle text)
+returns text
+language sql
+security definer
+set search_path = public
+as $$
+  select u.email
+  from auth.users u
+  join public.profiles p on p.id = u.id
+  where lower(p.user_handle) = lower(p_handle)
+  limit 1;
+$$;
+
+revoke all on function public.get_email_by_handle(text) from public;
+grant execute on function public.get_email_by_handle(text) to anon, authenticated;
+
 -- PIN: hashed server-side, never exposed in plaintext to the client
 create extension if not exists pgcrypto;
 

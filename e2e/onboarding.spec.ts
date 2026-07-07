@@ -103,7 +103,7 @@ test.describe('Onboarding flow', () => {
 
     // Navigate directly to summary with plan state in sessionStorage
     await page.goto('/auth/login');
-    await page.getByPlaceholder('nome@exemplo.com').fill('e2e@test.portify.app');
+    await page.getByPlaceholder('o_teu_username').fill('teste_e2e');
     await page.getByPlaceholder('••••••••').fill('Teste1234!');
     await page.getByRole('button', { name: 'Entrar', exact: true }).click();
     await expect(page).toHaveURL('/auth/pin');

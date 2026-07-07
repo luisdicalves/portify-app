@@ -20,6 +20,8 @@ export const pt = {
   // Auth
   loginTitle: 'Bem-vindo de volta',
   loginSubtitle: 'Inicie sessão para gerir o seu património.',
+  loginIdLabel: 'ID de utilizador',
+  loginIdPh: 'o_teu_username',
   emailLabel: 'Email',
   emailPh: 'nome@exemplo.com',
   passwordLabel: 'Palavra-passe',
