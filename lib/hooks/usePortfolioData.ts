@@ -86,6 +86,7 @@ export function usePortfolioData(userId: string | undefined, lang: string) {
         avatar: hasTicker ? ticker.charAt(0) : '',
         type: row.type as Transaction['type'],
         dateText: new Date(executedAt).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }),
+        executedAt,
         total: `${gain ? '+' : '-'}${eur.format(Math.abs(row.amount))} €`,
         totalColor: gain ? 'var(--gain)' : 'var(--on-surface)',
         units: row.units != null ? String(row.units) : undefined,

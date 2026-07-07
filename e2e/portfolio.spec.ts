@@ -170,3 +170,79 @@ test.describe('Portfolio dividends tab', () => {
     await expect(page.getByText('Recebidos', { exact: true })).toBeVisible();
   });
 });
+
+test.describe('Portfolio history filters', () => {
+  // RECENT is "now" (never in the future, so TradeDateDialog never disables it);
+  // OLD is a day in the previous calendar month, always before "first day of this month".
+  const now = new Date();
+  const OLD_ISO = new Date(now.getFullYear(), now.getMonth() - 1, 15, 10, 0, 0).toISOString();
+  const RECENT_ISO = now.toISOString();
+
+  async function mockHistoryTxns(page: import('@playwright/test').Page) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/rest/v1/transactions**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'old-buy', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'AAPL', type: 'buy', units: 10, price: 150, amount: 1500, currency: 'EUR', executed_at: OLD_ISO, notes: null, external_id: null },
+          { id: 'recent-deposit', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: null, type: 'deposit', units: null, price: null, amount: 500, currency: 'EUR', executed_at: RECENT_ISO, notes: null, external_id: null },
+        ]),
+      }),
+    );
+  }
+
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+  });
+
+  test('type filter shows only the selected transaction types', async ({ page }) => {
+    await mockHistoryTxns(page);
+    await loginAndReachPortfolio(page);
+    await page.getByRole('button', { name: 'Histórico', exact: true }).click();
+
+    // Both transactions visible by default (no filter selected)
+    await expect(page.getByText('AAPL')).toBeVisible();
+    await expect(page.getByText('+500,00 €')).toBeVisible();
+
+    // Selecting "Compra" hides the deposit
+    await page.getByRole('button', { name: 'Compra', exact: true }).click();
+    await expect(page.getByText('AAPL')).toBeVisible();
+    await expect(page.getByText('+500,00 €')).not.toBeVisible();
+
+    // Also selecting "Depósito" (multi-select) brings it back
+    await page.getByRole('button', { name: 'Depósito', exact: true }).click();
+    await expect(page.getByText('AAPL')).toBeVisible();
+    await expect(page.getByText('+500,00 €')).toBeVisible();
+  });
+
+  test('date-range filter excludes transactions outside the range', async ({ page }) => {
+    await mockHistoryTxns(page);
+    await loginAndReachPortfolio(page);
+    await page.getByRole('button', { name: 'Histórico', exact: true }).click();
+
+    await expect(page.getByText('AAPL')).toBeVisible();
+
+    // "De" defaults its calendar to the current month — pick day 1, which excludes
+    // the previous-month buy but keeps the "now" deposit.
+    await page.getByRole('button', { name: 'event De' }).click();
+    await page.getByRole('button', { name: '1', exact: true }).click();
+    await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+
+    await expect(page.getByText('AAPL')).not.toBeVisible();
+    await expect(page.getByText('+500,00 €')).toBeVisible();
+
+    // Clearing the bound restores the full list
+    await page.getByRole('button', { name: /event De:/ }).locator('text=close').click();
+    await expect(page.getByText('AAPL')).toBeVisible();
+  });
+
+  test('shows an empty state when the filter matches nothing', async ({ page }) => {
+    await mockHistoryTxns(page);
+    await loginAndReachPortfolio(page);
+    await page.getByRole('button', { name: 'Histórico', exact: true }).click();
+
+    // Neither fixture transaction is a dividend
+    await page.getByRole('button', { name: 'Dividendo', exact: true }).click();
+    await expect(page.getByText('Nenhum movimento corresponde ao filtro.')).toBeVisible();
+  });
+});

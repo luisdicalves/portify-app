@@ -17,6 +17,9 @@ export const pt = {
   txcUnitVal: 'Valor unit.',
   txcDelete: 'Apagar',
   noTransactions: 'Sem movimentos registados.',
+  noFilteredTransactions: 'Nenhum movimento corresponde ao filtro.',
+  historyDateFrom: 'De',
+  historyDateTo: 'Até',
   // Auth
   loginTitle: 'Bem-vindo de volta',
   loginSubtitle: 'Inicie sessão para gerir o seu património.',
