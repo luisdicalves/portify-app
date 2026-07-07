@@ -79,7 +79,7 @@ export default function PortfolioPage() {
   }
 
   const filteredTxns = useMemo(() => {
-    const activeTypes = [...txFilters].flatMap(id => TX_FILTER_TYPES[id]);
+    const activeTypes = Array.from(txFilters).flatMap(id => TX_FILTER_TYPES[id]);
     return txns.filter(tx => {
       if (activeTypes.length > 0 && !activeTypes.includes(tx.type)) return false;
       const txDate = tx.executedAt.slice(0, 10);
