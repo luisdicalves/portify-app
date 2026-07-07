@@ -57,7 +57,7 @@ export default function PinSetPage() {
   const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
 
   return (
-    <div className="phone-shell" style={{ justifyContent: 'space-between', padding: '0 24px' }}>
+    <div className="phone-shell" style={{ justifyContent: 'space-between', paddingLeft: 24, paddingRight: 24 }}>
       <div style={{ paddingTop: 20 }}>
         <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
           <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)' }}>arrow_back_ios_new</span>
