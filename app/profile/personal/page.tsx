@@ -95,7 +95,17 @@ export default function PersonalPage() {
         </div>
 
         {message && (
-          <div style={{ fontSize: 13, color: message === t.pdEmailSaved ? 'var(--gain)' : 'var(--loss)' }}>{message}</div>
+          message === t.pdEmailSaved ? (
+            <div data-testid="save-success" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--gain-container)', border: '1px solid var(--gain)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+              <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--gain)', flexShrink: 0 }}>check_circle</span>
+              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{message}</span>
+            </div>
+          ) : (
+            <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+              <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+              <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{message}</span>
+            </div>
+          )
         )}
 
         <button onClick={saveEmail} disabled={saving}

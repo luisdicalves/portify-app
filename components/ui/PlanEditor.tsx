@@ -245,8 +245,11 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
             {yearsInfeasible ? (
               <>
                 <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--on-surface-variant)', letterSpacing: '-0.02em' }}>Mais de 50 anos</div>
-                <div style={{ fontSize: 12, color: 'var(--loss)', marginTop: 6 }}>
-                  Com {fmt(monthlyAmt)}/{PLAN_PERIODS[freqIdx]?.toLowerCase()} não é possível atingir {fmt(goalNum)} num prazo razoável. Aumenta o montante ou reduz o objetivo.
+                <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', marginTop: 6 }}>
+                  <span className="material-symbols-outlined icf" style={{ fontSize: 14, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>error</span>
+                  <span style={{ fontSize: 12, color: 'var(--loss)' }}>
+                    Com {fmt(monthlyAmt)}/{PLAN_PERIODS[freqIdx]?.toLowerCase()} não é possível atingir {fmt(goalNum)} num prazo razoável. Aumenta o montante ou reduz o objetivo.
+                  </span>
                 </div>
               </>
             ) : (
