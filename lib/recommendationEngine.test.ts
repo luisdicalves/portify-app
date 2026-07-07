@@ -35,6 +35,21 @@ function makeEtf(ticker: string, qualityScore = 80): CandidateAsset {
   };
 }
 
+function makeBondEtf(ticker: string, qualityScore = 85): CandidateAsset {
+  return {
+    ticker,
+    name:          ticker,
+    exchange:      'NASDAQ',
+    assetClass:    'bond_etf',
+    sector:        'other',
+    beta:          0.1,
+    dividendYield: 3.5,
+    marketCap:     20_000_000_000,
+    qualityScore,
+    currency:      'USD',
+  };
+}
+
 const PROFILE: UserProfile = {
   risk_profile:     'moderate',
   investment_goal:  'wealth_growth',
@@ -148,5 +163,155 @@ describe('recommend — empty universe', () => {
   it('returns empty recommendations without throwing', () => {
     const result = recommend({ ...OPTS, universe: [] });
     expect(result.recommendations).toHaveLength(0);
+  });
+});
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.0 — preferred_asset_classes end-to-end (calcPlan zera + renormaliza,
+// e o orçamento da classe excluída é redistribuído, não perdido)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('recommend — preferredClasses (v3.0)', () => {
+  const universeAllClasses: CandidateAsset[] = [
+    makeStock('AAPL.US', 'tech',   85),
+    makeStock('MSFT.US', 'tech',   80),
+    makeEtf('VOO.US',              92),
+    makeBondEtf('BND.US',          85),
+  ];
+
+  it('defaults to all three classes when preferredClasses is omitted', () => {
+    const result = recommend({ ...OPTS, universe: universeAllClasses });
+    expect(result.allocationPlan.stock).toBeGreaterThan(0);
+    expect(result.allocationPlan.etf).toBeGreaterThan(0);
+    expect(result.allocationPlan.bond_etf).toBeGreaterThanOrEqual(0);
+  });
+
+  it('zeroes an excluded class in allocationPlan and recommends nothing from it', () => {
+    const result = recommend({
+      ...OPTS,
+      universe:         universeAllClasses,
+      preferredClasses: ['etf', 'bond_etf'],
+    });
+    expect(result.allocationPlan.stock).toBe(0);
+    expect(result.recommendations.some(r => r.asset.assetClass === 'stock')).toBe(false);
+  });
+
+  it("redistributes the excluded class's budget instead of losing it", () => {
+    const withStock = recommend({
+      ...OPTS,
+      universe:         universeAllClasses,
+      preferredClasses: ['stock', 'etf', 'bond_etf'],
+    });
+    const withoutStock = recommend({
+      ...OPTS,
+      universe:         universeAllClasses,
+      preferredClasses: ['etf', 'bond_etf'],
+    });
+
+    const totalWith    = withStock.recommendations.reduce((s, r) => s + r.suggestedAmount, 0);
+    const totalWithout = withoutStock.recommendations.reduce((s, r) => s + r.suggestedAmount, 0);
+
+    // Same monthly budget either way — excluding a class should not shrink
+    // the total recommended amount (previously the stock slice just vanished).
+    expect(totalWithout).toBeGreaterThanOrEqual(totalWith - 5);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.0 — subpesado usa a fórmula do gap (targetWeight − currentWeight), não o
+// valor plano da distribuição proporcional (Camada 3 · Passo 4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('recommend — subpesado / sobrepesado (v3.0)', () => {
+  it('an underweighted holding gets suggestedAmount = round(monthlyAmount × gap / 5) × 5', () => {
+    const opts: RecommendOptions = {
+      universe: [
+        makeStock('AAA.US', 'tech', 90),
+        makeStock('BBB.US', 'tech', 90),
+      ],
+      profile:          PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount:    500,
+      preferredClasses: ['stock'],
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100,  assetClass: 'stock' }, // pequena posição
+        { ticker: 'BBB.US', units: 1, avgPrice: 1900, assetClass: 'stock' }, // posição dominante
+      ],
+    };
+
+    const result = recommend(opts);
+    const aaa = result.recommendations.find(r => r.asset.ticker === 'AAA.US');
+    const bbb = result.recommendations.find(r => r.asset.ticker === 'BBB.US');
+
+    // BBB está claramente sobrepesado (95% da carteira) — não deve ser recomendado.
+    expect(bbb).toBeUndefined();
+
+    expect(aaa).toBeDefined();
+    if (aaa) {
+      expect(aaa.type).toBe('reinforce');
+      expect(aaa.reason).toMatch(/Subpesado/);
+      const expectedGapAmount = Math.max(5, Math.round((opts.monthlyAmount * (aaa.targetWeight - aaa.currentWeight)) / 5) * 5);
+      expect(aaa.suggestedAmount).toBe(expectedGapAmount);
+    }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.0 — holdings em classes fora do plano aparecem como "fora do plano",
+// não entram no cálculo de peso nem são recomendados para reforço
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('recommend — outOfPlanHoldings (v3.0)', () => {
+  it('flags a holding whose assetClass is outside preferredClasses', () => {
+    const result = recommend({
+      ...OPTS,
+      preferredClasses: ['stock', 'etf'],
+      holdings: [
+        { ticker: 'BND.US', units: 10, avgPrice: 80, assetClass: 'bond_etf' },
+      ],
+    });
+
+    expect(result.outOfPlanHoldings).toHaveLength(1);
+    expect(result.outOfPlanHoldings[0]).toMatchObject({ ticker: 'BND.US', assetClass: 'bond_etf', value: 800 });
+
+    // Não deve ser tratado como reforço — a classe está fora do plano.
+    const bnd = result.recommendations.find(r => r.asset.ticker === 'BND.US');
+    if (bnd) expect(bnd.alreadyOwned).toBe(false);
+  });
+
+  it('does not flag holdings inside preferredClasses', () => {
+    const result = recommend({
+      ...OPTS,
+      preferredClasses: ['stock', 'etf', 'bond_etf'],
+      holdings: [{ ticker: 'AAPL.US', units: 1, avgPrice: 100, assetClass: 'stock' }],
+    });
+    expect(result.outOfPlanHoldings).toHaveLength(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v3.0 — Passo 5: objetivo já atingido vs ritmo insuficiente (mutuamente exclusivos)
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('recommend — goalReached / paceAlert (v3.0)', () => {
+  it('flags goalReached when active-class holdings already cover goalAmount', () => {
+    const result = recommend({
+      ...OPTS,
+      goalAmount: 1000,
+      holdings: [{ ticker: 'AAPL.US', units: 10, avgPrice: 150, assetClass: 'stock' }], // 1500€ ≥ 1000€
+    });
+    expect(result.goalReached).toBe(true);
+    expect(result.paceAlert).toBe(false);
+  });
+
+  it('raises paceAlert when the remaining goal needs a pace above the current plan', () => {
+    const result = recommend({
+      ...OPTS,
+      goalAmount: 1_000_000, // objetivo muito distante face ao plano mensal
+      holdings:   [],
+    });
+    expect(result.goalReached).toBe(false);
+    expect(result.paceAlert).toBe(true);
   });
 });

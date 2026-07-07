@@ -37,6 +37,14 @@ export interface CandidateAsset {
   marketCap:      number;        // em EUR
   qualityScore:   number;        // 0–100
   currency:       string;
+
+  // Campos opcionais usados pelo goalCompatibility (Camada 2A) e pelo
+  // ajuste por objetivo do qualityScore (Camada 2B). Só disponíveis para
+  // stocks — undefined para ETFs/bond ETFs curados (sem fundamentais individuais).
+  epsGrowthTTMYoy?:    number;   // % YoY, populado em enrichStock()
+  pillarHealthScore?:  number;   // 0–100, populado em app/api/recommendations/route.ts via RiskReport
+  pillarGrowthScore?:  number;   // 0–100, idem
+  savingsPlanSuitable?: boolean; // do RiskReport.actionGuide, idem
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -357,6 +365,7 @@ async function enrichStock(
     marketCap:     marketCapEur,
     qualityScore,
     currency,
+    epsGrowthTTMYoy: metrics.epsGrowthTTMYoy,
   };
 }
 

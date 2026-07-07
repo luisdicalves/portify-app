@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getAuthedUser } from '@/lib/apiAuth';
-import { getUniverse, filterUniverseForUser, type AssetClass } from '@/lib/assetUniverse';
+import { getUniverse, filterUniverseForUser, type AssetClass, type CandidateAsset } from '@/lib/assetUniverse';
 import { getHoldings } from '@/lib/db/holdings';
-import { recommend } from '@/lib/recommendationEngine';
+import { recommend, type HoldingSnapshot } from '@/lib/recommendationEngine';
 import type { UserProfile } from '@/lib/planCalculator';
 import { fetchRiskReport } from '@/lib/riskScore';
 import { calcQualityScoreFromReport } from '@/lib/qualityScore';
@@ -20,6 +20,15 @@ const EXPERIENCE_LEVELS = ['none', 'beginner', 'intermediate', 'experienced', 'p
 const MARKET_REACTIONS  = ['sell_all', 'sell_some', 'hold', 'buy_more'] as const;
 const FINANCIAL_STATUSES = ['unstable', 'stable', 'comfortable', 'wealthy'] as const;
 const LIQUIDITY_NEEDS   = ['critical', 'possible', 'unlikely', 'never'] as const;
+const ASSET_CLASSES: readonly AssetClass[] = ['stock', 'etf', 'bond_etf'] as const;
+
+// investment_plans.preferred_asset_classes vem como text[] do Supabase — filtra
+// valores desconhecidos e cai para as 3 classes se o campo estiver vazio/nulo
+// (mantém o comportamento anterior para planos criados antes desta coluna existir).
+function parseAssetClasses(value: string[] | null | undefined): AssetClass[] {
+  const valid = (value ?? []).filter((v): v is AssetClass => (ASSET_CLASSES as readonly string[]).includes(v));
+  return valid.length > 0 ? valid : [...ASSET_CLASSES];
+}
 
 // 2 calls per hour per user — the Finnhub calls are cached server-side;
 // this prevents burst abuse of the rate limiter.
@@ -77,19 +86,23 @@ export async function GET(req: Request) {
   // ── Plano de investimento ─────────────────────────────────────────────────
   const { data: plan } = await supabase
     .from('investment_plans')
-    .select('horizon_years, amount, goal_amount')
+    .select('horizon_years, amount, goal_amount, preferred_asset_classes')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  const horizonYears:  number           = plan?.horizon_years ?? 10;
-  const monthlyAmount: number           = plan?.amount        ?? 250;
-  const goalAmount:    number | undefined = plan?.goal_amount ?? undefined;
+  const horizonYears:  number             = plan?.horizon_years ?? 10;
+  const monthlyAmount: number             = plan?.amount        ?? 250;
+  const goalAmount:    number | undefined = plan?.goal_amount   ?? undefined;
+  const preferredClasses: AssetClass[]    = parseAssetClasses(plan?.preferred_asset_classes);
 
   // ── Holdings ──────────────────────────────────────────────────────────────
+  // assetClass é anexado mais abaixo (Passo 5 do modelo precisa de saber quais
+  // holdings pertencem a classes fora do plano) usando o universo completo,
+  // ainda não filtrado, como mapa ticker → classe.
   const holdingsRaw = await getHoldings(supabase, user.id);
-  const holdings = holdingsRaw.map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
+  const holdingsBase = holdingsRaw.map(h => ({ ticker: h.ticker, units: h.units, avgPrice: h.avg_price }));
 
   // ── UserProfile ───────────────────────────────────────────────────────────
   const userProfile: UserProfile = {
@@ -102,15 +115,22 @@ export async function GET(req: Request) {
     horizon_years:    horizonYears,
   };
 
-  const assetClasses: AssetClass[] = ['stock', 'etf', 'bond_etf'];
-
   const preferredSectors: string[] = profileRaw.preferred_sectors ?? [];
 
   try {
     const universe = await getUniverse();
 
+    // Ticker → assetClass a partir do universo completo (ainda não filtrado) —
+    // usado para saber se um holding existente pertence a uma classe fora do
+    // plano (preferredClasses), independentemente de o filtro duro o ter excluído.
+    const tickerClassMap = new Map<string, AssetClass>(universe.map((a: CandidateAsset) => [a.ticker, a.assetClass]));
+    const holdings: HoldingSnapshot[] = holdingsBase.map(h => ({
+      ...h,
+      assetClass: tickerClassMap.get(h.ticker),
+    }));
+
     const filtered = filterUniverseForUser(universe, {
-      preferredAssetClasses: assetClasses.length > 0 ? assetClasses : ['stock', 'etf', 'bond_etf'],
+      preferredAssetClasses: preferredClasses,
       investmentGoal:        userProfile.investment_goal,
       liquidityNeed:         userProfile.liquidity_need,
       horizonYears,
@@ -151,10 +171,16 @@ export async function GET(req: Request) {
 
         return true;
       })
-      // ── Qualidade score personalizado ──────────────────────────────────────
+      // ── Qualidade score personalizado + campos usados no goalCompatibility ──
       .map(({ asset, report }) => {
         if (!report) return asset;
-        return { ...asset, qualityScore: calcQualityScoreFromReport(report, userProfile) };
+        return {
+          ...asset,
+          qualityScore:        calcQualityScoreFromReport(report, userProfile),
+          pillarHealthScore:   report.pillars.health.score,
+          pillarGrowthScore:   report.pillars.growth.score,
+          savingsPlanSuitable: report.actionGuide.savingsPlanSuitable,
+        };
       });
 
     const result = recommend({
@@ -164,6 +190,7 @@ export async function GET(req: Request) {
       monthlyAmount,
       goalAmount,
       holdings,
+      preferredClasses,
       maxPerClass:      3,
       maxPerSector:     2,
     });
@@ -175,7 +202,8 @@ export async function GET(req: Request) {
     const etag = makeETag(
       { risk_profile: userProfile.risk_profile, investment_goal: userProfile.investment_goal,
         experience_level: userProfile.experience_level, market_reaction: userProfile.market_reaction,
-        preferred_sectors: preferredSectors.slice().sort().join(',') },
+        preferred_sectors: preferredSectors.slice().sort().join(','),
+        preferred_asset_classes: preferredClasses.slice().sort().join(',') },
       holdingsSig,
       horizonYears,
       monthlyAmount,
