@@ -175,7 +175,7 @@ create table if not exists public.investment_plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade not null unique,
   monthly_amount numeric not null,
-  frequency text not null check (frequency in ('weekly','monthly','quarterly','annual')),
+  frequency text not null check (frequency in ('weekly','biweekly','monthly','quarterly','semiannual','annual')),
   horizon_years int not null,
   goal_amount numeric,
   preferred_asset_classes text[] default array['stock','etf','bond_etf'],

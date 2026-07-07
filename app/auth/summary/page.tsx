@@ -7,6 +7,7 @@ import { calcPlan, calcFV, type UserProfile } from '@/lib/planCalculator';
 import type { DbProfile, DbPlan } from '@/lib/types/profile';
 import { useUser, getSessionUserId } from '@/lib/hooks/useUser';
 import { onbState } from '@/lib/onboardingState';
+import { PLAN_FREQUENCY_PERIODS_PER_YEAR } from '@/lib/profileConstants';
 
 // ── Labels ────────────────────────────────────────────────────────
 const RISK_LABELS: Record<string, string> = {
@@ -50,10 +51,12 @@ const LIQUIDITY_LABELS: Record<string, string> = {
   never:    'Nunca',
 };
 const FREQ_LABELS: Record<string, string> = {
-  weekly:    'Semanal',
-  monthly:   'Mensal',
-  quarterly: 'Trimestral',
-  annual:    'Anual',
+  weekly:     'Semanal',
+  biweekly:   'Quinzenal',
+  monthly:    'Mensal',
+  quarterly:  'Trimestral',
+  semiannual: 'Semestral',
+  annual:     'Anual',
 };
 
 function fmt(n: number) {
@@ -145,8 +148,9 @@ export default function SummaryPage() {
   const rate      = planResult?.rate      ?? 0.07;
   const rateLow   = planResult?.rateLow   ?? Math.max(0, rate - 0.01);
   const rateHigh  = planResult?.rateHigh  ?? rate + 0.01;
-  const fvLow     = plan ? calcFV(plan.amount, rateLow,  plan.horizon_years) : 0;
-  const fvHigh    = plan ? calcFV(plan.amount, rateHigh, plan.horizon_years) : 0;
+  const periodsPerYr = plan ? (PLAN_FREQUENCY_PERIODS_PER_YEAR[plan.frequency as keyof typeof PLAN_FREQUENCY_PERIODS_PER_YEAR] ?? 12) : 12;
+  const fvLow     = plan ? calcFV(plan.amount, rateLow,  plan.horizon_years, periodsPerYr) : 0;
+  const fvHigh    = plan ? calcFV(plan.amount, rateHigh, plan.horizon_years, periodsPerYr) : 0;
   const conflicts = planResult?.conflicts ?? [];
 
   // ── Gravação final ─────────────────────────────────────────────

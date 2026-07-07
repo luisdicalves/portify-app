@@ -16,7 +16,7 @@ import { RISK_OPTIONS, OBJECTIVE_OPTIONS, SECTOR_OPTIONS, EXPERIENCE_OPTIONS, RE
 
 const RISK_LABELS:       Record<string, string> = { very_conservative: 'Muito conservador', conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo', very_aggressive: 'Muito agressivo' };
 const GOAL_LABELS:       Record<string, string> = { emergency_fund: 'Fundo de emergência', short_purchase: 'Compra a curto prazo', income: 'Rendimento passivo', wealth_growth: 'Crescimento', retirement: 'Reforma', legacy: 'Legado' };
-const FREQ_LABELS:       Record<string, string> = { weekly: 'Semanal', monthly: 'Mensal', quarterly: 'Trimestral', annual: 'Anual' };
+const FREQ_LABELS:       Record<string, string> = { weekly: 'Semanal', biweekly: 'Quinzenal', monthly: 'Mensal', quarterly: 'Trimestral', semiannual: 'Semestral', annual: 'Anual' };
 const EXPERIENCE_LABELS: Record<string, string> = { none: 'Nenhuma', beginner: 'Iniciante', intermediate: 'Intermédio', experienced: 'Experiente', professional: 'Profissional' };
 const REACTION_LABELS:   Record<string, string> = { sell_all: 'Vendo tudo', sell_some: 'Vendo parte', hold: 'Aguardo', buy_more: 'Compro mais' };
 const FINANCIAL_LABELS:  Record<string, string> = { unstable: 'Instável', stable: 'Estável', comfortable: 'Confortável', wealthy: 'Elevada' };
