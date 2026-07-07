@@ -139,4 +139,36 @@ describe('calcQualityScoreFromReport', () => {
     const income  = calcQualityScoreFromReport(growthReport, { ...PROFILE, investment_goal: 'income' });
     expect(wg).toBeGreaterThan(income);
   });
+
+  // v3.0: o modelo mapeia cada objetivo a um pillar específico —
+  // wealth_growth → growth, income → health, retirement → valuation.
+  // Regressão para o bug em que 'retirement' usava por engano o pillar de health.
+  it('income goal benefits from strong health pillar', () => {
+    const healthReport: RiskReport = {
+      ...MOCK_REPORT,
+      pillars: { ...MOCK_REPORT.pillars, health: makePillar(95), valuation: makePillar(30), growth: makePillar(30) },
+    };
+    const income    = calcQualityScoreFromReport(healthReport, { ...PROFILE, investment_goal: 'income' });
+    const retirement = calcQualityScoreFromReport(healthReport, { ...PROFILE, investment_goal: 'retirement' });
+    expect(income).toBeGreaterThan(retirement);
+  });
+
+  it('retirement goal benefits from strong valuation pillar, not health', () => {
+    const valuationReport: RiskReport = {
+      ...MOCK_REPORT,
+      pillars: { ...MOCK_REPORT.pillars, valuation: makePillar(95), health: makePillar(30), growth: makePillar(30) },
+    };
+    const retirementHighValuation = calcQualityScoreFromReport(valuationReport, { ...PROFILE, investment_goal: 'retirement' });
+
+    const lowValuationReport: RiskReport = {
+      ...MOCK_REPORT,
+      pillars: { ...MOCK_REPORT.pillars, valuation: makePillar(30), health: makePillar(95), growth: makePillar(30) },
+    };
+    const retirementHighHealth = calcQualityScoreFromReport(lowValuationReport, { ...PROFILE, investment_goal: 'retirement' });
+
+    // Se o mapeamento estivesse errado (retirement → health), o segundo report
+    // (health alto) daria um score maior. O modelo diz que retirement deve
+    // reagir à valuation, não à saúde financeira.
+    expect(retirementHighValuation).toBeGreaterThan(retirementHighHealth);
+  });
 });

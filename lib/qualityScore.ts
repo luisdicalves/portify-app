@@ -240,18 +240,20 @@ export function calcQualityScoreFromReport(
   const activeCatalysts = report.catalysts.filter(c => !c.toLowerCase().includes('sem catalisadores') && !c.toLowerCase().includes('no catalysts'));
   score += activeCatalysts.length * 3;
 
-  // Ajuste por objetivo de investimento
+  // Ajuste por objetivo de investimento (spec v3.0):
+  //   wealth_growth → pillar de crescimento
+  //   income        → pillar de saúde financeira
+  //   retirement    → pillar de valuation
+  // legacy/short_purchase não têm ajuste definido no modelo — sem alteração.
   const { pillars } = report;
   switch (profile.investment_goal) {
     case 'wealth_growth':
       score += (pillars.growth.score - 50) * 0.10;
       break;
     case 'income':
-    case 'retirement':
       score += (pillars.health.score - 50) * 0.10;
       break;
-    case 'legacy':
-    case 'short_purchase':
+    case 'retirement':
       score += (pillars.valuation.score - 50) * 0.10;
       break;
   }
