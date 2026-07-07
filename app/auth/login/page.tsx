@@ -43,7 +43,7 @@ export default function LoginPage() {
   } as const;
 
   return (
-    <div className="phone-shell" style={{ flexDirection: 'column', overflow: 'auto', padding: '28px 24px 24px' }}>
+    <div className="phone-shell" style={{ flexDirection: 'column', overflow: 'auto', paddingTop: 'calc(var(--safe-top) + 28px)', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}>
       {/* Logo + title */}
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, marginBottom: 28 }}>
         <div style={{ width: 64, height: 64, borderRadius: 18, background: 'var(--primary-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--shadow)' }}>

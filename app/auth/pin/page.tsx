@@ -52,7 +52,7 @@ export default function PinPage() {
   const keys = ['1','2','3','4','5','6','7','8','9','','0','del'];
 
   return (
-    <div className="phone-shell" style={{ padding: 24 }}>
+    <div className="phone-shell" style={{ paddingTop: 'calc(var(--safe-top) + 24px)', paddingLeft: 24, paddingRight: 24, paddingBottom: 24 }}>
       {/* Centered content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
         <div style={{ width: 56, height: 56, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

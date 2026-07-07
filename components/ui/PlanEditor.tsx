@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { calcPlan, calcFV, calcPMT, calcYears, type UserProfile, type AssetClass } from '@/lib/planCalculator';
-import { PLAN_AMOUNT_VALUES, PLAN_AMOUNTS, PLAN_PERIODS, PLAN_FREQUENCIES } from '@/lib/profileConstants';
+import { PLAN_AMOUNT_VALUES, PLAN_AMOUNTS, PLAN_PERIODS, PLAN_FREQUENCIES, PLAN_FREQUENCY_PERIODS_PER_YEAR } from '@/lib/profileConstants';
 
 export interface PlanEditorResult {
   amount: number;
@@ -57,7 +57,7 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
     : 2; // 250 €
   const initFreqIdx = initialFrequency != null
     ? Math.max(0, (PLAN_FREQUENCIES as readonly string[]).indexOf(initialFrequency))
-    : 1; // Mensal
+    : PLAN_FREQUENCIES.indexOf('monthly');
 
   const [mode, setMode]       = useState<Mode>('calc_goal');
   const [amtIdx, setAmtIdx]   = useState(initAmtIdx);
@@ -90,17 +90,18 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
     };
   })();
 
-  const monthlyAmt = PLAN_AMOUNT_VALUES[amtIdx];
-  const goalNum    = parseInt(goal.replace(/\D/g, ''), 10) || 0;
+  const monthlyAmt   = PLAN_AMOUNT_VALUES[amtIdx];
+  const goalNum      = parseInt(goal.replace(/\D/g, ''), 10) || 0;
+  const periodsPerYr = PLAN_FREQUENCY_PERIODS_PER_YEAR[PLAN_FREQUENCIES[freqIdx]];
 
-  const rawYears        = goalNum > 0 ? calcYears(goalNum, monthlyAmt, rate) : null;
+  const rawYears        = goalNum > 0 ? calcYears(goalNum, monthlyAmt, rate, periodsPerYr) : null;
   const yearsInfeasible = rawYears !== null && (!isFinite(rawYears) || rawYears > 50);
   const projectedYears  = yearsInfeasible ? null : rawYears;
-  const requiredMonthly = goalNum > 0 ? calcPMT(goalNum, rate, years) : null;
+  const requiredMonthly = goalNum > 0 ? calcPMT(goalNum, rate, years, periodsPerYr) : null;
 
-  const finalGoal = mode === 'calc_goal' ? calcFV(monthlyAmt, rate, years)
+  const finalGoal = mode === 'calc_goal' ? calcFV(monthlyAmt, rate, years, periodsPerYr)
     : goalNum > 0 ? goalNum
-    : calcFV(monthlyAmt, rate, years);
+    : calcFV(monthlyAmt, rate, years, periodsPerYr);
 
   function toggleClass(cls: AssetClass) {
     setPreferredClasses(prev => {
@@ -231,7 +232,7 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
           <>
             <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gain-strong)', marginBottom: 4 }}>Objetivo estimado</div>
             <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>
-              {fmt(calcFV(monthlyAmt, rateLow, years))} – {fmt(calcFV(monthlyAmt, rateHigh, years))}
+              {fmt(calcFV(monthlyAmt, rateLow, years, periodsPerYr))} – {fmt(calcFV(monthlyAmt, rateHigh, years, periodsPerYr))}
             </div>
             <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
               {fmt(monthlyAmt)}/{PLAN_PERIODS[freqIdx]?.toLowerCase()} · {years} anos · {(rateLow * 100).toFixed(1)}%–{(rateHigh * 100).toFixed(1)}% a.a.
@@ -245,14 +246,14 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
               <>
                 <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--on-surface-variant)', letterSpacing: '-0.02em' }}>Mais de 50 anos</div>
                 <div style={{ fontSize: 12, color: 'var(--loss)', marginTop: 6 }}>
-                  Com {fmt(monthlyAmt)}/mês não é possível atingir {fmt(goalNum)} num prazo razoável. Aumenta o montante ou reduz o objetivo.
+                  Com {fmt(monthlyAmt)}/{PLAN_PERIODS[freqIdx]?.toLowerCase()} não é possível atingir {fmt(goalNum)} num prazo razoável. Aumenta o montante ou reduz o objetivo.
                 </div>
               </>
             ) : (
               <>
                 <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>{projectedYears} anos</div>
                 <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
-                  Para atingir {fmt(goalNum)} com {fmt(monthlyAmt)}/mês · {(rate * 100).toFixed(1)}% a.a.
+                  Para atingir {fmt(goalNum)} com {fmt(monthlyAmt)}/{PLAN_PERIODS[freqIdx]?.toLowerCase()} · {(rate * 100).toFixed(1)}% a.a.
                 </div>
               </>
             )}
@@ -260,8 +261,8 @@ export function PlanEditor({ profile, initialAmount, initialFrequency, initialYe
         )}
         {mode === 'calc_amount' && requiredMonthly !== null && goalNum > 0 && (
           <>
-            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gain-strong)', marginBottom: 4 }}>Montante mensal necessário</div>
-            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>{fmt(requiredMonthly)}/mês</div>
+            <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gain-strong)', marginBottom: 4 }}>Montante {PLAN_PERIODS[freqIdx]?.toLowerCase()} necessário</div>
+            <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>{fmt(requiredMonthly)}/{PLAN_PERIODS[freqIdx]?.toLowerCase()}</div>
             <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
               Para atingir {fmt(goalNum)} em {years} anos · {(rate * 100).toFixed(1)}% a.a.
             </div>

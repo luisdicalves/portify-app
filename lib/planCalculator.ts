@@ -344,25 +344,29 @@ export function calcPlan(
 // 6. Funções de projecção financeira
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Valor futuro de contribuições mensais (juro composto) */
-export function calcFV(monthlyPmt: number, annualRate: number, years: number): number {
-  if (annualRate === 0) return monthlyPmt * 12 * years;
-  const r = annualRate / 12;
-  const n = years * 12;
-  return Math.round(monthlyPmt * ((Math.pow(1 + r, n) - 1) / r));
+/**
+ * Valor futuro de contribuições periódicas (juro composto).
+ * `periodsPerYear` define o ritmo das contribuições (12 = mensal, 4 = trimestral, etc.)
+ * — por omissão mensal, para compatibilidade com chamadas existentes.
+ */
+export function calcFV(pmt: number, annualRate: number, years: number, periodsPerYear = 12): number {
+  if (annualRate === 0) return pmt * periodsPerYear * years;
+  const r = annualRate / periodsPerYear;
+  const n = years * periodsPerYear;
+  return Math.round(pmt * ((Math.pow(1 + r, n) - 1) / r));
 }
 
-/** Montante mensal necessário para atingir um objetivo */
-export function calcPMT(goalAmount: number, annualRate: number, years: number): number {
-  if (annualRate === 0) return goalAmount / (12 * years);
-  const r = annualRate / 12;
-  const n = years * 12;
+/** Montante periódico necessário para atingir um objetivo */
+export function calcPMT(goalAmount: number, annualRate: number, years: number, periodsPerYear = 12): number {
+  if (annualRate === 0) return goalAmount / (periodsPerYear * years);
+  const r = annualRate / periodsPerYear;
+  const n = years * periodsPerYear;
   return Math.round(goalAmount * r / (Math.pow(1 + r, n) - 1));
 }
 
-/** Número de anos para atingir um objetivo com contribuição mensal fixa */
-export function calcYears(goalAmount: number, monthlyPmt: number, annualRate: number): number {
-  if (annualRate === 0) return Math.ceil(goalAmount / (monthlyPmt * 12));
-  const r = annualRate / 12;
-  return Math.ceil(Math.log(goalAmount * r / monthlyPmt + 1) / Math.log(1 + r) / 12);
+/** Número de anos para atingir um objetivo com contribuição periódica fixa */
+export function calcYears(goalAmount: number, pmt: number, annualRate: number, periodsPerYear = 12): number {
+  if (annualRate === 0) return Math.ceil(goalAmount / (pmt * periodsPerYear));
+  const r = annualRate / periodsPerYear;
+  return Math.ceil(Math.log(goalAmount * r / pmt + 1) / Math.log(1 + r) / periodsPerYear);
 }
