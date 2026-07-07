@@ -10,9 +10,10 @@ import { useProfileData } from '@/lib/hooks/useProfileData';
 import BottomNav from '@/components/ui/BottomNav';
 import { SelectList } from '@/components/ui/SelectList';
 import { PlanEditor } from '@/components/ui/PlanEditor';
-import { calcPlan } from '@/lib/planCalculator';
+import { calcPlan, calcFV } from '@/lib/planCalculator';
 import type { UserProfile, AssetClass } from '@/lib/planCalculator';
 import { RISK_OPTIONS, OBJECTIVE_OPTIONS, SECTOR_OPTIONS, EXPERIENCE_OPTIONS, REACTION_OPTIONS, FINANCIAL_OPTIONS, LIQUIDITY_OPTIONS, LIQUIDITY_CRITICAL_WARNING } from '@/lib/profileOptions';
+import { PLAN_FREQUENCY_PERIODS_PER_YEAR } from '@/lib/profileConstants';
 
 const RISK_LABELS:       Record<string, string> = { very_conservative: 'Muito conservador', conservative: 'Conservador', moderate: 'Moderado', aggressive: 'Agressivo', very_aggressive: 'Muito agressivo' };
 const GOAL_LABELS:       Record<string, string> = { emergency_fund: 'Fundo de emergência', short_purchase: 'Compra a curto prazo', income: 'Rendimento passivo', wealth_growth: 'Crescimento', retirement: 'Reforma', legacy: 'Legado' };
@@ -28,6 +29,10 @@ function horizonLabel(years: number | null | undefined) {
   if (years <= 5) return '2 – 5 anos';
   if (years <= 10) return '5 – 10 anos';
   return '> 10 anos';
+}
+
+function fmt(n: number) {
+  return n.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });
 }
 
 function SectionLabel({ label }: { label: string }) {
@@ -107,9 +112,14 @@ export default function ProfilePage() {
         financial_status: profile.financial_status  as UserProfile['financial_status'],
         liquidity_need:   profile.liquidity_need    as UserProfile['liquidity_need'],
         horizon_years:    plan?.horizon_years ?? 10,
-      });
+      }, (plan?.preferred_asset_classes ?? undefined) as AssetClass[] | undefined);
     } catch { return null; }
   })();
+
+  const planProjection = (plan && planResult) ? {
+    low:  calcFV(plan.amount, planResult.rateLow,  plan.horizon_years, PLAN_FREQUENCY_PERIODS_PER_YEAR[plan.frequency as keyof typeof PLAN_FREQUENCY_PERIODS_PER_YEAR] ?? 12),
+    high: calcFV(plan.amount, planResult.rateHigh, plan.horizon_years, PLAN_FREQUENCY_PERIODS_PER_YEAR[plan.frequency as keyof typeof PLAN_FREQUENCY_PERIODS_PER_YEAR] ?? 12),
+  } : null;
 
   const fullName       = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '...';
   const initials       = [profile?.first_name?.[0], profile?.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?';
@@ -273,6 +283,17 @@ export default function ProfilePage() {
           <Card>
             <SettingsRow icon="account_balance_wallet" label={t.activePlan} value={planLabel} onPress={() => setPlanSheetOpen(true)} border={false} />
           </Card>
+          {planProjection && plan && planResult && (
+            <div style={{ background: 'var(--gain-container)', border: '1px solid var(--gain)', borderRadius: 'var(--radius-lg)', padding: '16px 18px', marginTop: 10 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--gain-strong)', marginBottom: 4 }}>Objetivo estimado</div>
+              <div style={{ fontSize: 26, fontWeight: 700, color: 'var(--gain)', letterSpacing: '-0.02em' }}>
+                {fmt(planProjection.low)} – {fmt(planProjection.high)}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>
+                {fmt(plan.amount)}/{(FREQ_LABELS[plan.frequency] ?? plan.frequency).toLowerCase()} · {plan.horizon_years} anos · {(planResult.rateLow * 100).toFixed(1)}%–{(planResult.rateHigh * 100).toFixed(1)}% a.a.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Account */}

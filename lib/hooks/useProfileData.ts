@@ -106,7 +106,7 @@ export function useProfileData(userId: string | undefined) {
     setSaving(true);
     const supabase = createClient();
     const { amount, frequency, horizon_years, goal_amount, preferred_asset_classes } = result;
-    await upsertPlan(supabase, { user_id: userId, amount, frequency, horizon_years, goal_amount });
+    await upsertPlan(supabase, { user_id: userId, amount, frequency, horizon_years, goal_amount, preferred_asset_classes });
     setPlan(prev => ({ amount, frequency, horizon_years, goal_amount, preferred_asset_classes: preferred_asset_classes ?? prev?.preferred_asset_classes }));
     setSaving(false);
   }
