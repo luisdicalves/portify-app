@@ -261,3 +261,72 @@ test.describe('Profile page — plan projection card', () => {
     await expect(page.getByText(/250\s€\/mensal\s·\s10\sanos/)).toBeVisible();
   });
 });
+
+test.describe('Profile page — live risk score and allocation', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    // Same content-negotiation-aware override as the projection-card describe block above —
+    // needed so calcPlan() actually receives a real profile object.
+    const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
+    await page.route(new RegExp(sb.source + '/rest/v1/profiles'), route => {
+      if (route.request().method() !== 'GET') return route.fulfill({ status: 204 });
+      const wantsSingle = (route.request().headers()['accept'] ?? '').includes('pgrst.object');
+      const profileRow = {
+        id: 'aaaaaaaa-0000-0000-0000-000000000001',
+        first_name: 'Teste', last_name: 'E2E', user_handle: 'teste_e2e',
+        risk_profile: 'moderate', investment_goal: 'wealth_growth',
+        experience_level: 'beginner', market_reaction: 'hold',
+        financial_status: 'stable', liquidity_need: 'unlikely',
+        preferred_sectors: ['tech'], investor_since: 2024,
+      };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(wantsSingle ? profileRow : [profileRow]) });
+    });
+  });
+
+  test('changing risk profile updates the risk score immediately, without a reload', async ({ page }) => {
+    await loginAndReachProfile(page);
+
+    const scoreLocator = page.locator('text=/^\\d+\\/100$/');
+    const scoreBefore = await scoreLocator.textContent();
+
+    await page.getByText('Perfil de risco').first().click();
+    await page.getByTestId('select-item').filter({ hasText: 'Muito agressivo' }).click();
+    await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+
+    await expect(scoreLocator).not.toHaveText(scoreBefore ?? '');
+  });
+
+  test('deselecting an asset class updates the allocation immediately and persists it', async ({ page }) => {
+    const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let upsertBody: any = null;
+    await page.route(new RegExp(sb.source + '/rest/v1/investment_plans'), route => {
+      if (route.request().method() === 'POST') {
+        upsertBody = route.request().postDataJSON();
+        return route.fulfill({ status: 201, contentType: 'application/json', body: '[]' });
+      }
+      return route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ id: 'plan-1', amount: 250, frequency: 'monthly', horizon_years: 10, goal_amount: 50000, preferred_asset_classes: ['stock', 'etf', 'bond_etf'] }]),
+      });
+    });
+
+    await loginAndReachProfile(page);
+
+    // All 3 classes included initially — "Obrig." (bond_etf) shows a non-zero share
+    const obrigPct = page.getByText('Obrig.', { exact: true }).locator('..').locator('div').first();
+    await expect(obrigPct).not.toHaveText('0%');
+
+    await page.getByText('Plano ativo').click();
+    await page.getByText('Bond ETFs').first().click();
+    await page.getByRole('button', { name: 'Confirmar', exact: true }).click();
+
+    // Sheet closes and the underlying page's allocation box reflects the exclusion immediately
+    await expect(page.getByText('Podes alterar estes valores em qualquer altura.')).not.toBeVisible();
+    await expect(obrigPct).toHaveText('0%');
+
+    // ...and the exclusion was actually persisted, not just held in memory
+    expect(upsertBody?.preferred_asset_classes).toEqual(['stock', 'etf']);
+  });
+});

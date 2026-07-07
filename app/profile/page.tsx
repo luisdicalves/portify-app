@@ -112,7 +112,7 @@ export default function ProfilePage() {
         financial_status: profile.financial_status  as UserProfile['financial_status'],
         liquidity_need:   profile.liquidity_need    as UserProfile['liquidity_need'],
         horizon_years:    plan?.horizon_years ?? 10,
-      });
+      }, (plan?.preferred_asset_classes ?? undefined) as AssetClass[] | undefined);
     } catch { return null; }
   })();
 
