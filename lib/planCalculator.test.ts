@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calcRiskScore,
+  calcAllocation,
   calcPlan,
   calcFV,
   calcPMT,
@@ -67,6 +68,19 @@ describe('calcPlan', () => {
     const direct = calcRiskScore(BASE);
     const plan   = calcPlan(BASE);
     expect(plan.riskScore).toBe(direct);
+  });
+});
+
+describe('calcAllocation with preferredClasses', () => {
+  it('allocates 100% to the single preferred class even when its base weight is 0%', () => {
+    // very_aggressive + horizon 30 pushes the risk score above 80, where
+    // baseAllocation() assigns bond_etf: 0.00 — with only bond_etf preferred,
+    // the generic 50/50 stock/etf fallback must not kick back in.
+    const profile: UserProfile = { ...BASE, risk_profile: 'very_aggressive', horizon_years: 30 };
+    const score = calcRiskScore(profile);
+    const allocation = calcAllocation(score, profile, ['bond_etf']);
+
+    expect(allocation).toEqual({ stock: 0, etf: 0, bond_etf: 1 });
   });
 });
 
