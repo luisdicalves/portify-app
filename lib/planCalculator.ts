@@ -223,10 +223,15 @@ function applyLiquidityAdjustment(alloc: Allocation, liquidity: UserProfile['liq
   return normalise(a);
 }
 
-/** Normaliza a alocação para que a soma seja sempre 1.0 */
+/**
+ * Normaliza a alocação para que a soma seja sempre 1.0.
+ * Quando a soma é 0 devolve zeros — normalise() não sabe quais classes são
+ * válidas para o utilizador, por isso não decide um fallback sozinha; isso
+ * cabe a quem a chama (ver calcAllocation).
+ */
 function normalise(a: Allocation): Allocation {
   const total = a.stock + a.etf + a.bond_etf;
-  if (total === 0) return { stock: 0, etf: 0.5, bond_etf: 0.5 };
+  if (total === 0) return { stock: 0, etf: 0, bond_etf: 0 };
   return {
     stock:    Math.round((a.stock    / total) * 100) / 100,
     etf:      Math.round((a.etf      / total) * 100) / 100,
@@ -248,7 +253,17 @@ export function calcAllocation(
   if (!preferredClasses.includes('etf'))      alloc = { ...alloc, etf: 0 };
   if (!preferredClasses.includes('bond_etf')) alloc = { ...alloc, bond_etf: 0 };
 
-  return normalise(alloc);
+  const normalised = normalise(alloc);
+  if (normalised.stock + normalised.etf + normalised.bond_etf > 0) return normalised;
+
+  // Every class the user kept was itself zeroed by the risk-based allocation
+  // (ex: score > 80 dá bond_etf: 0.00, e o utilizador só quer bond_etf).
+  // Repartir 100% apenas pelas classes preferidas, nunca por uma excluída.
+  const classes = preferredClasses.length > 0 ? preferredClasses : (['stock', 'etf', 'bond_etf'] as AssetClass[]);
+  const share = Math.round((1 / classes.length) * 100) / 100;
+  const fallback: Allocation = { stock: 0, etf: 0, bond_etf: 0 };
+  classes.forEach((c) => { fallback[c] = share; });
+  return fallback;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
