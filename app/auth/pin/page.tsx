@@ -59,7 +59,7 @@ export default function PinPage() {
           <span className="material-symbols-outlined" style={{ fontSize: 28, color: 'var(--primary)' }}>lock</span>
         </div>
         <div style={{ fontSize: 22, fontWeight: 700 }}>{t.pinTitle}</div>
-        <div style={{ fontSize: 14, color: error ? 'var(--loss)' : 'var(--on-surface-variant)', textAlign: 'center' }}>{error ? t.pinWrong : t.pinSub}</div>
+        <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', textAlign: 'center' }}>{t.pinSub}</div>
 
         {/* PIN dots */}
         <div style={{ display: 'flex', gap: 14, marginTop: 8 }}>
@@ -69,6 +69,13 @@ export default function PinPage() {
             </span>
           ))}
         </div>
+
+        {error && (
+          <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+            <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.pinWrong}</span>
+          </div>
+        )}
       </div>
 
       {/* Keypad */}

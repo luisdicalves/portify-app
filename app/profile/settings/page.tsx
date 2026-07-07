@@ -342,7 +342,10 @@ export default function SettingsPage() {
             </label>
 
             {importError && (
-              <div style={{ fontSize: 13, color: 'var(--loss)', marginTop: 12 }}>{importError}</div>
+              <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginTop: 12 }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{importError}</span>
+              </div>
             )}
 
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
@@ -504,7 +507,10 @@ export default function SettingsPage() {
             </div>
 
             {deleteError && (
-              <div style={{ fontSize: 13, color: 'var(--loss)', marginBottom: 12 }}>{deleteError}</div>
+              <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 12 }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{deleteError}</span>
+              </div>
             )}
 
             <button

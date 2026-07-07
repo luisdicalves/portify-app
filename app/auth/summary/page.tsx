@@ -81,23 +81,25 @@ function Row({ icon, label, value, last = false }: { icon: string; label: string
 }
 
 // ── Toast ─────────────────────────────────────────────────────────
+// Canonical success-toast shape — matches app/profile/settings/page.tsx (importToast/exportToast/deleteToast).
 function Toast({ visible }: { visible: boolean }) {
   return (
     <div style={{
-      position: 'absolute', bottom: 100, left: 20, right: 20,
-      background: 'var(--primary-strong)', color: '#fff',
-      borderRadius: 'var(--radius-lg)', padding: '14px 18px',
+      position: 'absolute', top: 14, left: 14, right: 14,
       display: 'flex', alignItems: 'center', gap: 12,
-      boxShadow: 'var(--shadow)',
-      transform: visible ? 'translateY(0)' : 'translateY(120px)',
+      background: 'var(--inverse-surface)', borderRadius: 'var(--radius-md)',
+      padding: '13px 16px', boxShadow: 'var(--shadow)',
+      transform: visible ? 'translateY(0)' : 'translateY(-24px)',
       opacity: visible ? 1 : 0,
       transition: 'all .35s cubic-bezier(.4,0,.2,1)',
       zIndex: 200,
     }}>
-      <span className="material-symbols-outlined icf" style={{ fontSize: 22, flexShrink: 0 }}>check_circle</span>
+      <span style={{ width: 34, height: 34, flex: 'none', borderRadius: 'var(--radius-full)', background: 'var(--gain-strong)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: '#fff' }}>check</span>
+      </span>
       <div>
-        <div style={{ fontSize: 15, fontWeight: 700 }}>Perfil guardado!</div>
-        <div style={{ fontSize: 13, opacity: 0.85 }}>Bem-vindo ao Portify.</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>Perfil guardado!</div>
+        <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>Bem-vindo ao Portify.</div>
       </div>
     </div>
   );
@@ -256,7 +258,7 @@ export default function SummaryPage() {
         {conflicts.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {conflicts.map((c, i) => (
-              <div key={i} style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '10px 14px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+              <div key={i} data-testid="conflict-warning" style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
                 <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>warning</span>
                 <span style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{c}</span>
               </div>
@@ -302,8 +304,8 @@ export default function SummaryPage() {
         </div>
 
         {/* Nota */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--on-surface-variant)', flexShrink: 0, marginTop: 2 }}>info</span>
+        <div data-testid="save-note" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--surface-low)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+          <span className="material-symbols-outlined" style={{ fontSize: 16, color: 'var(--on-surface-variant)', flexShrink: 0, marginTop: 1 }}>info</span>
           <span style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>
             Os dados são guardados apenas quando carregas em <strong>Finalizar</strong>. Podes voltar atrás e editar qualquer campo.
           </span>
@@ -311,7 +313,10 @@ export default function SummaryPage() {
 
         {/* Erro de gravação */}
         {saveError && (
-          <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center' }}>{saveError}</div>
+          <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+            <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{saveError}</span>
+          </div>
         )}
 
         {/* Botões */}

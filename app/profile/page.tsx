@@ -389,7 +389,7 @@ export default function ProfilePage() {
         <SelectList options={LIQUIDITY_OPTIONS} selected={liquiditySelected} onSelect={setLiquiditySelected} />
         {isLiquidityCritical && (
           <div style={{ background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-lg)', padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 12 }}>
-            <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>info</span>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>warning</span>
             <span style={{ fontSize: 14, color: 'var(--on-surface-variant)', lineHeight: 1.5 }}>{LIQUIDITY_CRITICAL_WARNING}</span>
           </div>
         )}
