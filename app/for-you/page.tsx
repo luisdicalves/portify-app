@@ -273,7 +273,7 @@ export default function ForYouPage() {
             display: 'flex', gap: 10, alignItems: 'flex-start',
             background: 'color-mix(in oklab, #F59E0B 12%, var(--surface-lowest))',
             border: '1px solid #F59E0B',
-            borderRadius: 'var(--radius-md)', padding: '10px 12px',
+            borderRadius: 'var(--radius-lg)', padding: '12px 16px',
           }}>
             <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#F59E0B', flex: 'none', marginTop: 1 }}>warning</span>
             <span style={{ fontSize: 12, color: 'var(--on-surface)', lineHeight: 1.4 }}>{t.recPaceAlert}</span>

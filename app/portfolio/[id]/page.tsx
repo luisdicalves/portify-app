@@ -244,7 +244,12 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
 
-              {error && <div style={{ fontSize: 13, color: 'var(--loss)' }}>{error}</div>}
+              {error && (
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px' }}>
+                  <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                  <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{error}</span>
+                </div>
+              )}
 
               <button onClick={() => sheet && confirmTrade(sheet, shares, avgPrice, tradeDate, time, t.bsError, setError, closeSheet)} disabled={saving} style={{
                 background: sheet === 'buy' ? 'var(--gain-strong)' : 'var(--loss-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 15, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: saving ? 0.7 : 1,

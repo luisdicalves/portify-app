@@ -66,7 +66,12 @@ export default function SectorsPage() {
       </div>
 
       <div style={{ padding: '12px 20px 34px' }}>
-        {saveError && <div style={{ fontSize: 13, color: 'var(--loss)', textAlign: 'center', marginBottom: 8 }}>{saveError}</div>}
+        {saveError && (
+          <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 8 }}>
+            <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+            <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{saveError}</span>
+          </div>
+        )}
         <button
           disabled={selected.size === 0 || saving}
           onClick={handleContinue}
