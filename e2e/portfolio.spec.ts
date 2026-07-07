@@ -81,6 +81,57 @@ test.describe('Portfolio buy/sell sheets', () => {
   });
 });
 
+test.describe('Portfolio positions sorting', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    // ZANY: high value (100 units @ 10), no gain, alphabetically last.
+    // ABCX: low value (1 unit @ 50), huge gain (10 -> 50), alphabetically first, fewest units.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([
+          { id: 'h1', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'ZANY', units: 100, avg_price: 10, currency: 'EUR' },
+          { id: 'h2', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'ABCX', units: 1, avg_price: 10, currency: 'EUR' },
+        ]),
+      }),
+    );
+    await page.route('**/api/quote**', route => {
+      const symbol = new URL(route.request().url()).searchParams.get('symbol');
+      const price = symbol === 'ZANY' ? 10 : 50; // ZANY: flat (0% gain); ABCX: 10 -> 50 (400% gain)
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ price, change: 0, changePercent: 0 }) });
+    });
+  });
+
+  test('defaults to sorting by value, highest first', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+    const rows = page.locator('div').filter({ hasText: /^(ZANY|ABCX)/ });
+    await expect(rows.first()).toContainText('ZANY'); // 100×10=1000 > 1×50=50
+  });
+
+  test('sorting by rentabilidade puts the biggest gainer first', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+    await page.getByText('Rentabilidade', { exact: true }).click();
+    const rows = page.locator('div').filter({ hasText: /^(ZANY|ABCX)/ });
+    await expect(rows.first()).toContainText('ABCX'); // +400% > 0%
+  });
+
+  test('sorting A-Z is alphabetical by ticker', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+    await page.getByText('A-Z', { exact: true }).click();
+    const rows = page.locator('div').filter({ hasText: /^(ZANY|ABCX)/ });
+    await expect(rows.first()).toContainText('ABCX'); // 'ABCX' < 'ZANY'
+  });
+
+  test('sorting by unidades puts the largest position first', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+    await page.getByText('Unidades', { exact: true }).click();
+    const rows = page.locator('div').filter({ hasText: /^(ZANY|ABCX)/ });
+    await expect(rows.first()).toContainText('ZANY'); // 100 units > 1 unit
+  });
+});
+
 test.describe('Portfolio dividends tab', () => {
   test.beforeEach(async ({ page }) => {
     await mockSupabase(page);

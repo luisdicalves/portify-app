@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
@@ -19,6 +19,14 @@ const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFr
 
 const TAB_IDS = ['positions', 'dividends', 'history'] as const;
 
+const SORT_OPTIONS = [
+  { id: 'value',   label: 'sortValue'   as const },
+  { id: 'gainPct', label: 'sortGainPct' as const },
+  { id: 'ticker',  label: 'sortAlpha'   as const },
+  { id: 'units',   label: 'sortUnits'   as const },
+] as const;
+type SortKey = typeof SORT_OPTIONS[number]['id'];
+
 function todayIso() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -36,6 +44,18 @@ export default function PortfolioPage() {
   const { assets, loading, txns, dividends, cashSettings, removeTxn } = usePortfolioData(user?.id, lang);
   const [tab, setTab] = useState<typeof TAB_IDS[number]>('positions');
   const [openTxnId, setOpenTxnId] = useState<string | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>('value');
+
+  const sortedAssets = useMemo(() => {
+    const arr = [...assets];
+    switch (sortKey) {
+      case 'value':   arr.sort((a, b) => b.value - a.value); break;
+      case 'gainPct': arr.sort((a, b) => b.gainPct - a.gainPct); break;
+      case 'ticker':  arr.sort((a, b) => a.ticker.localeCompare(b.ticker)); break;
+      case 'units':   arr.sort((a, b) => b.units - a.units); break;
+    }
+    return arr;
+  }, [assets, sortKey]);
 
   // ── Buy sheet ────────────────────────────────────────────────────────────────
   const [buyOpen, setBuyOpen] = useState(false);
@@ -151,11 +171,24 @@ export default function PortfolioPage() {
         {/* Posições tab */}
         {tab === 'positions' && (
           <>
+            {!loading && assets.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto' }}>
+                <span style={{ fontSize: 12, color: 'var(--on-surface-variant)', flexShrink: 0 }}>{t.sortBy}</span>
+                {SORT_OPTIONS.map(opt => (
+                  <button key={opt.id} onClick={() => setSortKey(opt.id)} style={{
+                    flexShrink: 0, padding: '6px 14px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+                    fontSize: 12, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                    background: sortKey === opt.id ? 'var(--primary-container)' : 'var(--surface-container)',
+                    color: sortKey === opt.id ? 'var(--on-primary-container)' : 'var(--on-surface-variant)',
+                  }}>{t[opt.label]}</button>
+                ))}
+              </div>
+            )}
             {loading && <><SkeletonRow /><SkeletonRow /><SkeletonRow /></>}
             {!loading && assets.length === 0 && (
               <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>{t.noPositions}</div>
             )}
-            {assets.map(a => (
+            {sortedAssets.map(a => (
               <div key={a.ticker} onClick={() => router.push(`/portfolio/${a.ticker}`)} style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
                   {a.letter}
