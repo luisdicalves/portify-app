@@ -7,6 +7,7 @@ import { calcRiskEngineScore, buildRiskEngineInput } from '@/lib/engines/riskEng
 import { calcConvictionEngineScore, buildConvictionEngineInput } from '@/lib/engines/convictionEngine';
 import { classifyHoldingType } from '@/lib/engines/classification';
 import type { AssetClass } from '@/lib/engines/types';
+import type { Json } from '@/lib/supabase/database.types';
 
 // Fundamentais não mudam intradiariamente — cache 24h, como /api/risk.
 const SCORES_TTL_SECONDS = 24 * 60 * 60;
@@ -49,23 +50,18 @@ export async function GET(req: NextRequest) {
     // uma linha nova em asset_scores em cada pedido repetido dentro do TTL.
     if (cacheMiss) {
       const supabase = await createClient();
-      // `asset_scores` isn't in database.types.ts yet — it only exists after
-      // supabase-migration-asset-scores.sql is applied and lib/supabase/database.types.ts
-      // is regenerated from the live schema. Cast until then.
-      await (supabase as unknown as { from: (table: string) => { insert: (row: object) => Promise<unknown> } })
-        .from('asset_scores')
-        .insert({
-          user_id: user.id,
-          ticker: result.ticker,
-          quality_score: result.quality.total,
-          risk_score: result.risk.total,
-          conviction_score: result.conviction.total,
-          valuation_score: result.quality.valuationScore,
-          financial_health_score: result.quality.financialHealthScore,
-          growth_score: result.quality.growthScore,
-          holding_type: result.holdingType,
-          metadata: { risk: result.risk, conviction: result.conviction },
-        });
+      await supabase.from('asset_scores').insert({
+        user_id: user.id,
+        ticker: result.ticker,
+        quality_score: result.quality.total,
+        risk_score: result.risk.total,
+        conviction_score: result.conviction.total,
+        valuation_score: result.quality.valuationScore,
+        financial_health_score: result.quality.financialHealthScore,
+        growth_score: result.quality.growthScore,
+        holding_type: result.holdingType,
+        metadata: { risk: result.risk, conviction: result.conviction } as unknown as Json,
+      });
     }
 
     return NextResponse.json(result);

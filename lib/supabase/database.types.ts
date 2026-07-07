@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      asset_scores: {
+        Row: {
+          conviction_score: number | null
+          created_at: string
+          financial_health_score: number | null
+          growth_score: number | null
+          holding_type: string | null
+          id: string
+          metadata: Json
+          quality_score: number | null
+          risk_score: number | null
+          ticker: string
+          user_id: string
+          valuation_score: number | null
+        }
+        Insert: {
+          conviction_score?: number | null
+          created_at?: string
+          financial_health_score?: number | null
+          growth_score?: number | null
+          holding_type?: string | null
+          id?: string
+          metadata?: Json
+          quality_score?: number | null
+          risk_score?: number | null
+          ticker: string
+          user_id: string
+          valuation_score?: number | null
+        }
+        Update: {
+          conviction_score?: number | null
+          created_at?: string
+          financial_health_score?: number | null
+          growth_score?: number | null
+          holding_type?: string | null
+          id?: string
+          metadata?: Json
+          quality_score?: number | null
+          risk_score?: number | null
+          ticker?: string
+          user_id?: string
+          valuation_score?: number | null
+        }
+        Relationships: []
+      }
       holdings: {
         Row: {
           avg_price: number
@@ -285,8 +330,8 @@ export type Database = {
       }
     }
     Functions: {
+      get_email_by_handle: { Args: { p_handle: string }; Returns: string }
       is_username_available: { Args: { p_handle: string }; Returns: boolean }
-      get_email_by_handle: { Args: { p_handle: string }; Returns: string | null }
       set_pin: { Args: { p_pin: string }; Returns: undefined }
       verify_pin: { Args: { p_pin: string }; Returns: boolean }
     }
