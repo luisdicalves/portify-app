@@ -226,3 +226,38 @@ test.describe('Profile page', () => {
     await expect(page.getByRole('button', { name: 'Confirmar mesmo assim' })).not.toBeVisible();
   });
 });
+
+test.describe('Profile page — plan projection card', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    // The base mock's /rest/v1/profiles always returns an array body, which is fine for
+    // most tests but means .single() (used by useProfileData) resolves to an array
+    // instead of an object — undermining risk_profile/investment_goal reads that
+    // calcPlan() needs to produce a projection. Mirror real PostgREST content
+    // negotiation here (Accept: application/vnd.pgrst.object+json -> bare object) so
+    // this describe block alone can exercise the projection card end-to-end.
+    const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
+    await page.route(new RegExp(sb.source + '/rest/v1/profiles'), route => {
+      if (route.request().method() !== 'GET') return route.fulfill({ status: 204 });
+      const wantsSingle = (route.request().headers()['accept'] ?? '').includes('pgrst.object');
+      const profileRow = {
+        id: 'aaaaaaaa-0000-0000-0000-000000000001',
+        first_name: 'Teste', last_name: 'E2E', user_handle: 'teste_e2e',
+        risk_profile: 'moderate', investment_goal: 'wealth_growth',
+        experience_level: 'beginner', market_reaction: 'hold',
+        financial_status: 'stable', liquidity_need: 'unlikely',
+        preferred_sectors: ['tech'], investor_since: 2024,
+      };
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(wantsSingle ? profileRow : [profileRow]) });
+    });
+  });
+
+  test('shows the estimated goal range on the plan card without opening the sheet', async ({ page }) => {
+    await loginAndReachProfile(page);
+
+    // Visible directly on the page — no click on "Plano ativo" needed
+    await expect(page.getByText('Objetivo estimado')).toBeVisible();
+    await expect(page.getByText(/250\s€\/mensal\s·\s10\sanos/)).toBeVisible();
+  });
+});
