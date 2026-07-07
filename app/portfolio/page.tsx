@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import Fab from '@/components/ui/Fab';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
-import TransactionCard, { Transaction } from '@/components/ui/TransactionCard';
+import TransactionCard, { Transaction, TransactionType } from '@/components/ui/TransactionCard';
 import { SkeletonRow } from '@/components/ui/Skeleton';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
@@ -26,6 +26,13 @@ const SORT_OPTIONS = [
   { id: 'units',   label: 'sortUnits'   as const },
 ] as const;
 type SortKey = typeof SORT_OPTIONS[number]['id'];
+
+// "Impostos" groups both tax transaction types under a single filter chip.
+type TxFilterId = 'buy' | 'sell' | 'dividend' | 'deposit' | 'interest' | 'taxes';
+const TX_FILTER_TYPES: Record<TxFilterId, TransactionType[]> = {
+  buy: ['buy'], sell: ['sell'], dividend: ['dividend'], deposit: ['deposit'], interest: ['interest'],
+  taxes: ['withholding_tax', 'interest_tax'],
+};
 
 function todayIso() {
   const d = new Date();
@@ -56,6 +63,31 @@ export default function PortfolioPage() {
     }
     return arr;
   }, [assets, sortKey]);
+
+  // ── Histórico filters ────────────────────────────────────────────────────────
+  const [txFilters, setTxFilters] = useState<Set<TxFilterId>>(new Set());
+  const [historyDateFrom, setHistoryDateFrom] = useState('');
+  const [historyDateTo, setHistoryDateTo] = useState('');
+  const [historyDatePicker, setHistoryDatePicker] = useState<'from' | 'to' | null>(null);
+
+  function toggleTxFilter(id: TxFilterId) {
+    setTxFilters(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const filteredTxns = useMemo(() => {
+    const activeTypes = Array.from(txFilters).flatMap(id => TX_FILTER_TYPES[id]);
+    return txns.filter(tx => {
+      if (activeTypes.length > 0 && !activeTypes.includes(tx.type)) return false;
+      const txDate = tx.executedAt.slice(0, 10);
+      if (historyDateFrom && txDate < historyDateFrom) return false;
+      if (historyDateTo && txDate > historyDateTo) return false;
+      return true;
+    });
+  }, [txns, txFilters, historyDateFrom, historyDateTo]);
 
   // ── Buy sheet ────────────────────────────────────────────────────────────────
   const [buyOpen, setBuyOpen] = useState(false);
@@ -122,6 +154,15 @@ export default function PortfolioPage() {
     cashSettings.freeFundsAnnualRatePct,
     { horizonMonths: 12 },
   );
+
+  const TX_FILTER_LABELS: Record<TxFilterId, string> = {
+    buy: t.txcBuy, sell: t.txcSell, dividend: t.txcDiv, deposit: t.txcDeposit, interest: t.txcInterest,
+    taxes: `${t.txcWht} / ${t.txcInterestTax}`,
+  };
+
+  function fmtShortDate(iso: string) {
+    return new Date(iso).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short' });
+  }
 
   return (
     <div className="phone-shell" style={{ overflow: 'hidden' }}>
@@ -301,10 +342,53 @@ export default function PortfolioPage() {
         {/* Histórico tab */}
         {tab === 'history' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {txns.length > 0 && (
+              <>
+                {/* Filtro por tipo */}
+                <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                  {(Object.keys(TX_FILTER_TYPES) as TxFilterId[]).map(id => {
+                    const active = txFilters.has(id);
+                    return (
+                      <button key={id} onClick={() => toggleTxFilter(id)} style={{
+                        flexShrink: 0, padding: '6px 14px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+                        fontSize: 12, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                        background: active ? 'var(--primary-container)' : 'var(--surface-container)',
+                        color: active ? 'var(--on-primary-container)' : 'var(--on-surface-variant)',
+                      }}>{TX_FILTER_LABELS[id]}</button>
+                    );
+                  })}
+                </div>
+
+                {/* Filtro por intervalo de datas (opcional) */}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {([
+                    { key: 'from' as const, value: historyDateFrom, placeholder: t.historyDateFrom, clear: () => setHistoryDateFrom('') },
+                    { key: 'to'   as const, value: historyDateTo,   placeholder: t.historyDateTo,   clear: () => setHistoryDateTo('') },
+                  ]).map(({ key, value, placeholder, clear }) => (
+                    <button key={key} onClick={() => setHistoryDatePicker(key)} style={{
+                      display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
+                      fontSize: 12, fontWeight: 600, fontFamily: 'inherit', whiteSpace: 'nowrap',
+                      background: value ? 'var(--primary-container)' : 'var(--surface-container)',
+                      color: value ? 'var(--on-primary-container)' : 'var(--on-surface-variant)',
+                    }}>
+                      <span className="material-symbols-outlined" style={{ fontSize: 15 }}>event</span>
+                      {' '}{value ? `${placeholder}: ${fmtShortDate(value)}` : placeholder}
+                      {value && (
+                        <span onClick={e => { e.stopPropagation(); clear(); }} className="material-symbols-outlined" style={{ fontSize: 15 }}>close</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
             {txns.length === 0 && (
               <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>{t.noTransactions}</div>
             )}
-            {txns.map(tx => (
+            {txns.length > 0 && filteredTxns.length === 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>{t.noFilteredTransactions}</div>
+            )}
+            {filteredTxns.map(tx => (
               <TransactionCard
                 key={tx.id}
                 tx={tx}
@@ -558,6 +642,19 @@ export default function PortfolioPage() {
           confirmLabel={t.confirm}
           onClose={() => setDateDialogOpen(false)}
           onConfirm={iso => { setFormDate(iso); setDateDialogOpen(false); }}
+        />
+      )}
+
+      {historyDatePicker && (
+        <TradeDateDialog
+          value={(historyDatePicker === 'from' ? historyDateFrom : historyDateTo) || todayIso()}
+          lang={lang}
+          confirmLabel={t.confirm}
+          onClose={() => setHistoryDatePicker(null)}
+          onConfirm={iso => {
+            if (historyDatePicker === 'from') setHistoryDateFrom(iso); else setHistoryDateTo(iso);
+            setHistoryDatePicker(null);
+          }}
         />
       )}
 

@@ -8,6 +8,7 @@ export type Transaction = {
   avatar: string;
   type: TransactionType;
   dateText: string;
+  executedAt: string; // ISO datetime — used for date-range filtering, dateText is display-only
   total: string;
   totalColor: string;
   units?: string;
