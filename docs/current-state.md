@@ -1,34 +1,28 @@
 # Current state — financial calculations
 
-This is a technical snapshot of where portfolio-value math lives today, written as background for [dev-quality.md](dev-quality.md) (quality gates) and the new canonical portfolio-state layer (`lib/portfolio/portfolioState.ts`).
+This is a technical snapshot of where portfolio-value math lives today, written as background for [dev-quality.md](dev-quality.md) (quality gates) and the canonical portfolio-state layer (`lib/portfolio/portfolioState.ts`).
 
 ## The problem: duplicated valuation logic
 
-There is no single place that answers "what is this user's portfolio worth right now." At least three independent implementations compute overlapping numbers, from different inputs, with different fallback rules:
+There was no single place that answered "what is this user's portfolio worth right now." Three independent implementations computed overlapping numbers, from different inputs, with different fallback rules. **Dashboard and Portfolio have since been migrated to the shared layer (see "Current status" below); the recommendation engine has not.**
 
-### 1. Dashboard — [lib/portfolioMetrics.ts](../lib/portfolioMetrics.ts)
+### 1. Dashboard — migrated ✅
 
-`calcTotalValue(holdings, getPrice)` and `calcTotalInvested(holdings)` operate on a minimal `{ ticker, units, avg_price }` shape. Used by [app/dashboard/page.tsx](../app/dashboard/page.tsx):
+Previously used `calcTotalValue(holdings, getPrice)` / `calcTotalInvested(holdings)` from [lib/portfolioMetrics.ts](../lib/portfolioMetrics.ts) directly, which fell back from live price to `avg_price` silently with no signal when a quote was missing.
 
-```ts
-const totalValue    = calcTotalValue(holdings, ticker => quotes[ticker]?.price);
-const totalInvested = calcTotalInvested(holdings);
-```
+[app/dashboard/page.tsx](../app/dashboard/page.tsx) now calls `buildPortfolioState()` (via [lib/portfolio/portfolioStateAdapters.ts](../lib/portfolio/portfolioStateAdapters.ts)) and reads `marketValue` / `costBasis` / `unrealizedGainPct` off the result. `lib/portfolioMetrics.ts` itself is untouched and still used for the performance chart series and annualized-return math on `app/dashboard/performance`, which `portfolioState.ts` doesn't model.
 
-Live price falls back to `avg_price` silently when a quote is missing — no signal is raised when that happens.
+### 2. Portfolio tab — migrated ✅
 
-### 2. Portfolio tab — [lib/hooks/usePortfolioData.ts](../lib/hooks/usePortfolioData.ts) + [app/portfolio/page.tsx](../app/portfolio/page.tsx)
+[lib/hooks/usePortfolioData.ts](../lib/hooks/usePortfolioData.ts) fetches holdings and quotes and now maps them into the UI-shaped `Asset` type (`value`, `cost`, `dayChange`, `gainPct`, `gain`) using `buildPortfolioState()` for `value`/`cost`/`gainPct`, instead of the inline `price ?? avg_price` fallback it used to duplicate. [app/portfolio/page.tsx](../app/portfolio/page.tsx) itself needed no changes — it already derived its totals by summing over `assets`, so those sums now reflect the canonical calculation automatically.
 
-`usePortfolioData` fetches holdings and quotes itself and maps them into a UI-shaped `Asset` type (`value`, `cost`, `dayChange`, `gainPct`, `gain`), duplicating the same `price ?? avg_price` fallback inline:
+`dayChange` is intentionally **not** sourced from `portfolioState.ts` — it's a live intraday quote concern (`quote.change`), not a state-of-holdings concern, and is still computed the same way as before in both Dashboard and `usePortfolioData`. Dividends/transactions history (used for the dividends and history tabs) also still comes straight from `transactions`, unchanged — `portfolioState.ts` only reports aggregate dividend totals, not a per-transaction breakdown.
 
-```ts
-const price = quote?.price ?? h.avg_price;
-const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
-```
+**Design choice — holdings snapshot only, no transaction replay:** both call sites pass `transactions: []` to `buildPortfolioState()`, so it derives `marketValue`/`costBasis` from the `holdings` table snapshot rather than replaying full buy/sell history. This matches exactly what both pages did before (they already read `avg_price` straight from `holdings`, which `useTrade.ts` keeps updated on every trade) and keeps Dashboard and Portfolio guaranteed-consistent with each other. It's also the safer choice: `usePortfolioData`'s `removeTxn` deletes a transaction row without touching `holdings`, so `holdings` and `transactions` can drift apart — feeding transactions into the ledger replay here could silently produce different totals than the `holdings` table shows, which would be a behavior change, not just a refactor. Wiring the ledger-replay path in is a possible follow-up once that drift is addressed.
 
-The page then re-derives portfolio totals from that array (`assets.reduce((sum, a) => sum + a.value, 0)`, etc.) rather than from a shared source. Dividends and transactions are loaded and shaped separately in the same hook, with no realized-gain or net-of-tax dividend calculation — the page only sums raw dividend `amount`.
+### 3. Recommendation engine — not migrated
 
-### 3. Recommendation engine — [lib/recommendationEngine.ts](../lib/recommendationEngine.ts)
+[lib/recommendationEngine.ts](../lib/recommendationEngine.ts)
 
 `recommend()` computes `totalPortfolioValue` from `HoldingSnapshot[]` using **cost**, not market value:
 
@@ -36,16 +30,16 @@ The page then re-derives portfolio totals from that array (`assets.reduce((sum, 
 const totalPortfolioValue = holdings.reduce((s, h) => s + h.units * h.avgPrice, 0);
 ```
 
-This is a third, independent definition of "portfolio value" — it never looks at live quotes at all, so current weights used to detect "overweight" positions are computed against cost basis rather than market value. On a position with a large unrealized gain or loss, this can misclassify it as under/overweight relative to its true market weight.
+This is still an independent, un-migrated definition of "portfolio value" — it never looks at live quotes at all, so current weights used to detect "overweight" positions are computed against cost basis rather than market value. On a position with a large unrealized gain or loss, this can misclassify it as under/overweight relative to its true market weight. **Intentionally left alone** — migrating the recommendation engine changes its scoring behavior, not just where the arithmetic lives, so it's out of scope until it can be reviewed on its own.
 
-## Consequences
+## Consequences (remaining)
 
-- No single, tested definition of market value, cost basis, average cost, or realized/unrealized gain.
-- No consistent handling of missing quotes (silent fallback in two places, no fallback at all — i.e. cost-basis-only — in the third).
-- No modeling of cash balance (deposits, interest, taxes) as part of portfolio value anywhere.
-- No dividend gross/net/withholding-tax split; dividends are just summed as raw transaction amounts.
-- No data-quality signal when a ticker, currency, or price is missing or a transaction is malformed.
+- The recommendation engine still values holdings at cost, not market value — its notion of "current weight" can diverge from Dashboard/Portfolio's.
+- No dividend gross/net/withholding-tax split surfaces in the UI yet; Dashboard/Portfolio still sum raw dividend `amount` for the dividends tab and yield figure (`portfolioState.ts` computes the gross/net/tax split, it's just not read by these pages).
+- `dataQualityWarnings` are only surfaced as a dev-console warning (`logPortfolioStateWarnings`) — no in-app UI for them yet.
 
-## Direction
+## Current status
 
-[lib/portfolio/portfolioState.ts](../lib/portfolio/portfolioState.ts) introduces `buildPortfolioState()`, a single pure function that takes holdings + transactions + latest quotes and returns a canonical `PortfolioState` (market value, cost basis, average cost, realized/unrealized gain, dividend gross/net/tax split, cash balance, allocations, and explicit data-quality warnings instead of silent fallbacks). It does not yet replace any of the three call sites above — that migration is intentionally out of scope for this change so the new layer can be reviewed and tested in isolation first.
+[lib/portfolio/portfolioState.ts](../lib/portfolio/portfolioState.ts) provides `buildPortfolioState()`, a single pure function that takes holdings + transactions + latest quotes and returns a canonical `PortfolioState` (market value, cost basis, average cost, realized/unrealized gain, dividend gross/net/tax split, cash balance, allocations, and explicit data-quality warnings instead of silent fallbacks). [lib/portfolio/portfolioStateAdapters.ts](../lib/portfolio/portfolioStateAdapters.ts) adapts the project's existing DB-row/quote shapes into its input types.
+
+**Dashboard and Portfolio both consume it now** (see above). The recommendation engine does not, and updating it is a separate, deliberately out-of-scope change.
