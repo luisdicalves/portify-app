@@ -7,7 +7,9 @@ import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
 import { getPlan } from '@/lib/db/plans';
-import { calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
+import { buildPortfolioSeries, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
+import { buildPortfolioState } from '@/lib/portfolio/portfolioState';
+import { holdingsToPortfolioInput, quotesToLatestQuotes, logPortfolioStateWarnings, DEFAULT_CURRENCY } from '@/lib/portfolio/portfolioStateAdapters';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
@@ -78,9 +80,17 @@ export default function DashboardPage() {
     })();
   }, [holdings, tf]);
 
-  const totalValue = calcTotalValue(holdings, ticker => quotes[ticker]?.price);
-  const totalInvested = calcTotalInvested(holdings);
-  const totalReturnPct = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+  const portfolioState = buildPortfolioState({
+    holdings: holdingsToPortfolioInput(holdings),
+    transactions: [],
+    latestQuotes: quotesToLatestQuotes(quotes),
+    userCurrency: DEFAULT_CURRENCY,
+  });
+  logPortfolioStateWarnings('dashboard', portfolioState.dataQualityWarnings);
+
+  const totalValue = portfolioState.marketValue;
+  const totalInvested = portfolioState.costBasis;
+  const totalReturnPct = portfolioState.unrealizedGainPct * 100;
   const dayChangeValue = holdings.reduce((sum, h) => {
     const q = quotes[h.ticker];
     if (!q) return sum;

@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
 import { getTransactions, deleteTransaction as dbDeleteTransaction } from '@/lib/db/transactions';
-import { fetchQuote } from '@/lib/marketApi';
+import { fetchQuote, type Quote } from '@/lib/marketApi';
 import { getUser } from '@/lib/hooks/useUser';
+import { buildPortfolioState } from '@/lib/portfolio/portfolioState';
+import { holdingsToPortfolioInput, quotesToLatestQuotes, logPortfolioStateWarnings, DEFAULT_CURRENCY } from '@/lib/portfolio/portfolioStateAdapters';
 import type { Transaction } from '@/components/ui/TransactionCard';
 
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -51,17 +53,30 @@ export function usePortfolioData(userId: string | undefined, lang: string) {
 
     const holdings = await getHoldings(getClient(), u.id);
     const quotes = await Promise.all(holdings.map(h => fetchQuote(h.ticker)));
+    const quoteByTicker: Record<string, Quote | undefined> = {};
+    holdings.forEach((h, i) => { quoteByTicker[h.ticker] = quotes[i] ?? undefined; });
 
-    setAssets(holdings.map((h, i) => {
-      const quote = quotes[i];
-      const price = quote?.price ?? h.avg_price;
-      const gainPct = h.avg_price > 0 ? (price - h.avg_price) / h.avg_price : 0;
+    const state = buildPortfolioState({
+      holdings: holdingsToPortfolioInput(holdings),
+      transactions: [],
+      latestQuotes: quotesToLatestQuotes(quoteByTicker),
+      userCurrency: DEFAULT_CURRENCY,
+    });
+    logPortfolioStateWarnings('portfolio', state.dataQualityWarnings);
+    const holdingStateByTicker = new Map(state.holdings.map(h => [h.ticker, h]));
+
+    setAssets(holdings.map(h => {
+      const quote = quoteByTicker[h.ticker];
+      const hs = holdingStateByTicker.get(h.ticker);
+      const value = hs?.marketValue ?? h.units * h.avg_price;
+      const cost = hs?.costBasis ?? h.units * h.avg_price;
+      const gainPct = hs?.unrealizedGainPct ?? 0;
       return {
         ticker: h.ticker,
         letter: h.ticker.charAt(0),
         units: h.units,
-        value: h.units * price,
-        cost: h.units * h.avg_price,
+        value,
+        cost,
         dayChange: h.units * (quote?.change ?? 0),
         gainPct,
         gain: gainPct >= 0,
