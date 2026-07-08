@@ -2,6 +2,8 @@
 // applied to real fundamentals from Finnhub's free tier (US-listed tickers only;
 // non-US exchanges aren't covered by the free plan, same restriction as /api/quote).
 
+import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
+
 const FINNHUB_SUFFIX_MAP: Record<string, string> = { US: '' };
 
 export function toFinnhubSymbol(ticker: string): string {
@@ -10,6 +12,19 @@ export function toFinnhubSymbol(ticker: string): string {
   const mapped = FINNHUB_SUFFIX_MAP[suffix.toUpperCase()];
   return mapped === undefined ? ticker : `${base}${mapped}`;
 }
+
+// Coverage signaling — see docs/model-governance.md "score vs confidence vs coverageStatus".
+// coverageStatus reflects how much of the fundamentals this report's score relies on
+// were actually available; coverageReason is always set and explains why (a "why", not
+// only an excuse for gaps — e.g. US_EQUITY marks the well-covered common case too).
+export type RiskCoverageStatus = 'full' | 'partial' | 'unavailable';
+export type RiskCoverageReason =
+  | 'US_EQUITY'         // ticker is US-listed — Finnhub free tier's supported case
+  | 'ETF_LIMITED_DATA'  // reserved for callers with asset-class context (see docs/model-governance.md); not set by fetchRiskReport itself
+  | 'NON_US_EQUITY'     // ticker isn't US-listed — known Finnhub free-tier gap
+  | 'NO_FUNDAMENTALS'   // US-listed but Finnhub returned too few of the fields this model scores on
+  | 'API_ERROR'         // one or more upstream calls (recommendations/earnings) failed or degraded
+  | 'UNKNOWN';
 
 type Tag = 'LOCK' | 'FLEX' | 'WATCH';
 
@@ -48,6 +63,16 @@ export type RiskReport = {
     savingsPlanSuitable: boolean;
   };
   footer: { tags: string[]; source: string; nextEarnings: string | null };
+  /**
+   * How much of the fundamentals this report's score relies on were actually
+   * available. Does NOT cover the "no report at all" case — fetchRiskReport
+   * still returns null for that (missing API key, failed fetch, unknown
+   * ticker) so existing null-checking callers keep working unchanged.
+   */
+  coverageStatus: RiskCoverageStatus;
+  coverageReason: RiskCoverageReason;
+  /** Governance/versioning metadata — see docs/model-governance.md. Additive field, safe to ignore. */
+  meta?: ModelRunMeta;
 };
 
 export function band(value: number | null | undefined, thresholds: [number, number][]): number {
@@ -96,6 +121,42 @@ const T = {
   },
 };
 
+// Core fundamentals this model's score is actually built from (see the
+// valuation/health/growth pillars below). Coverage is measured against this
+// list, not the full Finnhub payload — extra unused fields don't count.
+const CORE_FUNDAMENTAL_FIELDS = [
+  'peTTM', 'psTTM', 'evRevenueTTM',
+  'currentRatioAnnual', 'totalDebt/totalEquityAnnual', 'roeTTM', 'operatingMarginTTM',
+  'revenueGrowthTTMYoy', 'epsGrowthTTMYoy',
+] as const;
+
+function isPresent(v: unknown): boolean {
+  return v !== undefined && v !== null && !(typeof v === 'number' && Number.isNaN(v));
+}
+
+function classifyRiskCoverage(
+  ticker: string,
+  m: Record<string, unknown>,
+  hadApiErrors: boolean,
+): { status: RiskCoverageStatus; reason: RiskCoverageReason; coverageRatio: number } {
+  const available = CORE_FUNDAMENTAL_FIELDS.filter(f => isPresent(m[f]));
+  const coverageRatio = Math.round((available.length / CORE_FUNDAMENTAL_FIELDS.length) * 100) / 100;
+
+  const status: RiskCoverageStatus = coverageRatio >= 0.8 ? 'full' : coverageRatio > 0 ? 'partial' : 'unavailable';
+
+  const [, suffix] = ticker.split('.');
+  const isUS = !suffix || suffix.toUpperCase() === 'US';
+
+  let reason: RiskCoverageReason;
+  if (!isUS) reason = 'NON_US_EQUITY';
+  else if (status === 'full') reason = 'US_EQUITY';
+  else if (hadApiErrors) reason = 'API_ERROR';
+  else if (status === 'partial' || status === 'unavailable') reason = 'NO_FUNDAMENTALS';
+  else reason = 'UNKNOWN';
+
+  return { status, reason, coverageRatio };
+}
+
 export async function fetchRiskReport(ticker: string, lang: 'pt' | 'en'): Promise<RiskReport | null> {
   const apiKey = process.env.FINNHUB_API_KEY;
   if (!apiKey) return null;
@@ -119,6 +180,19 @@ export async function fetchRiskReport(ticker: string, lang: 'pt' | 'en'): Promis
   const m = metricData.metric ?? {};
   const quarterly = metricData.series?.quarterly ?? {};
   if (!profile.name) return null;
+
+  const hadApiErrors = !recRes.ok || !earningsRes.ok;
+  const { status: coverageStatus, reason: coverageReason, coverageRatio } = classifyRiskCoverage(ticker, m, hadApiErrors);
+
+  const metaWarnings: string[] = [];
+  if (coverageStatus === 'partial') {
+    metaWarnings.push(`Cobertura parcial de fundamentais (${Math.round(coverageRatio * 100)}%) — score calculado apenas com os dados disponíveis.`);
+  } else if (coverageStatus === 'unavailable') {
+    metaWarnings.push('Fundamentais insuficientes para este ticker — score não é fiável.');
+  }
+  if (hadApiErrors) {
+    metaWarnings.push('Dados de recomendações de analistas e/ou resultados trimestrais indisponíveis; usado fallback neutro.');
+  }
 
   const toEur = (usd: number) => usd * eurRate;
 
@@ -261,5 +335,16 @@ export async function fetchRiskReport(ticker: string, lang: 'pt' | 'en'): Promis
       source: tx.sourceFootnote,
       nextEarnings: null,
     },
+    coverageStatus,
+    coverageReason,
+    meta: createModelRunMeta({
+      modelName: 'riskScore',
+      input: { ticker, lang },
+      assumptions: [
+        'Câmbio USD→EUR aplicado à taxa obtida no momento do pedido (não fixado à data das transações).',
+        'Métricas fundamentais em falta não são inventadas — thresholds tratam-nas como neutras via band().',
+      ],
+      warnings: metaWarnings,
+    }),
   };
 }

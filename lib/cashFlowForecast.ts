@@ -17,6 +17,8 @@
  *   buildCashFlowForecast(holdings, history, cash, rate, opts) → ForecastResult
  */
 
+import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
@@ -34,6 +36,8 @@ export interface ForecastResult {
   dividends:        ForecastDividend[];  // ordenados por expectedDate asc
   interestMonthly:  number;             // juro mensal esperado de fundos livres
   interestAnnual:   number;             // juro anual esperado
+  /** Governance/versioning metadata — see docs/model-governance.md. Additive field, safe to ignore. */
+  meta?:            ModelRunMeta;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -160,5 +164,24 @@ export function buildCashFlowForecast(
   const interestMonthly = parseFloat(((uninvestedCash * annualRate) / 12).toFixed(2));
   const interestAnnual  = parseFloat((uninvestedCash * annualRate).toFixed(2));
 
-  return { dividends, interestMonthly, interestAnnual };
+  const warnings: string[] = [];
+  const lowConfidenceCount = dividends.filter(d => d.confidence === 'low').length;
+  if (lowConfidenceCount > 0) {
+    warnings.push(`${lowConfidenceCount} previsão(ões) de dividendo baseiam-se num único pagamento histórico (confiança baixa).`);
+  }
+
+  return {
+    dividends,
+    interestMonthly,
+    interestAnnual,
+    meta: createModelRunMeta({
+      modelName: 'cashFlowForecast',
+      input: { holdings, history, uninvestedCash, freeFundsAnnualRatePct, opts },
+      assumptions: [
+        'Periodicidade e valor futuro dos dividendos assumidos iguais ao padrão histórico observado; sem garantia de manutenção pela empresa emissora.',
+        'WHT (retenção na fonte) estimada por sufixo do ticker/mercado de origem — ver WHT_BY_SUFFIX.',
+      ],
+      warnings,
+    }),
+  };
 }

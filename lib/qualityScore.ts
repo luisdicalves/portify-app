@@ -21,6 +21,8 @@
  *   qualityScoreFromMetrics(metrics) → number (0–100, arredondado)
  */
 
+import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
@@ -48,12 +50,25 @@ export interface StockMetrics {
   currentPrice?:             number;   // para calcular posição no range
 }
 
+export type QualityConfidence = 'high' | 'medium' | 'low';
+
 export interface ScoreBreakdown {
   health:      number;  // 0–100
   growth:      number;  // 0–100
   profitability: number; // 0–100
   stability:   number;  // 0–100
   total:       number;  // 0–100 ponderado
+  /**
+   * How much of this input's fields are actually informing the score above —
+   * missing fields still count as neutral (50) rather than penalizing, so the
+   * total alone can't tell you that. See docs/model-governance.md.
+   */
+  confidence:      QualityConfidence;
+  missingMetrics:  string[];
+  availableMetrics: string[];
+  coverageRatio:   number; // 0–1
+  /** Governance/versioning metadata — see docs/model-governance.md. Additive field, safe to ignore. */
+  meta?:           ModelRunMeta;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -177,6 +192,30 @@ const WEIGHTS = {
   stability:    0.10,
 } as const;
 
+// All optional StockMetrics fields — coverage is measured against this full
+// list, not just the ones a given dimension happens to use, so coverageRatio
+// reflects overall input completeness rather than any one pillar's needs.
+const ALL_METRIC_FIELDS: (keyof StockMetrics)[] = [
+  'currentRatioAnnual', 'debtToEquityAnnual', 'freeCashFlowPerShareAnnual',
+  'revenueGrowthTTMYoy', 'epsGrowthTTMYoy', 'revenueGrowth3Y',
+  'roeTTM', 'netProfitMarginTTM', 'grossMarginTTM',
+  'beta', '52WeekHigh', '52WeekLow', 'currentPrice',
+];
+
+function isPresent(v: unknown): boolean {
+  return v !== undefined && v !== null && !(typeof v === 'number' && Number.isNaN(v));
+}
+
+function assessCoverage(metrics: StockMetrics): { confidence: QualityConfidence; missingMetrics: string[]; availableMetrics: string[]; coverageRatio: number } {
+  const availableMetrics = ALL_METRIC_FIELDS.filter(f => isPresent(metrics[f]));
+  const missingMetrics = ALL_METRIC_FIELDS.filter(f => !isPresent(metrics[f]));
+  const coverageRatio = Math.round((availableMetrics.length / ALL_METRIC_FIELDS.length) * 100) / 100;
+
+  const confidence: QualityConfidence = coverageRatio >= 0.75 ? 'high' : coverageRatio >= 0.45 ? 'medium' : 'low';
+
+  return { confidence, missingMetrics, availableMetrics, coverageRatio };
+}
+
 /**
  * Calcula o qualityScore completo com decomposição por dimensão.
  * Útil para debug e para mostrar breakdown na UI de detalhe de ativo.
@@ -194,7 +233,22 @@ export function calcQualityScore(metrics: StockMetrics): ScoreBreakdown {
     stability    * WEIGHTS.stability,
   );
 
-  return { health, growth, profitability, stability, total };
+  const { confidence, missingMetrics, availableMetrics, coverageRatio } = assessCoverage(metrics);
+
+  return {
+    health, growth, profitability, stability, total,
+    confidence, missingMetrics, availableMetrics, coverageRatio,
+    meta: createModelRunMeta({
+      modelName: 'qualityScore',
+      input: metrics,
+      assumptions: [
+        'Métricas em falta contam como neutras (50) em vez de penalizar — ver NEUTRAL em lib/qualityScore.ts.',
+      ],
+      warnings: missingMetrics.length > 0
+        ? [`${missingMetrics.length}/${ALL_METRIC_FIELDS.length} métricas em falta (confiança ${confidence}): ${missingMetrics.join(', ')}.`]
+        : [],
+    }),
+  };
 }
 
 /**
