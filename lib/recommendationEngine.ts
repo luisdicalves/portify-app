@@ -11,6 +11,12 @@
  * classes que o utilizador escolheu — antes o orçamento de classes excluídas
  * simplesmente desaparecia). Também alinha goalCompatibility e o cálculo de
  * subpesado/sobrepesado com o texto do modelo.
+ *
+ * "Valor actual" de uma posição (totalPortfolioValue, currentWeight,
+ * OutOfPlanHolding.value) usa HoldingSnapshot.marketValue quando o chamador o
+ * fornece (ver holdingValue()), com fallback para units × avgPrice — alinhado
+ * com Dashboard/Portfolio via portfolioState.ts (ver docs/current-state.md).
+ * matchScore/qualityScore/finalScore e o blend 60/40 não são afectados.
  */
 
 import type { CandidateAsset, AssetClass } from '@/lib/assetUniverse';
@@ -41,7 +47,7 @@ export interface Recommendation {
 export interface OutOfPlanHolding {
   ticker:     string;
   assetClass: AssetClass;
-  value:      number; // units × avgPrice
+  value:      number; // marketValue when available, else units × avgPrice — see holdingValue()
 }
 
 export interface RecommendationResult {
@@ -61,6 +67,26 @@ export interface HoldingSnapshot {
   units:      number;
   avgPrice:   number;
   assetClass?: AssetClass; // opcional — usado para separar "classes ativas" (Passo 5) e detectar holdings fora do plano
+  sector?:    string;      // opcional — aceite para alinhar a shape com portfolioState.ts; não consumido pelo motor hoje
+  /**
+   * Valor de mercado actual da posição (units × preço de cotação), quando o
+   * chamador o tiver disponível — tipicamente via lib/portfolio/portfolioState.ts.
+   * Quando ausente, o motor cai para units × avgPrice (custo) — ver holdingValue().
+   */
+  marketValue?: number;
+}
+
+/**
+ * Valor financeiro actual de uma posição para efeitos de peso na carteira.
+ * Usa marketValue quando disponível e finito; caso contrário cai para
+ * units × avgPrice (custo), preservando o comportamento anterior a esta
+ * migração para chamadores que ainda não populam marketValue.
+ */
+function holdingValue(h: HoldingSnapshot): number {
+  if (typeof h.marketValue === 'number' && Number.isFinite(h.marketValue)) {
+    return Math.max(0, h.marketValue);
+  }
+  return Math.max(0, h.units * h.avgPrice);
 }
 
 export interface RecommendOptions {
@@ -73,6 +99,12 @@ export interface RecommendOptions {
   preferredClasses?: AssetClass[];  // default: todas as 3 — respeitado por calcPlan (zera + renormaliza)
   maxPerClass?:     number;         // default 3
   maxPerSector?:    number;         // default 2 (só para stocks)
+  /**
+   * Warnings já conhecidos pelo chamador (ex: dataQualityWarnings de
+   * buildPortfolioState()) a incluir em meta.warnings. Puramente informativo —
+   * não é I/O, apenas dados já calculados a montante pelo chamador.
+   */
+  externalWarnings?: string[];
 }
 
 const ALL_CLASSES: AssetClass[] = ['stock', 'etf', 'bond_etf'];
@@ -308,10 +340,10 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
   const activeHoldings   = holdings.filter(h => !h.assetClass || preferredClasses.includes(h.assetClass));
   const outOfPlanHoldings: OutOfPlanHolding[] = holdings
     .filter(h => h.assetClass && !preferredClasses.includes(h.assetClass))
-    .map(h => ({ ticker: h.ticker, assetClass: h.assetClass as AssetClass, value: h.units * h.avgPrice }));
+    .map(h => ({ ticker: h.ticker, assetClass: h.assetClass as AssetClass, value: holdingValue(h) }));
 
   // Valor total da carteira, apenas classes activas (Camada 3 · Passo 5)
-  const totalPortfolioValue = activeHoldings.reduce((s, h) => s + h.units * h.avgPrice, 0);
+  const totalPortfolioValue = activeHoldings.reduce((s, h) => s + holdingValue(h), 0);
 
   // Mapa ticker → currentWeight (só holdings activos entram no denominador)
   const holdingMap = new Map<string, HoldingSnapshot>();
@@ -348,7 +380,7 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
 
       const holding = holdingMap.get(item.asset.ticker);
       if (holding && totalPortfolioValue > 0) {
-        const currentW = (holding.units * holding.avgPrice) / totalPortfolioValue;
+        const currentW = holdingValue(holding) / totalPortfolioValue;
         const approxTargetW = alloc[cls] / maxPerClass;
         if (currentW > approxTargetW * 1.1) continue; // sobrepesado — pular, próximo da lista substitui
       }
@@ -387,7 +419,7 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
       const holding        = holdingMap.get(item.asset.ticker);
       const alreadyOwned    = !!holding;
       const currentWeight   = (holding && totalPortfolioValue > 0)
-        ? (holding.units * holding.avgPrice) / totalPortfolioValue
+        ? holdingValue(holding) / totalPortfolioValue
         : 0;
 
       // targetWeight = suggestedAmount / monthly_amount (Camada 3 · Passo 4)
@@ -453,7 +485,7 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
     }
   }
 
-  const metaWarnings: string[] = [];
+  const metaWarnings: string[] = [...(opts.externalWarnings ?? [])];
   if (paceAlert) metaWarnings.push('Ritmo de contribuição insuficiente para atingir o objetivo no horizonte definido.');
   if (outOfPlanHoldings.length > 0) metaWarnings.push(`${outOfPlanHoldings.length} holding(s) em classes fora de preferredClasses, excluído(s) do plano ativo.`);
 
@@ -470,11 +502,11 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
       input: {
         profile, preferredSectors, monthlyAmount, goalAmount, preferredClasses,
         universeSize: universe.length,
-        holdingsSignature: holdings.map(h => `${h.ticker}:${h.units}:${h.avgPrice}`).sort().join(','),
+        holdingsSignature: holdings.map(h => `${h.ticker}:${h.units}:${h.avgPrice}:${h.marketValue ?? ''}`).sort().join(','),
       },
       assumptions: [
         'finalScore = matchScore × 0.6 + qualityScore × 0.4 (v3.0) — inalterado por esta tarefa.',
-        'totalPortfolioValue usa avgPrice (custo), não marketValue — ver docs/current-state.md.',
+        'totalPortfolioValue e currentWeight usam HoldingSnapshot.marketValue quando disponível (ver holdingValue()), com fallback para units × avgPrice — ver docs/current-state.md.',
       ],
       warnings: metaWarnings,
     }),

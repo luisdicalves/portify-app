@@ -8,6 +8,10 @@ import type { UserProfile } from '@/lib/planCalculator';
 import { fetchRiskReport } from '@/lib/riskScore';
 import { calcQualityScoreFromReport } from '@/lib/qualityScore';
 import { checkRateLimit } from '@/lib/rateLimiter';
+import { getQuote } from '@/lib/marketData';
+import { getCached } from '@/lib/cache';
+import { buildPortfolioState } from '@/lib/portfolio/portfolioState';
+import { holdingsToPortfolioInput, quotesToLatestQuotes, DEFAULT_CURRENCY } from '@/lib/portfolio/portfolioStateAdapters';
 
 // ── Enum parsers ──────────────────────────────────────────────────────────────
 function parseEnum<T extends string>(value: string | null | undefined, allowed: readonly T[], fallback: T): T {
@@ -34,6 +38,10 @@ function parseAssetClasses(value: string[] | null | undefined): AssetClass[] {
 // this prevents burst abuse of the rate limiter.
 const RATE_LIMIT_MAX    = 2;
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000; // 1 hour in ms
+
+// Same cache key/TTL as app/api/quote/route.ts — intentional, so both routes
+// share the same cached quote instead of each keeping their own copy.
+const QUOTE_TTL_SECONDS = 45;
 
 // Stable hash of the inputs that determine the recommendation output.
 // When profile or holdings change the ETag changes → browser re-fetches.
@@ -120,6 +128,35 @@ export async function GET(req: Request) {
   try {
     const universe = await getUniverse();
 
+    // ── Valor de mercado das posições ─────────────────────────────────────────
+    // Mesma semântica conceptual de Dashboard/Portfolio: holdings snapshot +
+    // cotações mais recentes, sem replay de transactions (ver
+    // lib/hooks/usePortfolioData.ts / app/dashboard/page.tsx). Uma falha de
+    // cotação isolada não deve rebentar o endpoint inteiro — cai para null e
+    // buildPortfolioState() usa o fallback de average cost, tal como as outras
+    // páginas já fazem.
+    const finnhubApiKey = process.env.FINNHUB_API_KEY;
+    const quoteEntries = await Promise.all(
+      holdingsRaw.map(async (h): Promise<readonly [string, { price: number } | null]> => {
+        try {
+          const quote = await getCached(`quote:${h.ticker}`, QUOTE_TTL_SECONDS, () => getQuote(h.ticker, finnhubApiKey));
+          return [h.ticker, quote] as const;
+        } catch (err) {
+          console.error(`[/api/recommendations] quote fetch failed for ${h.ticker}`, err);
+          return [h.ticker, null] as const;
+        }
+      })
+    );
+    const quoteByTicker: Record<string, { price: number } | null> = Object.fromEntries(quoteEntries);
+
+    const portfolioState = buildPortfolioState({
+      holdings: holdingsToPortfolioInput(holdingsRaw),
+      transactions: [],
+      latestQuotes: quotesToLatestQuotes(quoteByTicker),
+      userCurrency: DEFAULT_CURRENCY,
+    });
+    const marketValueByTicker = new Map(portfolioState.holdings.map(h => [h.ticker, h.marketValue]));
+
     // Ticker → assetClass a partir do universo completo (ainda não filtrado) —
     // usado para saber se um holding existente pertence a uma classe fora do
     // plano (preferredClasses), independentemente de o filtro duro o ter excluído.
@@ -127,6 +164,7 @@ export async function GET(req: Request) {
     const holdings: HoldingSnapshot[] = holdingsBase.map(h => ({
       ...h,
       assetClass: tickerClassMap.get(h.ticker),
+      marketValue: marketValueByTicker.get(h.ticker),
     }));
 
     const filtered = filterUniverseForUser(universe, {
@@ -193,6 +231,7 @@ export async function GET(req: Request) {
       preferredClasses,
       maxPerClass:      3,
       maxPerSector:     2,
+      externalWarnings: portfolioState.dataQualityWarnings.map(w => w.message),
     });
 
     // ETag changes whenever profile or holdings change → browser re-fetches automatically.

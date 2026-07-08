@@ -321,3 +321,156 @@ describe('recommend — goalReached / paceAlert (v3.0)', () => {
     expect(result.paceAlert).toBe(true);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Market-value-aware weights — recommendationEngine now weighs holdings by
+// HoldingSnapshot.marketValue (from portfolioState.ts) when available, instead
+// of always deriving "current value" from units × avgPrice (cost).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('recommend — market value weights', () => {
+  it('1. weighs a holding by marketValue (200), not avgPrice × units (100), when both are set', () => {
+    const opts: RecommendOptions = {
+      universe: [makeStock('AAA.US', 'tech', 90), makeStock('BBB.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+      holdings: [
+        // Equal cost (100 each) but AAA is worth 3x as much at market price.
+        { ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 300 },
+        { ticker: 'BBB.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 100 },
+      ],
+    };
+    const result = recommend(opts);
+    const aaa = result.recommendations.find(r => r.asset.ticker === 'AAA.US');
+    const bbb = result.recommendations.find(r => r.asset.ticker === 'BBB.US');
+
+    // By cost both would be 50/50 (currentWeight 0.5 each). By market, total is
+    // 400 → AAA 75%, BBB 25%. AAA is now the overweighted one, not balanced.
+    if (aaa) expect(aaa.currentWeight).toBeCloseTo(0.75, 5);
+    if (bbb) expect(bbb.currentWeight).toBeCloseTo(0.25, 5);
+  });
+
+  it('2. treats a holding as overweighted by market value even though it looked balanced by cost', () => {
+    const opts: RecommendOptions = {
+      universe: [makeStock('AAA.US', 'tech', 90), makeStock('BBB.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 100 },
+        { ticker: 'BBB.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 900 }, // 9x gain — dominates by market
+      ],
+    };
+    const result = recommend(opts);
+    const bbb = result.recommendations.find(r => r.asset.ticker === 'BBB.US');
+
+    // By cost, BBB would be exactly 50% (balanced). By market it's 90% of the
+    // portfolio — clearly overweighted, so it must not be recommended.
+    expect(bbb).toBeUndefined();
+  });
+
+  it('3. does not offer a reinforce recommendation for a holding overweighted purely by market appreciation', () => {
+    const opts: RecommendOptions = {
+      universe: [makeStock('AAA.US', 'tech', 90), makeStock('BBB.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 100 },
+        { ticker: 'BBB.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 900 },
+      ],
+    };
+    const result = recommend(opts);
+    const reinforceTickers = result.recommendations.filter(r => r.type === 'reinforce').map(r => r.asset.ticker);
+    expect(reinforceTickers).not.toContain('BBB.US');
+  });
+
+  it('4. falls back to units × avgPrice when marketValue is absent (unchanged prior behavior)', () => {
+    // Same shape as the pre-existing "subpesado" scenario, without marketValue set.
+    const opts: RecommendOptions = {
+      universe: [makeStock('AAA.US', 'tech', 90), makeStock('BBB.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100 },
+        { ticker: 'BBB.US', units: 1, avgPrice: 1900 },
+      ],
+    };
+    const result = recommend(opts);
+    const bbb = result.recommendations.find(r => r.asset.ticker === 'BBB.US');
+    // 1900/(100+1900) = 95% by cost — same overweighted outcome as before this migration.
+    expect(bbb).toBeUndefined();
+  });
+
+  it('5. still generates "new" recommendations for an empty portfolio', () => {
+    const result = recommend({ ...OPTS, holdings: [] });
+    expect(result.recommendations.length).toBeGreaterThan(0);
+    result.recommendations.forEach(r => expect(r.type).toBe('new'));
+  });
+
+  it('6. a holding with marketValue 0 does not produce NaN or Infinity', () => {
+    const opts: RecommendOptions = {
+      universe: [makeStock('AAA.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+      holdings: [{ ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 0 }],
+    };
+    const result = recommend(opts);
+    result.recommendations.forEach(r => {
+      expect(Number.isFinite(r.currentWeight)).toBe(true);
+      expect(Number.isFinite(r.suggestedAmount)).toBe(true);
+      expect(Number.isNaN(r.currentWeight)).toBe(false);
+    });
+  });
+
+  it('7. still classifies recommendations as new vs reinforce with marketValue set', () => {
+    const result = recommend({
+      ...OPTS,
+      holdings: [{ ticker: 'AAPL.US', units: 10, avgPrice: 150, assetClass: 'stock', marketValue: 1600 }],
+    });
+    const aapl = result.recommendations.find(r => r.asset.ticker === 'AAPL.US');
+    if (aapl) expect(aapl.type).toBe('reinforce');
+    result.recommendations
+      .filter(r => r.asset.ticker !== 'AAPL.US')
+      .forEach(r => expect(r.type).toBe('new'));
+  });
+
+  it('8. outOfPlanHoldings[].value uses marketValue when available, not units × avgPrice', () => {
+    const result = recommend({
+      ...OPTS,
+      preferredClasses: ['stock', 'etf'],
+      holdings: [
+        { ticker: 'BND.US', units: 10, avgPrice: 80, assetClass: 'bond_etf', marketValue: 950 },
+      ],
+    });
+    expect(result.outOfPlanHoldings).toHaveLength(1);
+    expect(result.outOfPlanHoldings[0]).toMatchObject({ ticker: 'BND.US', assetClass: 'bond_etf', value: 950 });
+  });
+
+  it('9. RecommendationResult.meta remains present alongside the marketValue-aware calculation', () => {
+    const result = recommend({
+      ...OPTS,
+      holdings: [{ ticker: 'AAPL.US', units: 10, avgPrice: 150, assetClass: 'stock', marketValue: 1700 }],
+    });
+    expect(result.meta?.modelName).toBe('recommendationEngine');
+    expect(result.meta?.warnings).toEqual([]);
+  });
+
+  it('10. externalWarnings (e.g. from portfolioState fallbacks) surface in meta.warnings without breaking generation', () => {
+    const result = recommend({
+      ...OPTS,
+      holdings: [{ ticker: 'AAPL.US', units: 10, avgPrice: 150, assetClass: 'stock' }], // no marketValue — simulates a missing-quote fallback
+      externalWarnings: ['No live quote for AAPL.US; using average cost as a fallback'],
+    });
+    expect(result.recommendations.length).toBeGreaterThan(0);
+    expect(result.meta?.warnings).toContain('No live quote for AAPL.US; using average cost as a fallback');
+  });
+});
