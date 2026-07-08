@@ -8,7 +8,8 @@ import TradeDateDialog from '@/components/ui/TradeDateDialog';
 import { createClient } from '@/lib/supabase/client';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
-import { parseFile } from '@/lib/holdingsImport';
+import { previewFile, type ImportPreview } from '@/lib/holdingsImport';
+import { getTransactions } from '@/lib/db/transactions';
 import { useUser } from '@/lib/hooks/useUser';
 
 function SectionLabel({ label }: { label: string }) {
@@ -26,6 +27,15 @@ function SettingsRow({ icon, label, value, onPress, border = true }: { icon: str
         ? <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 14, color: 'var(--on-surface-variant)' }}>{value}<span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span></span>
         : onPress ? <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--on-surface-variant)' }}>chevron_right</span> : null
       }
+    </div>
+  );
+}
+
+function ImportStatTile({ label, value, tone }: { label: string; value: number; tone?: 'gain' | 'loss' }) {
+  return (
+    <div style={{ background: 'var(--surface-low)', borderRadius: 'var(--radius-md)', padding: '10px 12px' }}>
+      <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{label}</div>
+      <div style={{ fontSize: 17, fontWeight: 700, color: tone ? `var(--${tone})` : 'var(--on-surface)' }}>{value}</div>
     </div>
   );
 }
@@ -70,6 +80,8 @@ export default function SettingsPage() {
 
   const [importOpen, setImportOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [importToast, setImportToast] = useState<{ holdings: number; transactions: number } | null>(null);
@@ -128,39 +140,64 @@ export default function SettingsPage() {
   function closeImport() {
     setImportOpen(false);
     setImportFile(null);
+    setImportPreview(null);
     setImportError('');
   }
 
-  async function submitImport() {
+  // Phase 1: parse + validate + detect duplicates. Nothing is saved here —
+  // see docs/import-xtb.md for the two-phase flow.
+  async function analyzeImport() {
     if (!importFile) { setImportError(t.impNoFile); return; }
+    if (!user) return;
     setImportError('');
+    setAnalyzing(true);
+    try {
+      const supabase = createClient();
+      const { data: existing } = await getTransactions(supabase, user.id);
+      const preview = await previewFile(importFile, { existingTransactions: existing ?? [] });
+      setImportPreview(preview);
+    } catch {
+      setImportError(t.impParseError);
+    }
+    setAnalyzing(false);
+  }
+
+  function backToFileSelect() {
+    setImportPreview(null);
+    setImportFile(null);
+    setImportError('');
+  }
+
+  // Phase 2: only rows the user has seen and that aren't errors/duplicates
+  // are ever written — see docs/import-xtb.md.
+  async function confirmImport() {
+    if (!importPreview || !user) return;
     setImporting(true);
     try {
-      const { holdings, transactions } = await parseFile(importFile);
-      if (!user) throw new Error('no user');
       const supabase = createClient();
+      const toImport = importPreview.rows.filter(r => (r.status === 'valid' || r.status === 'warning') && r.transaction);
 
-      // Upsert holdings (positions)
-      if (holdings.length > 0) {
+      // Upsert holdings (positions) — the file replaces the position snapshot, same as before this task.
+      if (importPreview.holdings.length > 0) {
         await supabase.from('holdings').upsert(
-          holdings.map(r => ({ user_id: user.id, ticker: r.ticker, units: r.units, avg_price: r.avg_price, name: r.name })),
+          importPreview.holdings.map(h => ({ user_id: user.id, ticker: h.ticker, units: h.units, avg_price: h.avg_price, name: h.name })),
           { onConflict: 'user_id,ticker' }
         );
       }
 
-      // Insert transactions — skip duplicates via external_id unique index
+      // Insert transactions — external_id unique index still backstops exact re-imports.
       let importedTxns = 0;
-      if (transactions.length > 0) {
-        const rows = transactions.map(tx => ({
+      if (toImport.length > 0) {
+        const rows = toImport.map(r => ({
           user_id: user.id,
-          external_id: tx.external_id,
-          ticker: tx.ticker ?? null,
-          type: tx.type,
-          units: tx.units ?? null,
-          price: tx.price ?? null,
-          amount: tx.amount,
-          executed_at: tx.executed_at,
-          notes: tx.notes ?? null,
+          external_id: r.transaction!.external_id,
+          ticker: r.transaction!.ticker ?? null,
+          type: r.transaction!.type,
+          units: r.transaction!.units ?? null,
+          price: r.transaction!.price ?? null,
+          amount: r.transaction!.amount,
+          executed_at: r.transaction!.executed_at,
+          notes: r.transaction!.notes ?? null,
         }));
         const { data: inserted } = await supabase
           .from('transactions')
@@ -171,7 +208,7 @@ export default function SettingsPage() {
 
       setImporting(false);
       closeImport();
-      setImportToast({ holdings: holdings.length, transactions: importedTxns });
+      setImportToast({ holdings: importPreview.holdings.length, transactions: importedTxns });
       setTimeout(() => setImportToast(null), 4000);
     } catch {
       setImporting(false);
@@ -324,38 +361,102 @@ export default function SettingsPage() {
 
       {importOpen && (
         <div onClick={closeImport} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end' }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxHeight: '85vh', overflowY: 'auto', background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: 24, boxShadow: 'var(--shadow)' }}>
             <div style={{ width: 38, height: 5, borderRadius: 'var(--radius-full)', background: 'var(--surface-highest)', margin: '0 auto 16px' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ fontSize: 20, fontWeight: 700 }}>{t.impTitle}</span>
+              <span style={{ fontSize: 20, fontWeight: 700 }}>{importPreview ? t.impPreviewTitle : t.impTitle}</span>
               <span onClick={closeImport} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
             </div>
-            <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>{t.impSub}</div>
 
-            <label style={{ border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-low)', padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center', cursor: 'pointer' }}>
-              <input type="file" accept=".csv,.xlsx" onChange={e => { setImportFile(e.target.files?.[0] ?? null); setImportError(''); }} style={{ display: 'none' }} />
-              <div style={{ width: 52, height: 52, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <span className="material-symbols-outlined" style={{ fontSize: 26, color: 'var(--primary)' }}>upload_file</span>
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>{importFile ? importFile.name : t.impDrop}</div>
-              <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{t.impDropHint}</div>
-            </label>
+            {!importPreview && (
+              <>
+                <div style={{ fontSize: 14, color: 'var(--on-surface-variant)', marginBottom: 18 }}>{t.impSub}</div>
 
-            {importError && (
-              <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginTop: 12 }}>
-                <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
-                <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{importError}</span>
-              </div>
+                <label style={{ border: '2px dashed var(--outline-variant)', borderRadius: 'var(--radius-lg)', background: 'var(--surface-low)', padding: '28px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, textAlign: 'center', cursor: 'pointer' }}>
+                  <input type="file" accept=".csv,.xlsx" onChange={e => { setImportFile(e.target.files?.[0] ?? null); setImportError(''); }} style={{ display: 'none' }} />
+                  <div style={{ width: 52, height: 52, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span className="material-symbols-outlined" style={{ fontSize: 26, color: 'var(--primary)' }}>upload_file</span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600 }}>{importFile ? importFile.name : t.impDrop}</div>
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{t.impDropHint}</div>
+                </label>
+
+                {importError && (
+                  <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginTop: 12 }}>
+                    <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                    <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{importError}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                  <button onClick={closeImport} disabled={analyzing} style={{ flex: 1, background: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {t.impCancel}
+                  </button>
+                  <button onClick={analyzeImport} disabled={analyzing || !importFile} style={{ flex: 1, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: analyzing || !importFile ? 0.7 : 1 }}>
+                    {analyzing ? t.impAnalyzing : t.impAnalyze}
+                  </button>
+                </div>
+              </>
             )}
 
-            <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-              <button onClick={closeImport} disabled={importing} style={{ flex: 1, background: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
-                {t.impCancel}
-              </button>
-              <button onClick={submitImport} disabled={importing} style={{ flex: 1, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: importing ? 0.7 : 1 }}>
-                {importing ? t.impImporting : t.impConfirm}
-              </button>
-            </div>
+            {importPreview && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{importPreview.fileName}</div>
+                <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginBottom: 14 }}>{t.impNotSavedYet}</div>
+
+                {importPreview.rows.length === 0 && importPreview.errors.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+                    <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>error</span>
+                    <span style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{importPreview.errors[0].message}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 14 }}>
+                  <ImportStatTile label={t.impRowsRead} value={importPreview.totalRows} />
+                  <ImportStatTile label={t.impRowsValid} value={importPreview.validRows} tone="gain" />
+                  <ImportStatTile label={t.impRowsError} value={importPreview.invalidRows} tone={importPreview.invalidRows > 0 ? 'loss' : undefined} />
+                  <ImportStatTile label={t.impRowsDuplicate} value={importPreview.duplicateRows} />
+                  <ImportStatTile label={t.impRowsWarning} value={importPreview.warnings.length} />
+                </div>
+
+                {importPreview.invalidRows > 0 && (
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+                    <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0, marginTop: 1 }}>error</span>
+                    <div style={{ fontSize: 12, color: 'var(--on-surface)' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>{t.impReviewErrors}</div>
+                      {importPreview.rows.filter(r => r.status === 'error').slice(0, 5).map(r => (
+                        <div key={r.rowNumber} style={{ color: 'var(--on-surface-variant)', marginTop: 2 }}>
+                          {t.impRowPrefix} {r.rowNumber}: {r.issues.find(i => i.severity === 'error')?.message}
+                        </div>
+                      ))}
+                      {importPreview.invalidRows > 5 && (
+                        <div style={{ color: 'var(--on-surface-variant)', marginTop: 2 }}>+{importPreview.invalidRows - 5}</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {importPreview.validRows === 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginBottom: 14 }}>{t.impNoValidRowsHint}</div>
+                )}
+
+                {importError && (
+                  <div data-testid="save-error" style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'var(--loss-container)', border: '1px solid var(--loss)', borderRadius: 'var(--radius-md)', padding: '10px 14px', marginBottom: 14 }}>
+                    <span className="material-symbols-outlined icf" style={{ fontSize: 16, color: 'var(--loss)', flexShrink: 0 }}>error</span>
+                    <span style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{importError}</span>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={backToFileSelect} disabled={importing} style={{ flex: 1, background: 'transparent', color: 'var(--on-surface)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    {t.impBack}
+                  </button>
+                  <button onClick={confirmImport} disabled={importing || importPreview.validRows === 0} style={{ flex: 1, background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: importing || importPreview.validRows === 0 ? 0.7 : 1 }}>
+                    {importing ? t.impImporting : t.impConfirm}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -454,7 +555,7 @@ export default function SettingsPage() {
             <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: '#fff' }}>check</span>
           </span>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.impToastTitle}</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inverse-on-surface)' }}>{t.impDoneTitle}</div>
             <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>
               {importToast.holdings} {t.positionsUnit} · {importToast.transactions} {t.transactionsImportedUnit}
             </div>

@@ -64,6 +64,39 @@ Every `Recommendation` from `lib/recommendationEngine.ts` now carries an `explan
 
 **`finalScore = matchScore × 0.6 + qualityScore × 0.4` is unchanged** — this task only adds explanatory copy and signals on top of the existing scoring, never inputs into it. `app/for-you/page.tsx` reuses its existing expand-on-tap card detail section (no new modal/sheet): the collapsed "Razão" line now shows `explanation.primaryReason` instead of the old joined `reason` string (which still exists, unchanged, on `Recommendation.reason`), and the expanded section gained a "Confiança dos dados" row plus `portfolioEffect`/`riskNote` text lines. `scoreBreakdown` numbers are not rendered in the UI in this task — kept API-only, to limit UI risk (see [model-map.md](model-map.md)).
 
+## XTB import: preview and duplicate reconciliation
+
+`app/profile/settings/page.tsx`'s "Importar Portfólio" flow no longer writes
+to Supabase the moment a file is chosen. It's now two explicit phases — see
+[import-xtb.md](import-xtb.md) for the full flow, validation rules, and
+duplicate policy:
+
+- **`lib/holdingsImport.ts`** gained a `previewFile()` entry point that
+  parses, validates every row, and detects duplicates, returning a typed
+  `ImportPreview` — nothing is saved. The XTB "CASH OPERATION HISTORY" path
+  now validates **per row** (`mapXtbRowToTransaction()`): a bad row becomes
+  an `'error'`-status `ImportPreviewRow` with `issues` explaining why,
+  instead of being silently dropped like before this task. The generic
+  `ticker,units,avg_price` CSV/XLSX path still validates the whole file
+  atomically (one file-level error, not per-row) — a known, documented
+  limitation, not addressed here.
+- **Duplicates are detected two ways** (within the uploaded file, and
+  against the user's already-saved transactions, when the caller supplies
+  them) using a business-field key (date/type/ticker/units/price/amount) —
+  deliberately not just `external_id`, so it also catches a collision
+  against a manually-entered trade. **Duplicates are ignored by default**;
+  the confirm step only ever writes `'valid'`/`'warning'` rows.
+- The legacy `parseFile()`/`parseXlsxFile()`/`parseHoldingsCsv()` functions
+  are unchanged in behavior (same exact output for the same input — see
+  `lib/holdingsImport.test.ts`) and still exist; `previewFile()` is
+  additive, not a replacement.
+- No Supabase schema change, no new migration, no persistent import audit
+  log — `ImportPreview.importId` is reserved but always `undefined` this
+  task. `portfolioState.ts` and `recommendationEngine.ts` are untouched;
+  the holdings-replacement-on-confirm semantics (file replaces the position
+  snapshot, no merge with existing DB holdings) are exactly what the import
+  already did before this task.
+
 ## Model governance, versioning, coverage & confidence
 
 A separate pass added governance metadata to the core models — see
