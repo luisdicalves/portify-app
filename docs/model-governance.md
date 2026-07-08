@@ -201,6 +201,25 @@ live `ModelRunMeta` object on its return value. A caller that wants a
 itself with `createModelRunMeta({ modelName: 'portfolioState', input })`
 without that timestamp leaking into the pure function's own return value.
 
+## Feeding a caller's own warnings into `meta.warnings`: `RecommendOptions.externalWarnings`
+
+`recommendationEngine.ts` must stay pure — no API/Supabase/network calls inside
+it (see [model-map.md](model-map.md)). But its caller,
+`app/api/recommendations/route.ts`, builds a `portfolioState` (via
+`buildPortfolioState()`) before calling `recommend()`, and that step can
+produce its own `dataQualityWarnings` (e.g. a missing quote falling back to
+average cost). Those are exactly the kind of thing `meta.warnings` exists to
+surface, so `RecommendOptions` has an `externalWarnings?: string[]` field:
+the caller passes in plain warning strings it already computed (no I/O, just
+data), and `recommend()` merges them into its own `meta.warnings` alongside
+`paceAlert`/`outOfPlanHoldings` warnings it generates itself.
+
+**Policy:** this pattern — a plain `string[]` passed in by the caller and
+merged into `meta.warnings` — is the sanctioned way for a pure model to
+surface a caller's upstream warnings without becoming impure itself. Don't
+have a model reach out and fetch/compute those warnings on its own; require
+the caller to pass them in as already-computed strings.
+
 ## Backwards compatibility
 
 Every field this task added is **additive**:

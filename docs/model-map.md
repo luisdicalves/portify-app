@@ -91,13 +91,17 @@ marked **governed** below.
   new-vs-reinforce/subweighted detection; pace-to-goal alert.
 - **Inputs:** `RecommendOptions` (`universe`, `profile`, `preferredSectors`,
   `monthlyAmount`, `goalAmount`, `holdings`, `preferredClasses`,
-  `maxPerClass`, `maxPerSector`).
-- **Outputs:** `RecommendationResult` (adds `meta` in this task).
+  `maxPerClass`, `maxPerSector`, `externalWarnings`).
+- **Outputs:** `RecommendationResult` (adds `meta`).
 - **Consumers:** `app/api/recommendations/route.ts` (→ `app/for-you/page.tsx`).
 - **Tests:** `lib/recommendationEngine.test.ts`.
-- **Note:** `totalPortfolioValue` inside this model is still computed from
-  `avgPrice` (cost), not `marketValue` — a known, intentionally out-of-scope
-  gap, see [current-state.md](current-state.md).
+- **Note:** `totalPortfolioValue`/`currentWeight`/`OutOfPlanHolding.value` now
+  use `HoldingSnapshot.marketValue` when the caller provides it (via
+  `holdingValue()`), falling back to `units × avgPrice` otherwise — see
+  [current-state.md](current-state.md). The engine itself stays pure/I/O-free;
+  `app/api/recommendations/route.ts` is what fetches quotes and builds
+  `portfolioState` before calling `recommend()`. `matchScore`/`qualityScore`/
+  `finalScore` and the 60/40 blend are unchanged by this.
 
 ## `lib/assetUniverse.ts` — active
 
