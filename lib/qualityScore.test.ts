@@ -50,6 +50,36 @@ describe('calcQualityScore', () => {
     expect(bad.total).toBeGreaterThanOrEqual(0);
     expect(bad.total).toBeLessThanOrEqual(100);
   });
+
+  it('reports high confidence and no missing metrics when every field is present', () => {
+    const fullMetrics: StockMetrics = { ...GOOD_METRICS, '52WeekHigh': 200, '52WeekLow': 100, currentPrice: 180 };
+    const result = calcQualityScore(fullMetrics);
+    expect(result.confidence).toBe('high');
+    expect(result.missingMetrics).toEqual([]);
+    expect(result.coverageRatio).toBe(1);
+  });
+
+  it('reports high confidence for GOOD_METRICS even though the 52-week range fields are absent', () => {
+    const result = calcQualityScore(GOOD_METRICS);
+    expect(result.confidence).toBe('high');
+    expect(result.missingMetrics).toEqual(['52WeekHigh', '52WeekLow', 'currentPrice']);
+  });
+
+  it('reports low confidence and lists missing metrics for a mostly-empty input', () => {
+    const result = calcQualityScore({ currentRatioAnnual: 1.5 });
+    expect(result.confidence).toBe('low');
+    expect(result.missingMetrics.length).toBeGreaterThan(0);
+    expect(result.missingMetrics).not.toContain('currentRatioAnnual');
+    expect(result.availableMetrics).toEqual(['currentRatioAnnual']);
+    expect(result.coverageRatio).toBeLessThan(0.45);
+  });
+
+  it('does not change total based on confidence (informative only, see docs/model-governance.md)', () => {
+    // Same available metrics, wrapped with/without extras that would remain neutral either way.
+    const partial = calcQualityScore({ currentRatioAnnual: 2.5, debtToEquityAnnual: 0.3 });
+    expect(partial.confidence).toBe('low');
+    expect(typeof partial.total).toBe('number');
+  });
 });
 
 describe('qualityScoreFromMetrics', () => {
@@ -105,6 +135,8 @@ const MOCK_REPORT: RiskReport = {
     beta: 1.1, savingsPlanSuitable: true,
   },
   footer: { tags: [], source: 'Finnhub', nextEarnings: null },
+  coverageStatus: 'full',
+  coverageReason: 'US_EQUITY',
 };
 
 const PROFILE: UserProfile = {

@@ -16,6 +16,7 @@
 import type { CandidateAsset, AssetClass } from '@/lib/assetUniverse';
 import { sectorMatchScore }                from '@/lib/sectorMap';
 import { calcPlan, type UserProfile } from '@/lib/planCalculator';
+import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
@@ -51,6 +52,8 @@ export interface RecommendationResult {
   paceAlert:         boolean;            // true se ritmo insuficiente para atingir goal_amount
   goalReached:       boolean;            // true se goal_amount já foi atingido pelas classes ativas
   outOfPlanHoldings: OutOfPlanHolding[];  // holdings em classes fora de preferred_asset_classes
+  /** Governance/versioning metadata — see docs/model-governance.md. Additive field, safe to ignore. */
+  meta?:             ModelRunMeta;
 }
 
 export interface HoldingSnapshot {
@@ -450,6 +453,10 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
     }
   }
 
+  const metaWarnings: string[] = [];
+  if (paceAlert) metaWarnings.push('Ritmo de contribuição insuficiente para atingir o objetivo no horizonte definido.');
+  if (outOfPlanHoldings.length > 0) metaWarnings.push(`${outOfPlanHoldings.length} holding(s) em classes fora de preferredClasses, excluído(s) do plano ativo.`);
+
   return {
     recommendations,
     allocationPlan: alloc,
@@ -458,6 +465,19 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
     paceAlert,
     goalReached,
     outOfPlanHoldings,
+    meta: createModelRunMeta({
+      modelName: 'recommendationEngine',
+      input: {
+        profile, preferredSectors, monthlyAmount, goalAmount, preferredClasses,
+        universeSize: universe.length,
+        holdingsSignature: holdings.map(h => `${h.ticker}:${h.units}:${h.avgPrice}`).sort().join(','),
+      },
+      assumptions: [
+        'finalScore = matchScore × 0.6 + qualityScore × 0.4 (v3.0) — inalterado por esta tarefa.',
+        'totalPortfolioValue usa avgPrice (custo), não marketValue — ver docs/current-state.md.',
+      ],
+      warnings: metaWarnings,
+    }),
   };
 }
 

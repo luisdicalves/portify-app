@@ -10,6 +10,8 @@
  * Usado em plan-set e summary para tornar a projecção dinâmica e honesta.
  */
 
+import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,6 +41,8 @@ export interface PlanCalcResult {
   rateLow:    number;     // intervalo pessimista (−1%)
   rateHigh:   number;     // intervalo optimista (+1%)
   conflicts:  string[];   // alertas de contradição detetados
+  /** Governance/versioning metadata — see docs/model-governance.md. Additive field, safe to ignore. */
+  meta?:      ModelRunMeta;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -344,6 +348,7 @@ export function calcPlan(
   const riskScore  = calcRiskScore(p);
   const allocation = calcAllocation(riskScore, p, preferredClasses);
   const rate       = calcRate(allocation, p);
+  const conflicts  = detectConflicts(p);
 
   return {
     riskScore,
@@ -351,7 +356,15 @@ export function calcPlan(
     rate,
     rateLow:   Math.max(0, Math.round((rate - 0.01) * 10000) / 10000),
     rateHigh:  Math.round((rate + 0.01) * 10000) / 10000,
-    conflicts: detectConflicts(p),
+    conflicts,
+    meta: createModelRunMeta({
+      modelName: 'planCalculator',
+      input: { profile: p, preferredClasses },
+      assumptions: [
+        'Retornos anuais assumidos por classe (médias históricas de longo prazo): stock ~10%, etf ~8%, bond_etf ~3.5%.',
+      ],
+      warnings: conflicts,
+    }),
   };
 }
 

@@ -105,6 +105,10 @@ describe('fetchRiskReport', () => {
     expect(report!.risks).toEqual(['Sem sinais de alerta relevantes nos fundamentais analisados.']);
     expect(report!.catalysts.length).toBeGreaterThan(0);
     expect(report!.actionGuide.savingsPlanSuitable).toBe(false); // beta 0.9 < 1.1
+    expect(report!.coverageStatus).toBe('full');
+    expect(report!.coverageReason).toBe('US_EQUITY');
+    expect(report!.meta?.modelName).toBe('riskScore');
+    expect(report!.meta?.warnings).toEqual([]);
   });
 
   it('scores an expensive, indebted, shrinking company as high risk and lists matching risks', async () => {
@@ -156,5 +160,51 @@ describe('fetchRiskReport', () => {
     const report = await fetchRiskReport('AAPL', 'en');
     expect(report!.tagline).toBe('Risk analysis based on real fundamentals (no AI).');
     expect(report!.pillars.health.plainEnglish).toContain('bills and debts');
+  });
+
+  describe('coverage signaling', () => {
+    it('reports partial coverage and a warning when most fundamentals are missing', async () => {
+      mockFetch({ peTTM: 20, beta: 1 }); // only 1 of 9 core fundamentals present
+      const report = await fetchRiskReport('AAPL', 'pt');
+
+      expect(report!.coverageStatus).toBe('partial');
+      expect(report!.coverageReason).toBe('NO_FUNDAMENTALS');
+      expect(report!.meta?.warnings.some(w => w.includes('Cobertura parcial'))).toBe(true);
+    });
+
+    it('reports NON_US_EQUITY coverage reason for a non-US ticker', async () => {
+      mockFetch({
+        peTTM: 12, psTTM: 1.5, evRevenueTTM: 1.8,
+        currentRatioAnnual: 2.2, 'totalDebt/totalEquityAnnual': 0.2, roeTTM: 35, operatingMarginTTM: 35,
+        revenueGrowthTTMYoy: 25, epsGrowthTTMYoy: 30,
+        beta: 0.9,
+      });
+
+      const report = await fetchRiskReport('AIR.FR', 'pt');
+      expect(report!.coverageReason).toBe('NON_US_EQUITY');
+    });
+
+    it('reports API_ERROR coverage reason and a warning when analyst/earnings calls fail', async () => {
+      mockFetch({ peTTM: 20, beta: 1 }, {}); // partial fundamentals too, to keep status non-"full"
+      vi.stubGlobal('fetch', vi.fn((url: string) => {
+        if (url.includes('/stock/metric')) return Promise.resolve({ ok: true, json: async () => ({ metric: { peTTM: 20, beta: 1 }, series: { quarterly: {} } }) });
+        if (url.includes('/stock/profile2')) return Promise.resolve({ ok: true, json: async () => PROFILE });
+        if (url.includes('/stock/recommendation')) return Promise.resolve({ ok: false, json: async () => ({}) });
+        if (url.includes('/stock/earnings')) return Promise.resolve({ ok: false, json: async () => ({}) });
+        return Promise.resolve({ ok: true, json: async () => EUR_RATE });
+      }));
+
+      const report = await fetchRiskReport('AAPL', 'pt');
+      expect(report!.coverageReason).toBe('API_ERROR');
+      expect(report!.meta?.warnings.some(w => w.includes('recomendações de analistas'))).toBe(true);
+    });
+
+    it('does not invent a score for missing fundamentals — uses the same neutral band() fallback', async () => {
+      mockFetch({}); // no fundamentals at all
+      const report = await fetchRiskReport('AAPL', 'pt');
+
+      expect(report!.coverageStatus).toBe('unavailable');
+      expect(report!.pillars.valuation.score).toBe(50); // band()'s documented neutral fallback
+    });
   });
 });

@@ -89,6 +89,12 @@ describe('recommend — basic output shape', () => {
     expect(sum).toBeCloseTo(1, 5);
   });
 
+  it('includes governance meta with the recommendationEngine model name and version', () => {
+    const { meta } = recommend(OPTS);
+    expect(meta?.modelName).toBe('recommendationEngine');
+    expect(meta?.modelVersion).toBe('3.0.0');
+  });
+
   it('each recommendation has a positive suggestedAmount', () => {
     const { recommendations } = recommend(OPTS);
     recommendations.forEach(r => {
