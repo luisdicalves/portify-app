@@ -7,6 +7,10 @@ import { useDict } from '@/lib/dict';
 import BottomNav from '@/components/ui/BottomNav';
 import type { RecommendationResult, Recommendation } from '@/lib/recommendationEngine';
 
+// ─── Confiança dos dados (explanation.dataConfidence) ──────────────────────
+
+const CONFIDENCE_LABEL: Record<string, string> = { high: 'Alta', medium: 'Média', low: 'Baixa' };
+
 // ─── Badge de score ────────────────────────────────────────────────────────
 
 function ScoreBadge({ score }: { score: number }) {
@@ -133,7 +137,7 @@ function RecCard({ rec, t }: { rec: Recommendation; t: ReturnType<typeof useDict
         borderTop: expanded ? '1px solid var(--hairline)' : undefined,
         paddingTop: expanded ? 10 : 0,
       }}>
-        {rec.reason}
+        {rec.explanation.primaryReason}
       </div>
 
       {/* Detalhe expandido */}
@@ -163,6 +167,17 @@ function RecCard({ rec, t }: { rec: Recommendation; t: ReturnType<typeof useDict
               <span style={{ fontWeight: 600 }}>{rec.asset.dividendYield.toFixed(1)}%</span>
             </div>
           )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+            <span style={{ color: 'var(--on-surface-variant)' }}>Confiança dos dados</span>
+            <span style={{ fontWeight: 600 }}>{CONFIDENCE_LABEL[rec.explanation.dataConfidence]}</span>
+          </div>
+
+          <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', lineHeight: 1.4, marginTop: 2 }}>
+            {rec.explanation.portfolioEffect}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', lineHeight: 1.4 }}>
+            {rec.explanation.riskNote}
+          </div>
 
           <button
             onClick={goInvest}

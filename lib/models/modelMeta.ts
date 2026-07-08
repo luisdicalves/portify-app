@@ -23,7 +23,7 @@ export const MODEL_VERSIONS: Record<ModelName, ModelVersion> = {
   planCalculator: '1.0.0',
   riskScore: '1.0.0',
   qualityScore: '1.0.0',
-  recommendationEngine: '3.0.0', // aligned with the existing "modelo v3.0" already in lib/recommendationEngine.ts
+  recommendationEngine: '3.1.0', // 3.0.0 -> 3.1.0: additive Recommendation.explanation (RecommendationExplanation) — no formula/weight/threshold change, see docs/model-governance.md
   cashFlowForecast: '1.0.0',
   portfolioState: '1.0.0',
 };

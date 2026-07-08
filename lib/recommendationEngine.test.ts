@@ -92,7 +92,7 @@ describe('recommend — basic output shape', () => {
   it('includes governance meta with the recommendationEngine model name and version', () => {
     const { meta } = recommend(OPTS);
     expect(meta?.modelName).toBe('recommendationEngine');
-    expect(meta?.modelVersion).toBe('3.0.0');
+    expect(meta?.modelVersion).toBe('3.1.0');
   });
 
   it('each recommendation has a positive suggestedAmount', () => {
@@ -472,5 +472,157 @@ describe('recommend — market value weights', () => {
     });
     expect(result.recommendations.length).toBeGreaterThan(0);
     expect(result.meta?.warnings).toContain('No live quote for AAPL.US; using average cost as a fallback');
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Explainability layer — Recommendation.explanation (lib/recommendationExplanation.ts).
+// Purely informative: must never change matchScore/qualityScore/finalScore or ranking.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('recommend — explanation', () => {
+  it('1. every generated recommendation includes an explanation', () => {
+    const { recommendations } = recommend(OPTS);
+    expect(recommendations.length).toBeGreaterThan(0);
+    recommendations.forEach(r => expect(r.explanation).toBeDefined());
+  });
+
+  it('2. explanation.primaryReason is a non-empty string', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(typeof r.explanation.primaryReason).toBe('string');
+      expect(r.explanation.primaryReason.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('3. explanation.portfolioEffect is a non-empty string', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(typeof r.explanation.portfolioEffect).toBe('string');
+      expect(r.explanation.portfolioEffect.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('4. explanation.riskNote is a non-empty string', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(typeof r.explanation.riskNote).toBe('string');
+      expect(r.explanation.riskNote.length).toBeGreaterThan(0);
+    });
+  });
+
+  it('5. explanation.dataConfidence is high, medium, or low', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(['high', 'medium', 'low']).toContain(r.explanation.dataConfidence);
+    });
+  });
+
+  it('6. scoreBreakdown.profileMatch matches the matchScore used for this recommendation', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(r.explanation.scoreBreakdown.profileMatch).toBe(r.matchScore);
+    });
+  });
+
+  it('7. scoreBreakdown.fundamentalQuality matches the qualityScore used for this recommendation', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(r.explanation.scoreBreakdown.fundamentalQuality).toBe(r.qualityScore);
+    });
+  });
+
+  it('8. scoreBreakdown.diversificationImpact is a finite number between 0 and 100', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      const { diversificationImpact } = r.explanation.scoreBreakdown;
+      expect(Number.isFinite(diversificationImpact)).toBe(true);
+      expect(diversificationImpact).toBeGreaterThanOrEqual(0);
+      expect(diversificationImpact).toBeLessThanOrEqual(100);
+    });
+  });
+
+  it('9. a "new" recommendation gets a primaryReason about diversification/allocation fit', () => {
+    const result = recommend({ ...OPTS, holdings: [] });
+    const NEW_REASONS = [
+      'Respeita as tuas preferências sectoriais e melhora a diversificação.',
+      'Ajuda a diversificar a carteira numa classe de ativo ainda pouco representada.',
+      'Encaixa no teu perfil e aumenta exposição a uma classe prevista no plano.',
+    ];
+    result.recommendations.forEach(r => {
+      expect(r.type).toBe('new');
+      expect(NEW_REASONS).toContain(r.explanation.primaryReason);
+    });
+  });
+
+  it('10. a "reinforce" recommendation on an underweighted position gets a subweighted-appropriate primaryReason', () => {
+    const opts: RecommendOptions = {
+      universe: [makeStock('AAA.US', 'tech', 90), makeStock('BBB.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock' },
+        { ticker: 'BBB.US', units: 1, avgPrice: 1900, assetClass: 'stock' },
+      ],
+    };
+    const result = recommend(opts);
+    const aaa = result.recommendations.find(r => r.asset.ticker === 'AAA.US');
+
+    expect(aaa).toBeDefined();
+    if (aaa) {
+      expect(aaa.type).toBe('reinforce');
+      expect(aaa.explanation.primaryReason).toBe('Reforça uma posição que está abaixo do peso-alvo definido pelo teu plano.');
+      expect(aaa.explanation.reasons).toContain('Posição subponderada face ao plano');
+      expect(aaa.explanation.scoreBreakdown.diversificationImpact).toBeGreaterThanOrEqual(70);
+    }
+  });
+
+  it('11. a missing marketValue with a matching external warning lowers dataConfidence and adds a warning', () => {
+    // Same underweighted/overweighted pair as the "subpesado" fixture above —
+    // AAA stays in the recommendations (reinforce, underweighted); BBB doesn't
+    // (overweighted, filtered out either way regardless of marketValue).
+    const baseOpts: Omit<RecommendOptions, 'holdings' | 'externalWarnings'> = {
+      universe: [makeStock('AAA.US', 'tech', 90), makeStock('BBB.US', 'tech', 90)],
+      profile: PROFILE,
+      preferredSectors: ['tech'],
+      monthlyAmount: 500,
+      preferredClasses: ['stock'],
+    };
+
+    const withFallback = recommend({
+      ...baseOpts,
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock' }, // no marketValue — cost fallback
+        { ticker: 'BBB.US', units: 1, avgPrice: 1900, assetClass: 'stock' },
+      ],
+      externalWarnings: ['No live quote for AAA.US; using average cost as a fallback'],
+    });
+    const withMarketValue = recommend({
+      ...baseOpts,
+      holdings: [
+        { ticker: 'AAA.US', units: 1, avgPrice: 100, assetClass: 'stock', marketValue: 100 },
+        { ticker: 'BBB.US', units: 1, avgPrice: 1900, assetClass: 'stock', marketValue: 1900 },
+      ],
+    });
+
+    const aaaFallback = withFallback.recommendations.find(r => r.asset.ticker === 'AAA.US');
+    const aaaLive      = withMarketValue.recommendations.find(r => r.asset.ticker === 'AAA.US');
+
+    expect(aaaFallback).toBeDefined();
+    expect(aaaLive).toBeDefined();
+    if (aaaFallback && aaaLive) {
+      const order = { high: 0, medium: 1, low: 2 };
+      expect(order[aaaFallback.explanation.dataConfidence]).toBeGreaterThan(order[aaaLive.explanation.dataConfidence]);
+      expect(aaaFallback.explanation.warnings).toContain('Cotação indisponível; foi usado preço médio como fallback.');
+    }
+  });
+
+  it('12. finalScore keeps the matchScore × 0.6 + qualityScore × 0.4 formula, unchanged by the explanation layer', () => {
+    const { recommendations } = recommend(OPTS);
+    recommendations.forEach(r => {
+      expect(r.finalScore).toBe(Math.round(r.matchScore * 0.6 + r.qualityScore * 0.4));
+    });
   });
 });

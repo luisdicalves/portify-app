@@ -46,13 +46,23 @@ const portfolioState = buildPortfolioState({
 
 - No dividend gross/net/withholding-tax split surfaces in the UI yet; Dashboard/Portfolio still sum raw dividend `amount` for the dividends tab and yield figure (`portfolioState.ts` computes the gross/net/tax split, it's just not read by these pages).
 - `dataQualityWarnings` are surfaced as a dev-console warning on Dashboard/Portfolio (`logPortfolioStateWarnings`) and as `meta.warnings` on the recommendations API response — still no dedicated in-app UI for them.
-- `app/for-you/page.tsx` is unchanged visually — it already just renders whatever `currentWeight`/`type`/`outOfPlanHoldings` the API returns, so it reflects market-value-based weights automatically without needing edits.
 
 ## Current status
 
 [lib/portfolio/portfolioState.ts](../lib/portfolio/portfolioState.ts) provides `buildPortfolioState()`, a single pure function that takes holdings + transactions + latest quotes and returns a canonical `PortfolioState` (market value, cost basis, average cost, realized/unrealized gain, dividend gross/net/tax split, cash balance, allocations, and explicit data-quality warnings instead of silent fallbacks). [lib/portfolio/portfolioStateAdapters.ts](../lib/portfolio/portfolioStateAdapters.ts) adapts the project's existing DB-row/quote shapes into its input types.
 
 **Dashboard, Portfolio, and the recommendation engine (For You) all consume it now** (see above) — the three surfaces share the same conceptual notion of portfolio value: holdings snapshot + latest quotes, no transaction replay, average-cost fallback with an explicit warning when a quote is missing.
+
+## Recommendation explainability
+
+Every `Recommendation` from `lib/recommendationEngine.ts` now carries an `explanation: RecommendationExplanation` field (built by the pure helpers in [lib/recommendationExplanation.ts](../lib/recommendationExplanation.ts)):
+
+- `primaryReason` / `portfolioEffect` / `riskNote` — short, prudent, educational PT copy (no "you'll gain X", no guarantees, no personalized financial advice) covering why the recommendation appears, what it does to the portfolio, and its main risk.
+- `dataConfidence: 'high' | 'medium' | 'low'` — **purely informative, does not affect ranking or `finalScore`**. A simple, documented heuristic (no `confidence`/`coverageStatus` field exists yet on `CandidateAsset`): downgrades one level each for a stock without `pillarHealthScore` (no `RiskReport` was available — ETFs/bond ETFs aren't penalized for this, since they never carry pillar data by design), an owned position priced via the average-cost fallback rather than a live quote, and a data-quality warning that specifically mentions this ticker.
+- `scoreBreakdown: { profileMatch, fundamentalQuality, diversificationImpact }` — `profileMatch`/`fundamentalQuality` are just `matchScore`/`qualityScore` decomposed for display; `diversificationImpact` (0–100) is a new, simple, deterministic band on `currentWeight`/`targetWeight` — **explanatory only, never fed into `finalScore`**.
+- `reasons`/`warnings` — itemized supporting points and recommendation-specific caveats (e.g. "Cotação indisponível; foi usado preço médio como fallback.").
+
+**`finalScore = matchScore × 0.6 + qualityScore × 0.4` is unchanged** — this task only adds explanatory copy and signals on top of the existing scoring, never inputs into it. `app/for-you/page.tsx` reuses its existing expand-on-tap card detail section (no new modal/sheet): the collapsed "Razão" line now shows `explanation.primaryReason` instead of the old joined `reason` string (which still exists, unchanged, on `Recommendation.reason`), and the expanded section gained a "Confiança dos dados" row plus `portfolioEffect`/`riskNote` text lines. `scoreBreakdown` numbers are not rendered in the UI in this task — kept API-only, to limit UI risk (see [model-map.md](model-map.md)).
 
 ## Model governance, versioning, coverage & confidence
 
