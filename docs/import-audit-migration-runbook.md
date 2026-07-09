@@ -42,8 +42,55 @@ correct.
   target project, in case rollback is needed (see below). Supabase Pro+
   projects have PITR; free-tier projects should be manually backed up first.
 
+## Environment confirmation gate
+
+**Before running anything in "Recommended order of application" below,**
+confirm the target environment is unambiguous. See
+[docs/supabase-environments.md](supabase-environments.md) for the full
+policy this enforces — this section is just the checklist.
+
+1. Run the guardrail script for the environment you intend to target:
+   ```bash
+   npm run check:supabase-env -- --target=staging
+   # or, for production:
+   npm run check:supabase-env -- --target=production --confirm-production
+   ```
+   This fails (exit 1) if `SUPABASE_ENVIRONMENT` is unset/invalid, if
+   `--target` doesn't match it, if `production` is requested without
+   `--confirm-production`, or if `SUPABASE_PROJECT_REF` disagrees with
+   `supabase/.temp/linked-project.json`. It never prints an unmasked project
+   ref. **Do not proceed past a failing result** — fix the underlying
+   ambiguity (see "Handling an ambiguous environment" in
+   supabase-environments.md), don't just re-run with different flags until
+   it happens to pass.
+2. Manually confirm, in the Supabase dashboard (the script cannot verify
+   these on its own):
+   - **Project ref** matches what `SUPABASE_PROJECT_REF`/the linked project
+     reports.
+   - **Project name** — should contain `staging` or `prod`/`production` per
+     the naming convention; if it doesn't yet, this is itself a blocker (see
+     below).
+   - **Dashboard URL** — matches the ref/name above.
+   - **Owner** — you know who administers this project and that it's the
+     one actually meant for this purpose.
+   - **Environment** — cross-checked against the runbook's "Staging
+     validation log" below, or added as a new entry there if this is the
+     first time this project is being confirmed.
+3. **Abort** (do not apply the migration) if any of the following is true:
+   - The environment is ambiguous by any of the checks above.
+   - The only project available is the one named plainly `"portify"` (the
+     exact situation found in this repository as of 2026-07-09 — see
+     "Staging validation log") — that project has not been confirmed as
+     staging by this procedure and must not be treated as such.
+   - There's no clear staging/production separation at all.
+   - `lib/supabase/database.types.ts` cannot be regenerated against the
+     confirmed environment immediately after applying the migration (if type
+     regeneration isn't possible, the migration shouldn't be applied yet
+     either — see "Regenerating `database.types.ts`" below).
+
 ## Recommended order of application
 
+0. Complete the "Environment confirmation gate" above — do not start here.
 1. **Staging first.** Never apply directly to production.
 2. Take a backup / confirm PITR is available for the target project.
 3. Open the target project's Supabase SQL Editor.

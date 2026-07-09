@@ -64,3 +64,35 @@ this before merging or deploying any change that touches that schema or
 
 Only after every box above is checked for **staging** should the same
 sequence be repeated for **production**.
+
+## Supabase environment guardrails
+
+Scope: any PR that applies a migration, regenerates
+`lib/supabase/database.types.ts` against a real project, or otherwise runs a
+sensitive operation against Supabase. See
+[docs/supabase-environments.md](supabase-environments.md) for the full
+policy and [scripts/check-supabase-environment.mjs](../scripts/check-supabase-environment.mjs)
+(`npm run check:supabase-env`) for the automated check.
+
+- [ ] `SUPABASE_ENVIRONMENT` definido (exactamente `local`, `staging`, ou
+      `production`) no ambiente onde o comando sensível vai correr.
+- [ ] `SUPABASE_PROJECT_REF` confirmado — coincide com o projecto visto no
+      dashboard Supabase, não apenas assumido a partir do `.env.local`.
+- [ ] Linked project ref (`supabase/.temp/linked-project.json`, se existir)
+      coincide com `SUPABASE_PROJECT_REF` — `npm run check:supabase-env`
+      falha automaticamente se não coincidir.
+- [ ] Staging confirmado manualmente antes da migration (project ref, nome,
+      URL, owner — ver runbook, secção "Environment confirmation gate") e
+      registado no runbook.
+- [ ] Produção exige confirmação explícita —
+      `npm run check:supabase-env -- --target=production --confirm-production`
+      corrido e a passar, mais backup/PITR confirmado.
+- [ ] Output de `npm run check:supabase-env` anexado ao PR ou registado no
+      runbook (secção "Staging validation log") — refs sempre mascarados,
+      nunca em texto completo.
+- [ ] Nenhum secret (anon key, service role key, JWT secret, database
+      URL/password, ou project ref não mascarado) aparece nos logs, no PR,
+      ou em qualquer documento deste repositório.
+- [ ] `lib/supabase/database.types.ts` regenerado depois da migration ser
+      aplicada ao ambiente confirmado (não antes, e não contra um ambiente
+      diferente do que foi migrado).

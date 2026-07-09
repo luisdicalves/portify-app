@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm test",
-    "check:schema": "node scripts/check-import-audit-schema.mjs"
+    "check:schema": "node scripts/check-import-audit-schema.mjs",
+    "check:supabase-env": "node scripts/check-supabase-environment.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
