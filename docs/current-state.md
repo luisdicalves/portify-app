@@ -90,12 +90,46 @@ duplicate policy:
   are unchanged in behavior (same exact output for the same input — see
   `lib/holdingsImport.test.ts`) and still exist; `previewFile()` is
   additive, not a replacement.
-- No Supabase schema change, no new migration, no persistent import audit
-  log — `ImportPreview.importId` is reserved but always `undefined` this
-  task. `portfolioState.ts` and `recommendationEngine.ts` are untouched;
-  the holdings-replacement-on-confirm semantics (file replaces the position
-  snapshot, no merge with existing DB holdings) are exactly what the import
-  already did before this task.
+- **Now has a persistent audit log** (added in a later task — see the next
+  section): every *confirmed* import creates a row in
+  `public.import_audit_logs`, and its transactions are tagged with
+  `import_id`. `portfolioState.ts` and `recommendationEngine.ts` remain
+  untouched; the holdings-replacement-on-confirm semantics (file replaces
+  the position snapshot, no merge with existing DB holdings) are unchanged
+  from before either of these two import tasks.
+
+## XTB import: persistent audit log
+
+Every confirmed import (not the preview step — previewing still saves
+nothing) now creates a row in `public.import_audit_logs` before any
+holdings/transactions write happens, and updates it to its final status
+(`completed`/`partial`/`failed`) once the write is known. Full detail —
+schema, RLS, status lifecycle, file-hash policy, and what is/isn't stored —
+is in [import-xtb.md](import-xtb.md#audit-log-persistente).
+
+- **Schema:** `supabase-migration-import-audit-log.sql` (new table +
+  `transactions.import_id`, nullable FK), consolidated into
+  `supabase-schema.sql`. Also fixes a pre-existing bug found while building
+  this: `transactions`' `type` check constraint only allowed `'wht'`, not
+  `'withholding_tax'` (which the app has always written) — see
+  import-xtb.md for the full story.
+- **`ImportPreview.importId` is still not populated by the parser** — the
+  parser stays fully decoupled from persistence (no import from
+  `lib/db/importAudit.ts`, verified by the existing purity test). The
+  created audit log's `id` is surfaced directly by
+  `app/profile/settings/page.tsx` after a successful confirm, not threaded
+  back through the preview type.
+- **No raw file content is ever stored** — `filename` is a bare name
+  (`File.name`, never a path), and `file_hash` fingerprints parsed content
+  (via `lib/models/modelMeta.ts`'s `createInputHash()`), never file bytes.
+- **`lib/db/importAudit.ts`** (new) holds all the persistence logic:
+  `createImportAuditLog`/`completeImportAuditLog`/`failImportAuditLog`/
+  `listImportAuditLogs`/`getImportAuditLog`, plus two pure, unit-tested
+  helpers (`determineImportStatus`, `computeImportFileHash`) and a pure
+  payload builder (`buildImportAuditLogInsert`).
+- `app/profile/settings/page.tsx` also gained a minimal read-only "Últimas
+  importações" list (last 5, via `listImportAuditLogs()`) — no new page,
+  reusing the existing Card/SettingsRow visual language.
 
 ## Model governance, versioning, coverage & confidence
 

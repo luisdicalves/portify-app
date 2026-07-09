@@ -197,6 +197,39 @@ marked **governed** below.
   `'valid'`/`'warning'` rows on "Importar" — see
   [current-state.md](current-state.md)/[import-xtb.md](import-xtb.md)).
 - **Tests:** `lib/holdingsImport.test.ts`.
+- **Still pure after the audit-log task too** — does not import from
+  `lib/db/importAudit.ts` or know about `import_id`/audit logs at all.
+  Persistence is entirely the settings page's/`lib/db/importAudit.ts`'s
+  concern; see below.
+
+## `lib/db/importAudit.ts` — active (support module, not a model)
+
+- **Function:** persists one row per *confirmed* import in
+  `public.import_audit_logs` (schema: `supabase-migration-import-audit-log.sql`,
+  consolidated into `supabase-schema.sql`) and tags the transactions it
+  writes with `import_id`. `createImportAuditLog`/`completeImportAuditLog`/
+  `failImportAuditLog`/`listImportAuditLogs`/`getImportAuditLog`, plus pure
+  helpers: `determineImportStatus` (status lifecycle logic),
+  `computeImportFileHash` (reuses `lib/models/modelMeta.ts`'s
+  `createInputHash()` — non-cryptographic, content-based, never touches raw
+  file bytes), and `buildImportAuditLogInsert` (payload builder, split out
+  specifically so it's unit-testable without a Supabase client).
+- **Inputs:** a `SupabaseClient<AppDatabase>` (browser or server, same
+  convention as `lib/db/holdings.ts`/`transactions.ts`/`plans.ts`) plus
+  plain data (`userId`, `filename`, an `ImportPreview`, etc.) — no parsing,
+  no file I/O.
+- **Outputs:** raw Supabase responses (`{ data, error }`), same convention
+  as the rest of `lib/db/*` — callers check `.error` themselves.
+- **Consumers:** `app/profile/settings/page.tsx`'s `confirmImport()` (create
+  → write holdings/transactions → complete/fail) and its "Últimas
+  importações" read-only history list.
+- **Tests:** `lib/db/importAudit.test.ts` — the three pure functions only
+  (`determineImportStatus`, `computeImportFileHash`,
+  `buildImportAuditLogInsert`); the DB-client-dependent functions
+  (`createImportAuditLog` etc.) aren't unit-tested — no existing
+  Supabase-client mock pattern exists elsewhere in this repo's unit tests to
+  follow (only `e2e/*.spec.ts` mocks Supabase, at the network/Playwright
+  level, not the JS client level).
 
 ## `lib/marketData.ts` — active
 
