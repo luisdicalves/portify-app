@@ -121,7 +121,22 @@ is in [import-xtb.md](import-xtb.md#audit-log-persistente).
   [release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
   for the pre-deploy checklist. Until migrated, imports in that environment
   fail closed (abort, nothing written, friendly error) rather than silently
-  succeeding without an audit trail.
+  succeeding without an audit trail. **Real validation is still pending** —
+  this environment has no Supabase project unambiguously identifiable as
+  staging (see the runbook's "Staging validation log"), so the migration has
+  not actually been run anywhere yet.
+- **Supabase environment guardrails** were added (`chore/supabase-environment-guardrails`)
+  precisely because of the gap above: [docs/supabase-environments.md](supabase-environments.md)
+  defines local/staging/production and the naming/`SUPABASE_ENVIRONMENT`
+  convention, and `npm run check:supabase-env`
+  ([scripts/check-supabase-environment.mjs](../scripts/check-supabase-environment.mjs))
+  refuses to let a migration or `database.types.ts` regeneration proceed
+  against an ambiguous project. This is distinct from `npm run check:schema`
+  ([scripts/check-import-audit-schema.mjs](../scripts/check-import-audit-schema.mjs)),
+  which validates the *static structure* (migration/schema/types agree with
+  each other) — `check:supabase-env` validates the *operational context*
+  (which real project a sensitive command is about to run against) before
+  such a command is allowed.
 - **`ImportPreview.importId` is still not populated by the parser** — the
   parser stays fully decoupled from persistence (no import from
   `lib/db/importAudit.ts`, verified by the existing purity test). The
