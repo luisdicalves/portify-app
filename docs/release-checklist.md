@@ -27,17 +27,34 @@ this before merging or deploying any change that touches that schema or
       deliberada — ver runbook).
 - [ ] Supabase staging migrado (migration aplicada e queries de verificação
       do runbook corridas com sucesso).
-- [ ] Importação XTB testada em staging com um ficheiro pequeno (poucas
-      linhas) — audit log criado, transactions com `import_id` preenchido.
+- [ ] Importação XTB testada em staging com um ficheiro pequeno válido
+      (poucas linhas) — audit log criado, transactions com `import_id`
+      preenchido (ver runbook, "Functional smoke test", passos 1–5).
+- [ ] Importação com linhas inválidas testada — linhas com erro não são
+      gravadas, `invalid_rows`/`error_count` no audit log reflectem-nas
+      (runbook, passo 6).
+- [ ] Importação com duplicados internos (dentro do próprio ficheiro)
+      testada — só a primeira ocorrência é gravada (runbook, passo 7).
 - [ ] Importação com retenção na fonte (`withholding_tax`) testada em
       staging — confirma que o `transactions_type_check` alargado aceita o
-      tipo (bug pré-existente corrigido por esta migration).
-- [ ] Importação duplicada testada — reimportar o mesmo ficheiro não
-      duplica transactions, e continua a criar um audit log
-      (`imported_rows: 0`, `status: 'completed'`).
+      tipo (bug pré-existente corrigido por esta migration; runbook, passo 8).
+- [ ] `interest_tax` e `deposit` testados (runbook, passo 9). `'wht'` não é
+      produzível pela UI de importação — não tentar simular via ficheiro,
+      ver runbook para o porquê.
+- [ ] Importação duplicada persistente testada — reimportar o mesmo ficheiro
+      já confirmado não duplica transactions, e continua a criar um novo
+      audit log (`imported_rows: 0`, `status: 'completed'`; runbook, passo 10).
 - [ ] Falha de audit log testada — com `import_audit_logs` indisponível
       (ou RLS a bloquear), a importação aborta e nada é gravado
-      (ver `e2e/notifications.spec.ts`).
+      (ver `e2e/notifications.spec.ts`, e runbook passo 11 se houver um
+      segundo ambiente não migrado disponível).
+- [ ] RLS testada com dois utilizadores distintos (ver runbook, secção "RLS
+      checklist (staging, two users)"): utilizador A não vê nem actualiza
+      imports de B, `delete` não é permitido para ninguém, e
+      `transactions.import_id` fica correctamente associado por utilizador.
+- [ ] Confirmado, com a query do runbook ("Troubleshooting / mitigation"),
+      que não existe nenhuma transacção com `external_id` preenchido e
+      `import_id` nulo (i.e. nenhuma transacção importada sem audit trail).
 - [ ] Confirmado que nenhum conteúdo bruto do ficheiro é guardado —
       `import_audit_logs` só guarda metadados/sumários (`filename`,
       `file_hash`, contagens, `summary`/`warnings`/`errors` agregados),

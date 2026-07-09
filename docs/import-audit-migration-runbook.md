@@ -151,12 +151,14 @@ static text check, complementary to the queries above, not a replacement).
 
 ## Functional smoke test (staging)
 
-Manual, against the deployed staging app, after the migration is applied:
+Manual, against the deployed staging app, after the migration is applied.
+Use two separate test accounts (**user A**, **user B**) — user B is only
+needed for the RLS checklist further down, not for steps 1–9 below.
 
-1. Log in as a test user with no existing transactions.
+1. Log in as **user A**, a test user with no existing transactions.
 2. Go to **Perfil → Definições → Importar Portfólio**.
-3. Upload a small CSV (`ticker,units,avg_price` — e.g. 2–3 rows) or a small
-   XTB "CASH OPERATION HISTORY" export.
+3. **Valid file:** upload a small CSV (`ticker,units,avg_price` — e.g. 2–3
+   rows) or a small XTB "CASH OPERATION HISTORY" export.
 4. Click **Analisar ficheiro** — confirm the preview shows the expected row
    counts (nothing written to the DB yet at this point).
 5. Click **Importar**. Confirm:
@@ -167,24 +169,84 @@ Manual, against the deployed staging app, after the migration is applied:
    - In the SQL Editor: `select * from import_audit_logs order by created_at desc limit 1;`
      shows `status = 'completed'`, `imported_rows` matching what the toast said.
    - The imported transactions have `import_id` set to that row's `id`
-     (`select import_id, count(*) from transactions where user_id = '<test-user>' group by import_id;`).
-6. Repeat the import with a file containing a **withholding-tax** row
-   (`withholding_tax` transaction type) — confirms the constraint fix; this
-   would have failed with the pre-migration `transactions_type_check`.
-7. Re-upload the **same** file again — confirm rows are flagged
-   `'duplicate'` in the preview and are not re-imported (per
-   [import-xtb.md](import-xtb.md#duplicate-policy)), and that a new audit log
-   row is still created (`status: 'completed'`, `imported_rows: 0`, since
-   there was nothing eligible to write — see "Status lifecycle" in
-   import-xtb.md).
-8. Optional: temporarily revoke the app's ability to reach
-   `import_audit_logs` (e.g. test against a project where the migration has
-   *not* yet been applied) and confirm the import aborts with the friendly
-   `impAuditFailed` message and writes nothing — this is the same scenario
-   already covered by the `e2e/notifications.spec.ts` test
-   ("import audit log failure renders styled error banner and saves
-   nothing"), just re-confirmed against a real backend instead of a mocked
-   route.
+     (`select import_id, count(*) from transactions where user_id = '<user-a-id>' group by import_id;`).
+6. **Invalid rows:** upload a file with at least one row that fails
+   validation (e.g. a "CASH OPERATION" row with an unrecognized `Type`, or a
+   `buy` row missing units/price). Confirm the preview marks that row
+   `'error'` with a reason, **"Importar" still only writes the valid rows**,
+   and the audit log's `invalid_rows`/`error_count` reflect the bad row(s)
+   (`status` should still be `'completed'` if at least the valid rows made
+   it in — an all-invalid file is `'completed'` with `imported_rows: 0`, not
+   `'failed'`; see "Status lifecycle" in import-xtb.md).
+7. **Internal duplicates:** upload a file where two rows resolve to the same
+   `[date, type, ticker, units, price, amount]` key (see
+   [import-xtb.md](import-xtb.md#duplicate-policy)). Confirm the preview
+   flags the later row(s) `'duplicate'`, only the first occurrence is
+   imported, and the audit log's `duplicate_rows` count matches.
+8. **Withholding tax:** repeat the import with a file containing a
+   **`withholding_tax`** row — confirms the `transactions_type_check` fix;
+   this row would have failed the pre-migration constraint (`'wht'`-only).
+9. **`interest_tax` and `deposit`:** repeat with a file containing an
+   `interest_tax` row and a `deposit` row (no ticker on either) — confirm
+   both import without error and appear correctly in **Actividade**.
+   `'wht'` itself is **not producible through the import UI** — the parser
+   (`normalizeXtbTransactionType()` in `lib/holdingsImport.ts`) only ever
+   emits `'withholding_tax'`; `'wht'` is kept in the DB check constraint
+   purely for backward compatibility with rows written before that naming
+   was standardized (see "Known risks" below for the one place this matters:
+   `portfolioState.ts` doesn't recognize a `'wht'`-typed row either). There is
+   nothing to test here beyond confirming the constraint still *accepts*
+   `'wht'` (covered by the post-migration validation query above) — don't
+   try to manufacture a `'wht'` row through the UI, it can't happen.
+10. **Persistent duplicate (same file, re-imported):** re-upload the
+    **same** file from step 5 again — confirm rows are flagged `'duplicate'`
+    in the preview and are not re-imported (checked against the user's
+    already-saved transactions this time, not just within-file), and that a
+    **new** audit log row is still created (`status: 'completed'`,
+    `imported_rows: 0`, since there was nothing eligible to write).
+11. **Unmigrated DB simulation:** if you have access to a *second*,
+    not-yet-migrated staging-like project (or can temporarily revoke the
+    app's grants on `import_audit_logs` in a disposable project), point the
+    app at it and confirm the import aborts with the friendly
+    `impAuditFailed` message and writes nothing. This is the same scenario
+    already covered by the `e2e/notifications.spec.ts` test ("import audit
+    log failure renders styled error banner and saves nothing"), just
+    re-confirmed against a real backend instead of a mocked route. Skip this
+    step if no such environment exists — the e2e test is the fallback
+    coverage.
+
+## RLS checklist (staging, two users)
+
+Requires two distinct authenticated test accounts, **user A** and **user
+B**, each with at least one completed import from the smoke test above.
+Run as each user (either through the app while logged in as that user, or
+via the SQL Editor using `set local role authenticated; set local request.jwt.claim.sub = '<user-id>';`
+to simulate their session — the app-level check is the one that actually
+matters, the SQL Editor version is a faster way to iterate).
+
+- [ ] **User A cannot see user B's imports.** As user A,
+      `select * from import_audit_logs where user_id = '<user-b-id>';`
+      returns zero rows (RLS `select` policy scopes to `auth.uid() = user_id`).
+      In the app, user A's **Últimas importações** list never shows user B's
+      filenames.
+- [ ] **User A cannot update user B's imports.** As user A,
+      `update import_audit_logs set status = 'failed' where user_id = '<user-b-id>';`
+      affects **0 rows** (RLS `update` policy's `using`/`with check` both
+      require `auth.uid() = user_id`) — it should not error outright with
+      most Supabase clients, it should just silently match nothing.
+- [ ] **Delete is not permitted, for anyone.**
+      `delete from import_audit_logs where user_id = '<own-user-id>';` (as
+      that same user) affects **0 rows** — there is deliberately no `delete`
+      policy, and RLS-enabled tables block any command with no matching
+      policy by default, including deleting your own rows.
+- [ ] **`transactions.import_id` is recorded correctly and stays scoped per
+      user.** After user A's import, `select id, import_id from transactions where user_id = '<user-a-id>' and import_id is not null;`
+      shows the expected rows, all pointing at an `import_audit_logs.id`
+      that also belongs to user A (`import_id` is just a foreign key value —
+      it does not bypass `transactions`' own RLS policy, which is what
+      actually gates every read/write on that table; see
+      [import-xtb.md](import-xtb.md#audit-log-persistente) "No
+      cross-user leakage").
 
 ## Rollback (manual)
 
@@ -220,6 +282,56 @@ after being applied:
    import again, the same as an unmigrated environment) — coordinate the
    schema rollback with a code deploy, don't do just one.
 
+## Troubleshooting / mitigation
+
+**If the migration fails partway through the SQL Editor run:**
+- Re-run the whole file from the top. Every statement in it is guarded
+  (`if not exists`/`if exists`/`drop ... if exists` before `create`/`add`),
+  so re-running after a partial failure is safe — it picks up wherever it
+  left off rather than erroring on "already exists".
+- If a specific statement keeps failing, run the "Post-migration validation"
+  queries above to see exactly what state the schema is actually in before
+  retrying, rather than guessing.
+- If the failure looks like a permissions error (not a syntax/constraint
+  error), confirm you're running the SQL Editor as the project owner/service
+  role, not a restricted role.
+
+**If the app shows the "audit log unavailable" error
+(`impAuditFailed`) in a supposedly-migrated environment:**
+- Open the browser console — `createImportAuditLog failed: ...` is logged
+  there with the real Supabase error (see `app/profile/settings/page.tsx`),
+  which is not shown to the user by design.
+- Most likely causes, in order of likelihood: (1) migration genuinely
+  wasn't applied to *this* project/environment (double-check
+  `NEXT_PUBLIC_SUPABASE_URL` points where you think it does), (2) RLS
+  rejected the insert because the authenticated session's `auth.uid()`
+  doesn't match the `userId` being sent (stale session, or `useUser()`
+  resolved to a stale/mismatched id — check the session in the same
+  browser tab), (3) a real transient Supabase outage.
+- The app's behavior in all three cases is identical and correct: abort,
+  write nothing, show the friendly message. No further mitigation is needed
+  on the data-integrity side — this is fixing availability, not safety.
+
+**How to confirm no transaction was ever written without a matching audit
+log (data-integrity spot-check, any time):**
+```sql
+-- Should always return zero rows: a transaction written by an import
+-- (external_id not null, i.e. came from a parsed file, not a manual trade)
+-- with no import_id at all would mean the invariant broke somewhere.
+-- Manually-entered trades (external_id is null) are expected to have
+-- import_id = null and are correctly excluded by this filter.
+select count(*) from transactions
+where external_id is not null and import_id is null;
+
+-- Should always return zero rows: an import_audit_logs row stuck in
+-- 'pending' for a long time (older than a few minutes) means confirmImport()
+-- crashed between creating the audit log and calling complete/failImportAuditLog
+-- — the try/catch in confirmImport() should prevent this, but this query is
+-- the fast way to notice if it ever does happen.
+select id, user_id, filename, created_at from import_audit_logs
+where status = 'pending' and created_at < now() - interval '10 minutes';
+```
+
 ## Known risks
 
 - **`database.types.ts` was hand-written, not generated.** Until it's
@@ -247,6 +359,33 @@ after being applied:
   than writing to the wrong user's row — this is the intended fail-closed
   behavior, but worth knowing if a future symptom looks like "audit log
   silently didn't update."
+- **`'wht'` is a DB-only legacy value, unhandled by `portfolioState.ts`.**
+  `transactions_type_check` accepts `'wht'` (kept for backward compatibility
+  with rows written before the app standardized on `'withholding_tax'`), but
+  `lib/portfolio/portfolioState.ts`'s `TransactionType` union and its
+  ledger-replay `switch`/`if` chain only recognize `'withholding_tax'`, not
+  `'wht'` — a legacy `'wht'`-typed row would silently not contribute to
+  `taxWithheld`/`cashBalance` if it ever reached that code path (it's
+  currently only reached when `transactions: []` is *not* passed, which none
+  of Dashboard/Portfolio/For You do today — see
+  [current-state.md](current-state.md)). This is a **pre-existing
+  characteristic of any `'wht'`-labeled legacy row**, not something
+  introduced by the import-audit-log migration, and out of scope for this
+  task to fix (`portfolioState.ts` is explicitly off-limits — see
+  [model-map.md](model-map.md)). No current code path writes `'wht'`; the
+  import parser (`normalizeXtbTransactionType()`) only ever produces
+  `'withholding_tax'`. Flagging here so it isn't mistaken for a regression
+  if it's ever noticed downstream.
+- **The `holdings` upsert in `confirmImport()` isn't checked for errors.**
+  `app/profile/settings/page.tsx`'s `confirmImport()` awaits
+  `supabase.from('holdings').upsert(...)` but doesn't inspect its `.error` —
+  if that specific call fails (network blip, RLS misconfiguration) while the
+  audit log and transactions writes both succeed, the audit log will report
+  `'completed'` even though the holdings snapshot wasn't actually updated.
+  This is a **pre-existing gap in `confirmImport()`, not introduced by this
+  task**, and fixing it would mean changing the import write path itself —
+  out of scope here (this task's brief is schema/docs/copy, not import
+  behavior). Noted so it's a known, not a surprise.
 
 ## What was and wasn't validated
 
@@ -267,6 +406,18 @@ after being applied:
   ("import audit log failure renders styled error banner and saves nothing")
   already exercises this abort path against a mocked 500 response simulating
   an unmigrated database.
+- The `transactions_type_check` constraint was confirmed (by reading
+  `lib/holdingsImport.ts`, `lib/portfolio/portfolioState.ts`, and
+  `components/ui/TransactionCard.tsx`) to cover every transaction type the
+  app actually produces or reads (`buy`, `sell`, `dividend`, `deposit`,
+  `interest`, `withholding_tax`, `interest_tax`), plus the legacy-only
+  `'wht'` — see "Known risks" above for the one place `'wht'` isn't
+  recognized downstream (`portfolioState.ts`, pre-existing, out of scope).
+- `npm run check:schema` was extended (this task) to also statically check:
+  RLS is enabled with select/insert/update policies and no delete policy on
+  `import_audit_logs`, no raw-file-content column exists, all 7 required
+  transaction types are present in the `transactions_type_check` definition,
+  and all the docs/test files this runbook depends on actually exist.
 
 **Not validated (pending, needs a real or local Postgres/Supabase instance):**
 - Actually executing the migration SQL against any Postgres instance (local
