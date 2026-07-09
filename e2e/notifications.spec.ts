@@ -181,15 +181,70 @@ test.describe('Notifications — profile pages', () => {
     await expect(banner).toHaveCSS('border-style', 'solid');
   });
 
-  test('settings: import without a file renders styled error banner', async ({ page }) => {
+  test('settings: import without a file keeps the analyze button disabled', async ({ page }) => {
+    // The two-phase import flow (analyze -> preview -> confirm) disables
+    // "Analisar ficheiro" until a file is chosen, instead of the old
+    // single-step flow's "click and get told why" error banner.
     await page.goto('/profile/settings');
     await page.getByText('Importar Portfólio').click();
+
+    await expect(page.getByRole('button', { name: 'Analisar ficheiro', exact: true })).toBeDisabled();
+  });
+
+  test('settings: import audit log failure renders styled error banner and saves nothing', async ({ page }) => {
+    // analyzeImport() looks up the user's existing transactions before it can
+    // build a preview, so this needs an authenticated session — unlike the
+    // "no file" test above, which only checks a disabled-button state.
+    const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
+    await page.route(new RegExp(sb.source + '/rest/v1/import_audit_logs'), route =>
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'relation "import_audit_logs" does not exist' }) }),
+    );
+    await seedSession(page);
+
+    await page.goto('/profile/settings');
+    await page.getByText('Importar Portfólio').click();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'test-portfolio.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('ticker,units,avg_price\nAAPL,10,150.5'),
+    });
+    await page.getByRole('button', { name: 'Analisar ficheiro', exact: true }).click();
+    await expect(page.getByText('Ficheiro analisado')).toBeVisible();
+
     await page.getByRole('button', { name: 'Importar', exact: true }).click();
 
     const banner = page.locator('[data-testid="save-error"]');
     await expect(banner).toBeVisible();
     await expect(banner.locator('text=' + ERROR_ICON)).toBeVisible();
     await expect(banner).toHaveCSS('border-style', 'solid');
+
+    // The modal must still be open on the preview step — a failed audit log
+    // means the import was aborted, not silently treated as done.
+    await expect(page.getByText('Ficheiro analisado')).toBeVisible();
+  });
+
+  test('settings: successful import shows a completion toast referencing the audit log id', async ({ page }) => {
+    const sb = /https?:\/\/[^/]*supabase\.(co|test|io)/;
+    const fakeAuditLogId = 'aaaaaaaa-1111-0000-0000-000000000099';
+    await page.route(new RegExp(sb.source + '/rest/v1/import_audit_logs'), route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ id: fakeAuditLogId, status: 'pending' }) }),
+    );
+    await seedSession(page);
+
+    await page.goto('/profile/settings');
+    await page.getByText('Importar Portfólio').click();
+    await page.locator('input[type="file"]').setInputFiles({
+      name: 'test-portfolio.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from('ticker,units,avg_price\nAAPL,10,150.5'),
+    });
+    await page.getByRole('button', { name: 'Analisar ficheiro', exact: true }).click();
+    await expect(page.getByText('Ficheiro analisado')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Importar', exact: true }).click();
+
+    await expect(page.getByText('Importação concluída.')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText(fakeAuditLogId.slice(0, 8))).toBeVisible();
   });
 
   test('settings: account deletion failure renders styled error banner', async ({ page }) => {
