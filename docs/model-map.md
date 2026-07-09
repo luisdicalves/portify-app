@@ -173,11 +173,29 @@ marked **governed** below.
 ## `lib/holdingsImport.ts` — active
 
 - **Function:** parses CSV/XLSX broker exports (XTB-style) into
-  `ParsedHolding[]`/`ParsedTransaction[]`.
-- **Inputs:** raw file text/buffer.
-- **Outputs:** `ParseResult`.
-- **Consumers:** the holdings-import flow (out of scope for this task — see
-  "fora de âmbito").
+  `ParsedHolding[]`/`ParsedTransaction[]` (legacy `parseFile()`/
+  `parseXlsxFile()`/`parseHoldingsCsv()`, unchanged), and — since this task —
+  a richer two-phase preview: `previewFile()` parses + validates every row +
+  detects duplicates without saving anything, returning a typed
+  `ImportPreview` (`parserVersion: XTB_IMPORT_PARSER_VERSION`, currently
+  `1.0.0` — bump it whenever column mapping/type detection/validation rules
+  change, see [import-xtb.md](import-xtb.md)). Row-level helpers
+  (`mapXtbRowToTransaction`, `parseXtbRows`, `detectImportDuplicates`,
+  `normalizeXtbTransactionType`, `normalizeTicker`, `normalizeMoney`,
+  `normalizeDate`) are exported and independently testable. Still pure — no
+  Supabase, no external API, no React/Next.js (asserted by a source-inspection
+  test in `lib/holdingsImport.test.ts`).
+- **Inputs:** a `File` (browser) or raw buffer/text, plus optionally the
+  caller's already-saved transactions (`ExistingTransactionLike[]`) for
+  cross-referencing duplicates — the caller fetches these (e.g. via
+  `lib/db/transactions.ts`'s `getTransactions()`); the module itself does no I/O.
+- **Outputs:** `ParseResult` (legacy) or `ImportPreview` (new — includes
+  `rows: ImportPreviewRow[]` with per-row `status`/`issues`, `summary`,
+  and the derived `holdings` snapshot).
+- **Consumers:** `app/profile/settings/page.tsx` — now a two-phase flow
+  (`previewFile()` on "Analisar ficheiro", then a manual write of only
+  `'valid'`/`'warning'` rows on "Importar" — see
+  [current-state.md](current-state.md)/[import-xtb.md](import-xtb.md)).
 - **Tests:** `lib/holdingsImport.test.ts`.
 
 ## `lib/marketData.ts` — active
