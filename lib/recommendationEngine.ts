@@ -23,12 +23,41 @@ import type { CandidateAsset, AssetClass } from '@/lib/assetUniverse';
 import { sectorMatchScore }                from '@/lib/sectorMap';
 import { calcPlan, type UserProfile } from '@/lib/planCalculator';
 import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
+import { buildRecommendationExplanation } from '@/lib/recommendationExplanation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos públicos
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type RecommendationType = 'new' | 'reinforce';
+
+/**
+ * Confiança nos dados que suportam esta recomendação — puramente informativo.
+ * Não afecta ranking, finalScore, nem qualquer peso nesta fase — ver
+ * docs/model-governance.md. Qualquer uso futuro para alterar ranking exige
+ * bump de MODEL_VERSIONS.recommendationEngine (ver lib/models/modelMeta.ts).
+ */
+export type RecommendationDataConfidence = 'high' | 'medium' | 'low';
+
+/**
+ * Camada explicativa adicionada a cada Recommendation — ver
+ * lib/recommendationExplanation.ts para a lógica pura que a constrói.
+ * Aditiva: não substitui `reason`, `matchScore`, `qualityScore` ou
+ * `finalScore`, apenas explica-os em linguagem simples.
+ */
+export interface RecommendationExplanation {
+  primaryReason:   string; // porque é que esta recomendação aparece
+  portfolioEffect: string; // efeito esperado na carteira
+  riskNote:        string; // principal risco, em linguagem educativa
+  dataConfidence:  RecommendationDataConfidence;
+  scoreBreakdown: {
+    profileMatch:          number; // = matchScore, decomposto para leitura
+    fundamentalQuality:    number; // = qualityScore, idem
+    diversificationImpact: number; // 0–100, explicativo apenas — nunca entra no finalScore
+  };
+  reasons:  string[]; // pontos de apoio a primaryReason
+  warnings: string[]; // avisos específicos desta recomendação (dados em falta, fallback, etc.)
+}
 
 export interface Recommendation {
   asset:           CandidateAsset;
@@ -42,6 +71,7 @@ export interface Recommendation {
   targetWeight:    number;             // peso ideal segundo o modelo
   reason:          string;             // frase gerada automaticamente
   alreadyOwned:    boolean;
+  explanation:     RecommendationExplanation;
 }
 
 export interface OutOfPlanHolding {
@@ -349,6 +379,14 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
   const holdingMap = new Map<string, HoldingSnapshot>();
   for (const h of activeHoldings) holdingMap.set(h.ticker, h);
 
+  // Usado só por explanation.primaryReason/portfolioEffect (não afecta scoring):
+  // classes onde o utilizador já tem holdings activos, para distinguir "ainda
+  // pouco representada" de "encaixa no perfil".
+  const classHasActiveHoldings: Record<AssetClass, boolean> = { stock: false, etf: false, bond_etf: false };
+  for (const h of activeHoldings) {
+    if (h.assetClass) classHasActiveHoldings[h.assetClass] = true;
+  }
+
   // ── Score todos os candidatos ──────────────────────────────────────────────
   const scored = universe.map(asset => {
     const matchScore   = calcMatchScore(asset, profile, preferredSectors, alloc);
@@ -439,6 +477,9 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
 
       const type: RecommendationType = alreadyOwned ? 'reinforce' : 'new';
 
+      const hasMarketValue = !!holding && typeof holding.marketValue === 'number' && Number.isFinite(holding.marketValue);
+      const tickerWarnings = (opts.externalWarnings ?? []).filter(w => w.includes(item.asset.ticker));
+
       recommendations.push({
         asset:           item.asset,
         matchScore:      item.matchScore,
@@ -451,6 +492,21 @@ export function recommend(opts: RecommendOptions): RecommendationResult {
         targetWeight,
         reason:          buildReason(item.asset, item.finalScore, profile, type, isSubweighted),
         alreadyOwned,
+        explanation: buildRecommendationExplanation({
+          asset:            item.asset,
+          type,
+          matchScore:       item.matchScore,
+          qualityScore:     item.qualityScore,
+          currentWeight,
+          targetWeight,
+          isSubweighted,
+          alreadyOwned,
+          hasMarketValue,
+          classHasActiveHoldings: classHasActiveHoldings[cls],
+          preferredSectors,
+          investmentGoal:   profile.investment_goal,
+          tickerWarnings,
+        }),
       });
     });
   }

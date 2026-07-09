@@ -92,7 +92,10 @@ marked **governed** below.
 - **Inputs:** `RecommendOptions` (`universe`, `profile`, `preferredSectors`,
   `monthlyAmount`, `goalAmount`, `holdings`, `preferredClasses`,
   `maxPerClass`, `maxPerSector`, `externalWarnings`).
-- **Outputs:** `RecommendationResult` (adds `meta`).
+- **Outputs:** `RecommendationResult` (adds `meta`); each `Recommendation` now
+  also carries `explanation: RecommendationExplanation` (see
+  [lib/recommendationExplanation.ts](../lib/recommendationExplanation.ts)
+  below) — purely explanatory, does not feed back into scoring.
 - **Consumers:** `app/api/recommendations/route.ts` (→ `app/for-you/page.tsx`).
 - **Tests:** `lib/recommendationEngine.test.ts`.
 - **Note:** `totalPortfolioValue`/`currentWeight`/`OutOfPlanHolding.value` now
@@ -101,7 +104,32 @@ marked **governed** below.
   [current-state.md](current-state.md). The engine itself stays pure/I/O-free;
   `app/api/recommendations/route.ts` is what fetches quotes and builds
   `portfolioState` before calling `recommend()`. `matchScore`/`qualityScore`/
-  `finalScore` and the 60/40 blend are unchanged by this.
+  `finalScore` and the 60/40 blend are unchanged by this or by the
+  explanation layer below.
+
+## `lib/recommendationExplanation.ts` — governed (recommendationEngine), active
+
+- **Function:** `buildRecommendationExplanation()` plus the pure helpers it
+  composes (`getPrimaryReason`, `getPortfolioEffect`, `getRiskNote`,
+  `inferDataConfidence`, `calcDiversificationImpact`) — builds the
+  `RecommendationExplanation` attached to each `Recommendation`. Kept out of
+  `lib/recommendationEngine.ts` because it's copy-generation logic, not
+  scoring; types (`RecommendationDataConfidence`, `RecommendationExplanation`)
+  are declared in `recommendationEngine.ts` itself and imported here
+  type-only, so the dependency graph stays one-directional
+  (`recommendationEngine.ts` → `recommendationExplanation.ts`).
+- **Inputs:** `BuildExplanationInput` (asset, type, matchScore, qualityScore,
+  currentWeight, targetWeight, isSubweighted, alreadyOwned, hasMarketValue,
+  classHasActiveHoldings, preferredSectors, investmentGoal, tickerWarnings) —
+  all plain data already computed by `recommend()`, no I/O.
+- **Outputs:** `RecommendationExplanation`.
+- **Consumers:** `lib/recommendationEngine.ts` (`recommend()`).
+- **Tests:** covered via `lib/recommendationEngine.test.ts`'s
+  `describe('recommend — explanation', ...)` block (integration-level,
+  through `recommend()`, rather than unit tests calling the helpers
+  directly — kept in one file since both cover the same behavior).
+- Same purity rules as `recommendationEngine.ts`: no Supabase, no external
+  APIs, no React/Next.js, no `lib/marketData.ts`.
 
 ## `lib/assetUniverse.ts` — active
 

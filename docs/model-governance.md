@@ -81,13 +81,16 @@ functions.
 | `riskScore` | `1.0.0` | `lib/riskScore.ts` |
 | `qualityScore` | `1.0.0` | `lib/qualityScore.ts` |
 | `cashFlowForecast` | `1.0.0` | `lib/cashFlowForecast.ts` |
-| `recommendationEngine` | `3.0.0` | `lib/recommendationEngine.ts` |
+| `recommendationEngine` | `3.1.0` | `lib/recommendationEngine.ts` |
 
 `recommendationEngine` starts at `3.0.0` rather than `1.0.0` because the file
 already documented itself as "modelo v3.0" (the `preferred_asset_classes`
 rollout, see [current-state.md](current-state.md) and the PR history) before
 this task — the version constant here just makes that existing, already-true
-version machine-readable instead of introducing a new number.
+version machine-readable instead of introducing a new number. It moved to
+`3.1.0` (minor bump) when `Recommendation.explanation` was added — a purely
+additive, backwards-compatible field, not a formula/weight/threshold change,
+so a minor bump rather than major (see policy below).
 
 **Policy for future changes:** any change to a model's formula, weights, or
 thresholds (e.g. `WEIGHTS` in `planCalculator.ts`/`qualityScore.ts`, the
@@ -142,6 +145,38 @@ information it already has (e.g. `assetUniverse.ts`/`recommendationEngine.ts`,
 which do know `assetClass`) and wants to relabel a partial/unavailable
 coverage as "this is an ETF, fundamentals-style scoring doesn't really apply"
 instead of "no fundamentals found". No current caller does this yet.
+
+### A fourth signal: `Recommendation.explanation.dataConfidence`
+
+`lib/recommendationEngine.ts`'s `Recommendation.explanation.dataConfidence`
+(`'high' | 'medium' | 'low'`, built by
+[lib/recommendationExplanation.ts](../lib/recommendationExplanation.ts)'s
+`inferDataConfidence()`) is the same idea again, one level further out: how
+much you should trust the *specific recommendation shown to this user*, not
+just one asset's fundamentals. It's a simple, explicitly documented heuristic
+rather than a reuse of `qualityScore.ts`'s `confidence` — no
+`confidence`/`coverageStatus` field is threaded onto `CandidateAsset` yet, so
+there's nothing upstream to reuse today. It downgrades one level each for:
+a stock candidate missing `pillarHealthScore` (no `RiskReport` backed it —
+ETFs/bond ETFs are never penalized for lacking this, since they don't carry
+pillar data by design); an owned position whose weight came from the
+average-cost fallback instead of a live quote; and a data-quality warning
+that specifically names this ticker.
+
+**Policy — informative only, same as `confidence`/`coverageStatus`:**
+`dataConfidence` (like `qualityScore.ts`'s `confidence` before it) currently
+has **zero effect on `finalScore`, ranking, or `suggestedAmount`** — it is
+surfaced to the user (see `app/for-you/page.tsx`'s "Confiança dos dados" row)
+purely so they can weigh a recommendation themselves. The same applies to
+`scoreBreakdown.diversificationImpact`: it decomposes `currentWeight`/
+`targetWeight` into a 0–100 explanatory number but is never added into
+`finalScore`. **Any future change that has `dataConfidence` or
+`diversificationImpact` actually influence ranking, filtering, or
+`suggestedAmount` is a real model-behavior change and must bump
+`MODEL_VERSIONS.recommendationEngine`** (a minor bump if still additive/
+backwards-compatible in shape, a major bump if it changes which
+recommendations appear or in what order for existing users) — per the
+general versioning policy above.
 
 ## `qualityScore.ts` has two different "quality scores" — only one got confidence
 
