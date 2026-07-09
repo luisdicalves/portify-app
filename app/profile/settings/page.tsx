@@ -10,6 +10,10 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { previewFile, type ImportPreview } from '@/lib/holdingsImport';
 import { getTransactions } from '@/lib/db/transactions';
+import {
+  createImportAuditLog, completeImportAuditLog, failImportAuditLog, listImportAuditLogs,
+  computeImportFileHash, type ImportAuditStatus,
+} from '@/lib/db/importAudit';
 import { useUser } from '@/lib/hooks/useUser';
 
 function SectionLabel({ label }: { label: string }) {
@@ -43,6 +47,23 @@ function ImportStatTile({ label, value, tone }: { label: string; value: number; 
 function Card({ children }: { children: React.ReactNode }) {
   return <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>{children}</div>;
 }
+
+type ImportHistoryEntry = {
+  id: string;
+  filename: string;
+  status: ImportAuditStatus;
+  total_rows: number;
+  imported_rows: number;
+  skipped_rows: number;
+  created_at: string;
+};
+
+const IMPORT_STATUS_LABEL_KEY: Record<ImportAuditStatus, 'impStatusPending' | 'impStatusCompleted' | 'impStatusPartial' | 'impStatusFailed'> = {
+  pending: 'impStatusPending',
+  completed: 'impStatusCompleted',
+  partial: 'impStatusPartial',
+  failed: 'impStatusFailed',
+};
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -84,7 +105,8 @@ export default function SettingsPage() {
   const [analyzing, setAnalyzing] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
-  const [importToast, setImportToast] = useState<{ holdings: number; transactions: number } | null>(null);
+  const [importToast, setImportToast] = useState<{ holdings: number; transactions: number; importId?: string } | null>(null);
+  const [importHistory, setImportHistory] = useState<ImportHistoryEntry[]>([]);
   const [exportOpen, setExportOpen] = useState(false);
   const [exportFormat, setExportFormat] = useState<'csv' | 'pdf'>('csv');
   const [exportPeriodOpen, setExportPeriodOpen] = useState(false);
@@ -114,6 +136,18 @@ export default function SettingsPage() {
         setFreeFundsRate(data.free_funds_annual_rate_pct ?? 0);
       }
     })();
+  }, [user]);
+
+  async function loadImportHistory() {
+    if (!user) return;
+    const supabase = createClient();
+    const { data } = await listImportAuditLogs(supabase, user.id, 5);
+    if (data) setImportHistory(data as ImportHistoryEntry[]);
+  }
+
+  useEffect(() => {
+    loadImportHistory();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   function openCashSheet(field: 'cash' | 'rate') {
@@ -169,13 +203,33 @@ export default function SettingsPage() {
   }
 
   // Phase 2: only rows the user has seen and that aren't errors/duplicates
-  // are ever written — see docs/import-xtb.md.
+  // are ever written — see docs/import-xtb.md. A persistent audit log row is
+  // created *before* anything else is written, and updated to its final
+  // status once the write attempt is known — see docs/import-xtb.md's
+  // "audit log persistente" section for the full contract.
   async function confirmImport() {
     if (!importPreview || !user) return;
     setImporting(true);
     try {
       const supabase = createClient();
       const toImport = importPreview.rows.filter(r => (r.status === 'valid' || r.status === 'warning') && r.transaction);
+
+      // Create the audit log first — if this fails, abort. We never want to
+      // write holdings/transactions without a matching audit trail.
+      const { data: auditLog, error: auditError } = await createImportAuditLog(supabase, {
+        userId: user.id,
+        filename: importPreview.fileName,
+        fileHash: computeImportFileHash(importPreview),
+        parserName: importPreview.parserName,
+        parserVersion: importPreview.parserVersion,
+        preview: importPreview,
+      });
+      if (auditError || !auditLog) {
+        setImporting(false);
+        setImportError(t.impAuditFailed);
+        return;
+      }
+      const importId = auditLog.id;
 
       // Upsert holdings (positions) — the file replaces the position snapshot, same as before this task.
       if (importPreview.holdings.length > 0) {
@@ -185,11 +239,15 @@ export default function SettingsPage() {
         );
       }
 
-      // Insert transactions — external_id unique index still backstops exact re-imports.
+      // Insert transactions — external_id unique index still backstops exact
+      // re-imports; each row is tagged with import_id so it can be traced
+      // back to this audit log.
       let importedTxns = 0;
+      let writeErrorMessage: string | null = null;
       if (toImport.length > 0) {
         const rows = toImport.map(r => ({
           user_id: user.id,
+          import_id: importId,
           external_id: r.transaction!.external_id,
           ticker: r.transaction!.ticker ?? null,
           type: r.transaction!.type,
@@ -199,16 +257,30 @@ export default function SettingsPage() {
           executed_at: r.transaction!.executed_at,
           notes: r.transaction!.notes ?? null,
         }));
-        const { data: inserted } = await supabase
+        const { data: inserted, error: writeError } = await supabase
           .from('transactions')
           .upsert(rows, { onConflict: 'user_id,external_id', ignoreDuplicates: true })
           .select('id');
         importedTxns = inserted?.length ?? 0;
+        writeErrorMessage = writeError?.message ?? null;
+      }
+
+      if (writeErrorMessage) {
+        await failImportAuditLog(supabase, { userId: user.id, importId, error: writeErrorMessage, importedRows: importedTxns });
+      } else {
+        await completeImportAuditLog(supabase, {
+          userId: user.id,
+          importId,
+          eligibleRows: toImport.length,
+          importedRows: importedTxns,
+          skippedRows: importPreview.totalRows - importedTxns,
+        });
       }
 
       setImporting(false);
       closeImport();
-      setImportToast({ holdings: importPreview.holdings.length, transactions: importedTxns });
+      setImportToast({ holdings: importPreview.holdings.length, transactions: importedTxns, importId });
+      loadImportHistory();
       setTimeout(() => setImportToast(null), 4000);
     } catch {
       setImporting(false);
@@ -282,6 +354,34 @@ export default function SettingsPage() {
             <SettingsRow icon="link" label={t.linkBroker} border={false} />
           </Card>
         </div>
+
+        {/* Import history — read-only, last 5 (lib/db/importAudit.ts's listImportAuditLogs) */}
+        {importHistory.length > 0 && (
+          <div>
+            <SectionLabel label={t.impHistoryTitle} />
+            <Card>
+              {importHistory.map((entry, i) => (
+                <div key={entry.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: i < importHistory.length - 1 ? '1px solid var(--hairline)' : 'none' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{entry.filename}</div>
+                    <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 2 }}>
+                      {new Date(entry.created_at).toLocaleDateString(lang === 'pt' ? 'pt-PT' : 'en-GB')}
+                      {' · '}{entry.imported_rows} {t.impHistoryImported.toLowerCase()}
+                      {entry.skipped_rows > 0 && <> · {entry.skipped_rows} {t.impHistorySkipped.toLowerCase()}</>}
+                    </div>
+                  </div>
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 'var(--radius-xs)', flexShrink: 0, marginLeft: 8,
+                    background: entry.status === 'completed' ? 'var(--gain-container)' : entry.status === 'failed' ? 'var(--loss-container)' : 'var(--surface-high)',
+                    color: entry.status === 'completed' ? 'var(--gain)' : entry.status === 'failed' ? 'var(--loss)' : 'var(--on-surface-variant)',
+                  }}>
+                    {t[IMPORT_STATUS_LABEL_KEY[entry.status]]}
+                  </span>
+                </div>
+              ))}
+            </Card>
+          </div>
+        )}
 
         {/* Free funds */}
         <div>
@@ -559,6 +659,11 @@ export default function SettingsPage() {
             <div style={{ fontSize: 12, color: 'var(--inverse-on-surface)', opacity: 0.7 }}>
               {importToast.holdings} {t.positionsUnit} · {importToast.transactions} {t.transactionsImportedUnit}
             </div>
+            {importToast.importId && (
+              <div style={{ fontSize: 10, color: 'var(--inverse-on-surface)', opacity: 0.5, marginTop: 2 }}>
+                {t.impRegisteredWithId} {importToast.importId.slice(0, 8)}
+              </div>
+            )}
           </div>
         </div>
       )}

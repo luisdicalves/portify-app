@@ -164,25 +164,77 @@ create policy "Users manage their own holdings"
   using     (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+-- Import audit logs — one row per confirmed XTB/CSV import (lib/db/importAudit.ts).
+-- Created before "transactions" since transactions.import_id references it.
+-- Never stores raw file content — see docs/import-xtb.md.
+create table if not exists public.import_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  parser_name text not null default 'xtb',
+  parser_version text not null,
+  filename text not null,
+  file_hash text,
+  status text not null default 'pending'
+    check (status in ('pending', 'completed', 'partial', 'failed')),
+  total_rows integer not null default 0,
+  valid_rows integer not null default 0,
+  invalid_rows integer not null default 0,
+  duplicate_rows integer not null default 0,
+  imported_rows integer not null default 0,
+  skipped_rows integer not null default 0,
+  warning_count integer not null default 0,
+  error_count integer not null default 0,
+  summary jsonb not null default '{}'::jsonb,
+  warnings jsonb not null default '[]'::jsonb,
+  errors jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default now(),
+  completed_at timestamptz
+);
+
+create index if not exists import_audit_logs_user_id_created_at_idx
+  on public.import_audit_logs (user_id, created_at desc);
+
+alter table public.import_audit_logs enable row level security;
+
+create policy "Users can view their own import audit logs"
+  on public.import_audit_logs for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert their own import audit logs"
+  on public.import_audit_logs for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update their own import audit logs"
+  on public.import_audit_logs for update
+  using     (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- No delete policy, deliberately — same pattern as profiles' missing INSERT
+-- policy: RLS active + no policy for a command blocks it by default. An
+-- audit log shouldn't be deletable by the user it belongs to.
+
 -- Transactions
 create table if not exists public.transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade not null,
-  ticker text not null,
-  type text not null check (type in ('buy','sell','dividend','deposit','interest','wht','interest_tax')),
+  ticker text,
+  type text not null check (type in ('buy','sell','dividend','deposit','interest','withholding_tax','wht','interest_tax')),
   units numeric,
   price numeric,
   amount numeric not null,
   currency text default 'EUR',
   executed_at timestamptz default now(),
   notes text,
-  external_id text
+  external_id text,
+  import_id uuid references public.import_audit_logs(id) on delete set null
 );
 
 -- Plain (non-partial) unique index: required so upsert(... onConflict: 'user_id,external_id')
 -- can target it via ON CONFLICT. Postgres allows multiple NULL external_id rows under this
 -- index (NULL <> NULL), so manually-entered trades (no external_id) are unaffected.
 create unique index if not exists transactions_user_external_id_idx on public.transactions (user_id, external_id);
+
+create index if not exists transactions_user_id_import_id_idx on public.transactions (user_id, import_id);
 
 alter table public.transactions enable row level security;
 

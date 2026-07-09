@@ -110,6 +110,90 @@ export type Database = {
           },
         ]
       }
+      import_audit_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          duplicate_rows: number
+          error_count: number
+          errors: Json
+          file_hash: string | null
+          filename: string
+          id: string
+          imported_rows: number
+          invalid_rows: number
+          parser_name: string
+          parser_version: string
+          skipped_rows: number
+          status: string
+          summary: Json
+          total_rows: number
+          user_id: string
+          valid_rows: number
+          warning_count: number
+          warnings: Json
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          duplicate_rows?: number
+          error_count?: number
+          errors?: Json
+          file_hash?: string | null
+          filename: string
+          id?: string
+          imported_rows?: number
+          invalid_rows?: number
+          parser_name?: string
+          parser_version: string
+          skipped_rows?: number
+          status?: string
+          summary?: Json
+          total_rows?: number
+          user_id: string
+          valid_rows?: number
+          warning_count?: number
+          warnings?: Json
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          duplicate_rows?: number
+          error_count?: number
+          errors?: Json
+          file_hash?: string | null
+          filename?: string
+          id?: string
+          imported_rows?: number
+          invalid_rows?: number
+          parser_name?: string
+          parser_version?: string
+          skipped_rows?: number
+          status?: string
+          summary?: Json
+          total_rows?: number
+          user_id?: string
+          valid_rows?: number
+          warning_count?: number
+          warnings?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "investor_profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "import_audit_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investment_plans: {
         Row: {
           amount: number
@@ -252,6 +336,7 @@ export type Database = {
           executed_at: string | null
           external_id: string | null
           id: string
+          import_id: string | null
           notes: string | null
           price: number | null
           ticker: string | null
@@ -265,6 +350,7 @@ export type Database = {
           executed_at?: string | null
           external_id?: string | null
           id?: string
+          import_id?: string | null
           notes?: string | null
           price?: number | null
           ticker?: string | null
@@ -278,6 +364,7 @@ export type Database = {
           executed_at?: string | null
           external_id?: string | null
           id?: string
+          import_id?: string | null
           notes?: string | null
           price?: number | null
           ticker?: string | null
@@ -286,6 +373,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "import_audit_logs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_user_id_fkey"
             columns: ["user_id"]

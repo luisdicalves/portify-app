@@ -157,18 +157,147 @@ import flow — both explicitly out of scope.
   purity rule or duplicating every message in two languages inside a
   non-UI module. The surrounding UI chrome (buttons, labels, stat tiles) is
   fully bilingual via `lib/dict/{pt,en}.ts`, as usual.
-- **No persistent import audit log.** `ImportPreview.importId` exists in the
-  type and is always `undefined` — it's a placeholder for a future feature
-  that would record "user X imported file Y on date Z, N rows, M errors"
-  somewhere durable (a new table, or reusing `transactions.notes`). Out of
-  scope for this task by design (no Supabase schema/migration changes).
+## Audit log persistente
+
+Every confirmed import now creates a row in `public.import_audit_logs`
+(schema in [supabase-migration-import-audit-log.sql](../supabase-migration-import-audit-log.sql),
+consolidated into [supabase-schema.sql](../supabase-schema.sql); helpers in
+[lib/db/importAudit.ts](../lib/db/importAudit.ts)). `ImportPreview.importId`
+was reserved but always `undefined` before this task — it's still not
+threaded onto the preview type itself (the parser stays fully decoupled from
+persistence, see "Parser stays pure" below), but `app/profile/settings/page.tsx`
+now surfaces the created audit log's `id` directly in the confirmation
+toast.
+
+### What's stored
+
+| Column | What it holds |
+|---|---|
+| `user_id` | who imported (FK to `public.profiles(id)`, RLS-scoped) |
+| `parser_name`, `parser_version` | which parser produced this preview, and which version — see `XTB_IMPORT_PARSER_VERSION` |
+| `filename` | the **name** of the uploaded file only (e.g. `"extract.xlsx"`) — never a path, never the file itself |
+| `file_hash` | see "File hash" below |
+| `status` | `pending` → `completed` \| `partial` \| `failed` — see "Status lifecycle" |
+| `total_rows`/`valid_rows`/`invalid_rows`/`duplicate_rows` | copied straight from the `ImportPreview` the user reviewed |
+| `imported_rows`/`skipped_rows` | filled in once the write attempt is known |
+| `warning_count`/`error_count` | counts, not the full issue text |
+| `summary` | `ImportPreview.summary` (per-type counts, tickers, currencies) as jsonb |
+| `warnings`/`errors` | `ImportPreview.warnings`/`errors` (the `ImportIssue[]` arrays: severity/code/message/rowNumber/field) as jsonb |
+| `created_at`/`completed_at` | when the log was created vs. when its final status was set |
+
+### What's never stored
+
+- The raw file (bytes, base64, or otherwise) — `previewFile()`'s parsing
+  happens entirely in the browser/request and nothing downstream of the
+  `ImportPreview` object ever sees the original `File`/`ArrayBuffer` again.
+- Per-cell original file content beyond what already flows through
+  `ImportIssue.message`/`ImportPreviewSummary` (i.e. no dump of every row's
+  raw spreadsheet cells into the audit log — `rows` is deliberately not a
+  column on `import_audit_logs`).
+- Any file path — `filename` is `File.name` (a bare filename, e.g.
+  `"extract.xlsx"`), sourced entirely from the browser's `<input type="file">`,
+  which never exposes the uploader's local filesystem path to begin with.
+
+### File hash
+
+`computeImportFileHash()` (`lib/db/importAudit.ts`) reuses
+`lib/models/modelMeta.ts`'s `createInputHash()` — the same non-cryptographic,
+32-bit rolling hash used elsewhere in this codebase for change detection
+(see [model-governance.md](model-governance.md)). It fingerprints the
+**parsed content** (parser version + each row's resulting transaction/
+original cells), not the raw file bytes, and deliberately excludes the
+filename — two exports of the same underlying data hash the same even if
+renamed. This is an operational fingerprint for "does this look like
+something I already imported", not a security or integrity mechanism, and
+has no collision-resistance guarantees.
+
+### Status lifecycle
+
+1. **`pending`** — set the instant the audit log row is created, *before*
+   any holdings/transactions write is attempted. If this insert itself
+   fails, `confirmImport()` aborts immediately (`impAuditFailed` shown to
+   the user) — holdings/transactions are never written without a matching
+   audit log.
+2. After the write attempt, `determineImportStatus()` (pure, unit-tested in
+   `lib/db/importAudit.test.ts`) resolves the final status:
+   - **`completed`** — every eligible row (`status: 'valid'`/`'warning'` in
+     the preview) was written, or there were zero eligible rows to begin
+     with (an all-invalid/all-duplicate file is a successful no-op, not a
+     failure).
+   - **`partial`** — some, but not all, eligible rows made it in.
+   - **`failed`** — there were eligible rows but none were written (either
+     the write call itself errored, or it nominally succeeded but wrote
+     zero rows).
+3. `completed_at` is set alongside the final status.
+
+`invalid_rows`/`duplicate_rows` (rows never attempted, known from the
+preview) are conceptually distinct from write-time gaps
+(`eligibleRows − importedRows`, only knowable after the write) —
+`skipped_rows` on the row is the **total** of both (`total_rows − imported_rows`).
+
+### `transactions.import_id`
+
+Every transaction written by a confirmed import is tagged with
+`import_id = <the audit log's id>`, via a nullable FK
+(`transactions.import_id references import_audit_logs(id) on delete set null`).
+Manually-entered trades (`lib/hooks/useTrade.ts`) and transactions imported
+before this task keep `import_id = null` — nothing about existing rows
+changes. Deleting an audit log (not currently exposed to users — see RLS
+below) would `set null` on its transactions rather than cascading, so
+transaction history is never silently deleted as a side effect of an audit
+log going away.
+
+**No cross-user leakage:** `transactions`' own RLS policy
+(`auth.uid() = user_id`, `for all`) is what actually gates every read/write
+on that table — `import_id` is just a foreign key value, not a bypass. A
+user querying `transactions` filtered by some `import_id` still only ever
+sees rows where `user_id = auth.uid()`, regardless of whose audit log that
+id belongs to.
+
+### RLS
+
+`import_audit_logs` has RLS enabled with `select`/`insert`/`update` policies
+scoped to `auth.uid() = user_id` (with an explicit `with check` on
+insert/update, same pattern as the rest of the schema post-RLS-audit — see
+`supabase-migration-rls-audit.sql`). **No delete policy** — same pattern as
+`profiles`' missing insert policy: RLS enabled + no policy for a command
+blocks that command by default. An audit trail shouldn't be deletable by the
+user it describes.
+
+### Parser stays pure
+
+`lib/holdingsImport.ts` was **not** changed by this task beyond what's
+already documented above — it still exports `ImportPreview` with no
+`import_id`/audit-log awareness, still does no I/O, and still doesn't import
+from `lib/db/importAudit.ts` (verified by the same source-inspection purity
+test as before). All persistence — creating the log, tagging transactions,
+resolving the final status — lives in `app/profile/settings/page.tsx` and
+`lib/db/importAudit.ts`, which the parser has no dependency on.
+
+### Known limitation: pre-existing schema bug, fixed in passing
+
+While building this, we found that `transactions`' `type` check constraint
+only allowed `'wht'`, but the app (this parser included) has always written
+`'withholding_tax'` — any import containing a withholding-tax row would have
+failed the constraint. `supabase-migration-import-audit-log.sql` widens the
+constraint to accept both (keeping `'wht'` for any rows that may already use
+it). This is unrelated to the audit log feature itself but was directly
+blocking correct `status: 'failed'` reporting for real imports, so it's
+fixed in the same migration rather than filed separately.
 
 ## Next steps (future tasks, not started here)
 
-- Persistent import audit log (`importId`, saved preview summary, timestamp).
+- A dedicated import-history page (today: a short "last 5" list in
+  `app/profile/settings/page.tsx`, see `listImportAuditLogs()`).
 - Per-row validation for the generic CSV/holdings-only path.
 - Currency as a first-class field on `transactions`, if/when multi-currency
   support is added elsewhere in the app (`portfolioState.ts` already has a
   `multi_currency_no_fx` warning code for the same underlying gap).
 - Optional: let the user review/edit a row's parsed transaction before
   confirming, rather than only accept-or-reject at the row level.
+- Unit tests for `createImportAuditLog`/`completeImportAuditLog`/
+  `failImportAuditLog`/`listImportAuditLogs`/`getImportAuditLog` themselves
+  (currently only `determineImportStatus`/`computeImportFileHash`/
+  `buildImportAuditLogInsert` are unit-tested — the DB-client-dependent
+  functions have no existing Supabase-mock pattern in this repo to follow;
+  see the commit summary for the full reasoning).
