@@ -217,6 +217,10 @@ test.describe('Notifications — profile pages', () => {
     await expect(banner).toBeVisible();
     await expect(banner.locator('text=' + ERROR_ICON)).toBeVisible();
     await expect(banner).toHaveCSS('border-style', 'solid');
+    // Friendly copy should point at a possibly-unmigrated DB and reassure
+    // the user nothing was saved — not a generic "try again".
+    await expect(banner.getByText('base de dados pode ainda não estar atualizada')).toBeVisible();
+    await expect(banner.getByText('Nenhum dado foi gravado')).toBeVisible();
 
     // The modal must still be open on the preview step — a failed audit log
     // means the import was aborted, not silently treated as done.
