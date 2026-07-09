@@ -225,6 +225,10 @@ export default function SettingsPage() {
         preview: importPreview,
       });
       if (auditError || !auditLog) {
+        // Real cause (e.g. "relation import_audit_logs does not exist" when the
+        // migration hasn't been applied yet) goes to the console for diagnosis —
+        // the user only ever sees the friendly, migration-agnostic t.impAuditFailed.
+        console.error('createImportAuditLog failed:', auditError);
         setImporting(false);
         setImportError(t.impAuditFailed);
         return;

@@ -190,7 +190,7 @@ export const pt = {
   impNoValidRowsHint: 'Nenhuma linha válida para importar.',
   impDoneTitle: 'Importação concluída.',
   impRegisteredWithId: 'Importação registada com ID',
-  impAuditFailed: 'Não foi possível registar a importação. Tenta novamente.',
+  impAuditFailed: 'Não foi possível registar a importação. A base de dados pode ainda não estar atualizada. Nenhum dado foi gravado.',
   impHistoryTitle: 'Últimas importações',
   impHistoryImported: 'Importadas',
   impHistorySkipped: 'Ignoradas',
