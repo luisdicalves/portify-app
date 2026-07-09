@@ -36,6 +36,14 @@ if (schema !== null) {
   check('supabase-schema.sql defines import_audit_logs table', /create table if not exists public\.import_audit_logs/.test(schema));
   check('supabase-schema.sql adds transactions.import_id', /transactions[\s\S]*?import_id uuid references public\.import_audit_logs\(id\)/.test(schema));
   check('supabase-schema.sql transactions type check allows withholding_tax', /type text not null check \(type in \([^)]*'withholding_tax'/.test(schema));
+  check('supabase-schema.sql import_audit_logs has RLS enabled', /alter table public\.import_audit_logs enable row level security/.test(schema));
+  check('supabase-schema.sql import_audit_logs has select/insert/update policies', [
+    /create policy[^;]*on public\.import_audit_logs for select/,
+    /create policy[^;]*on public\.import_audit_logs for insert/,
+    /create policy[^;]*on public\.import_audit_logs for update/,
+  ].every(re => re.test(schema)));
+  check('supabase-schema.sql import_audit_logs has no delete policy', !/create policy[^;]*on public\.import_audit_logs for delete/.test(schema));
+  check('supabase-schema.sql import_audit_logs stores no raw file content column', !/raw_content|file_content|raw_rows|file_bytes|file_data/.test(schema));
 }
 
 if (migration !== null) {
@@ -48,6 +56,33 @@ if (types !== null) {
   check('database.types.ts declares import_audit_logs table', /import_audit_logs:\s*\{/.test(types));
   check('database.types.ts transactions Row has import_id', /transactions:[\s\S]*?Row:\s*\{[\s\S]*?import_id: string \| null/.test(types));
 }
+
+// Transaction types the app is known to read/write (see lib/holdingsImport.ts,
+// lib/portfolio/portfolioState.ts, components/ui/TransactionCard.tsx) plus
+// 'wht', kept in the DB check constraint only for backward compatibility with
+// rows written before the app standardized on 'withholding_tax' — no current
+// code path writes or reads 'wht'.
+const REQUIRED_TRANSACTION_TYPES = ['wht', 'withholding_tax', 'interest_tax', 'deposit', 'buy', 'sell', 'dividend'];
+
+if (schema !== null) {
+  const constraintMatch = schema.match(/type text not null check \(type in \(([^)]*)\)\)/);
+  const constraintValues = constraintMatch ? constraintMatch[1] : '';
+  const missingTypes = REQUIRED_TRANSACTION_TYPES.filter(t => !constraintValues.includes(`'${t}'`));
+  check('supabase-schema.sql transactions type check covers all required transaction types', constraintMatch !== null && missingTypes.length === 0);
+  if (missingTypes.length > 0) console.error('  missing transaction types in schema check constraint:', missingTypes.join(', '));
+}
+
+const REQUIRED_DOCS = [
+  'docs/import-xtb.md',
+  'docs/import-audit-migration-runbook.md',
+  'docs/release-checklist.md',
+];
+
+for (const doc of REQUIRED_DOCS) {
+  check(`${doc} exists`, readOrFail(doc) !== null);
+}
+
+check('lib/db/importAudit.test.ts exists', readOrFail('lib/db/importAudit.test.ts') !== null);
 
 const REQUIRED_COLUMNS = [
   'id', 'user_id', 'parser_name', 'parser_version', 'filename', 'file_hash',
