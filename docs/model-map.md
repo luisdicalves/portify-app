@@ -206,7 +206,9 @@ marked **governed** below.
 
 - **Function:** persists one row per *confirmed* import in
   `public.import_audit_logs` (schema: `supabase-migration-import-audit-log.sql`,
-  consolidated into `supabase-schema.sql`) and tags the transactions it
+  consolidated into `supabase-schema.sql` — see
+  [import-audit-migration-runbook.md](import-audit-migration-runbook.md) for
+  how/when to apply that migration to a real environment) and tags the transactions it
   writes with `import_id`. `createImportAuditLog`/`completeImportAuditLog`/
   `failImportAuditLog`/`listImportAuditLogs`/`getImportAuditLog`, plus pure
   helpers: `determineImportStatus` (status lifecycle logic),

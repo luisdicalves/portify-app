@@ -113,6 +113,15 @@ is in [import-xtb.md](import-xtb.md#audit-log-persistente).
   this: `transactions`' `type` check constraint only allowed `'wht'`, not
   `'withholding_tax'` (which the app has always written) — see
   import-xtb.md for the full story.
+- **Deploy readiness:** the schema/code exist in this repo, but the migration
+  still needs to be applied to each real Supabase environment (staging,
+  production) before imports work there — see
+  [import-audit-migration-runbook.md](import-audit-migration-runbook.md) for
+  the apply/verify/rollback steps and
+  [release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
+  for the pre-deploy checklist. Until migrated, imports in that environment
+  fail closed (abort, nothing written, friendly error) rather than silently
+  succeeding without an audit trail.
 - **`ImportPreview.importId` is still not populated by the parser** — the
   parser stays fully decoupled from persistence (no import from
   `lib/db/importAudit.ts`, verified by the existing purity test). The

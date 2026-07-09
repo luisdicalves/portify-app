@@ -159,10 +159,19 @@ import flow — both explicitly out of scope.
   fully bilingual via `lib/dict/{pt,en}.ts`, as usual.
 ## Audit log persistente
 
-Every confirmed import now creates a row in `public.import_audit_logs`
+**Requires the migration to be applied in each environment.** Every
+confirmed import now creates a row in `public.import_audit_logs`
 (schema in [supabase-migration-import-audit-log.sql](../supabase-migration-import-audit-log.sql),
 consolidated into [supabase-schema.sql](../supabase-schema.sql); helpers in
-[lib/db/importAudit.ts](../lib/db/importAudit.ts)). `ImportPreview.importId`
+[lib/db/importAudit.ts](../lib/db/importAudit.ts)). If the target Supabase
+project hasn't run that migration yet, `createImportAuditLog` fails and
+`confirmImport()` aborts before writing anything — the user sees a friendly
+"database may not be up to date" message (`t.impAuditFailed`), and no
+holdings/transactions are written. This is the intended fail-closed
+behavior, not a bug. See
+[import-audit-migration-runbook.md](import-audit-migration-runbook.md) for
+how to apply the migration to staging/production, verify it, and roll it
+back if needed. `ImportPreview.importId`
 was reserved but always `undefined` before this task — it's still not
 threaded onto the preview type itself (the parser stays fully decoupled from
 persistence, see "Parser stays pure" below), but `app/profile/settings/page.tsx`

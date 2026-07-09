@@ -11,8 +11,9 @@ This document lists the official commands for validating a change before it's co
 | `npm test` | Runs the unit/component test suite with Vitest (`vitest run`). |
 | `npm run test:e2e` | Runs the Playwright end-to-end suite. Not part of `check` — slower and needs a running app. |
 | `npm run check` | Runs `typecheck`, then `lint`, then `test` in sequence. Use this as the single pre-commit/pre-PR gate. |
+| `npm run check:schema` | Static, no-DB-access consistency check between `supabase-migration-import-audit-log.sql`, `supabase-schema.sql`, and `lib/supabase/database.types.ts` (see [scripts/check-import-audit-schema.mjs](../scripts/check-import-audit-schema.mjs) and [import-audit-migration-runbook.md](import-audit-migration-runbook.md)). Not part of `npm run check` yet — run it manually when touching the import-audit-log schema. |
 
-`npm run check` stops at the first failing step (typecheck → lint → test), so a red `lint` step means typecheck already passed, etc.
+`npm run check` stops at the first failing step (typecheck → lint → test), so a red `lint` step means typecheck already passed, etc. `check:schema` is intentionally separate: it's narrow (one feature's schema) rather than a general project gate, and it doesn't touch Supabase — it only greps the three files above for consistency.
 
 ## Current status (as of this baseline)
 

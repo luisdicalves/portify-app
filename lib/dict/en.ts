@@ -184,7 +184,7 @@ export const en: typeof pt = {
   impNoValidRowsHint: 'No valid rows to import.',
   impDoneTitle: 'Import complete.',
   impRegisteredWithId: 'Import recorded with ID',
-  impAuditFailed: 'Could not record the import. Try again.',
+  impAuditFailed: 'We could not register this import. The database may not be up to date yet. No data was saved.',
   impHistoryTitle: 'Recent imports',
   impHistoryImported: 'Imported',
   impHistorySkipped: 'Skipped',
