@@ -226,6 +226,117 @@ believed at the time; the actual target was production throughout.
   against it, and re-run the smoke/RLS tests without needing to touch
   production or clean up afterward.
 
+### 2026-07-10 — `portify-staging` bootstrap (schema, smoke/RLS test)
+
+Closes the "next steps" above. Everything below happened against
+`portify-staging` (masked ref `pqsl****ojgjd`) only — `portify` (production)
+and `portifyv1` were never touched, no production data was read or copied
+into staging, and no migration was applied to production.
+
+- **Repo linked to staging.** `npx supabase link --project-ref
+  <masked ref pqsl****jgjd>` was run; the interactive DB-password prompt it
+  asks for next can't be answered in this environment, but the command had
+  already rewritten `supabase/.temp/linked-project.json` (ref/name/org only,
+  no secrets) before hanging, which is all the guardrail script reads.
+  `npm run check:supabase-env -- --target=staging` then passed cleanly:
+  `SUPABASE_PROJECT_REF=<masked ref pqsl****jgjd>`, linked ref `pqsl****jgjd`,
+  linked name `portify-staging`, "OK — environment is unambiguous."
+- **Bootstrap strategy (Option B — reviewed with the project owner first):**
+  `supabase-schema.sql` was not, on inspection, a complete mirror of
+  production. Applied via the Supabase MCP `apply_migration` tool, in order:
+  `supabase-schema.sql` (base schema — already includes the import-audit-log
+  table/column since PR #129), then `supabase-migration-asset-scores.sql`
+  (adds `asset_scores`). `supabase-migration-import-audit-log.sql` was
+  **not** applied separately — it's already folded into `supabase-schema.sql`
+  and reapplying it would be redundant (its `create table if not exists`
+  guard would just no-op).
+- **Known, pre-existing schema gap vs. production** (found here, not
+  something this task introduced or was asked to fix): `supabase-schema.sql`
+  is missing the `investor_profiles` view entirely, and several `profiles`
+  columns that exist in real production per `lib/supabase/database.types.ts`
+  (`allocated_bond_etf`, `allocated_etf`, `allocated_stock`, `estimated_rate`,
+  `free_funds_annual_rate_pct`, `profile_updated_at`, `uninvested_cash`).
+  Confirmed via `generate_typescript_types` against staging after the
+  bootstrap — same gap, nothing new. Consequence observed live: the
+  Settings page's "Saldo não investido"/"Taxa de juro anual" read
+  (`profiles?select=uninvested_cash,free_funds_annual_rate_pct`) returns
+  `400` in staging. Not fixed here — reconstructing those columns/the view
+  from `database.types.ts` alone (no constraints/defaults/trigger source)
+  would be exactly the "não improvisar schema manual" the owner asked to
+  avoid; needs its own follow-up with the real DDL.
+- **A second, blocking gap was found and fixed, with the owner's explicit
+  sign-off:** `supabase-schema.sql`'s `investment_plans` table still had the
+  table's original column name, `monthly_amount`, and was missing
+  `plan_updated_at` — but the app (`app/auth/summary/page.tsx`) and real
+  production (`lib/supabase/database.types.ts`) both use `amount`. This
+  isn't a cosmetic gap: without it, `POST .../investment_plans` fails
+  `PGRST204` and **no new user can finish onboarding in staging at all**
+  (the summary page won't route past `/auth/plan-set` without a saved
+  plan). Fixed with a small, staging-only, explicitly-commented migration
+  (`fix_investment_plans_amount_column`, applied via MCP): `alter table
+  investment_plans rename column monthly_amount to amount; alter table
+  investment_plans add column if not exists plan_updated_at timestamptz;`.
+  Verified via `information_schema.columns` afterward — matches production's
+  shape exactly. This SQL fix lives only in the staging project (applied via
+  MCP), not in any versioned `.sql` file in this repo — the underlying
+  `supabase-schema.sql` staleness is the same known-gap class as above and
+  should be corrected there in a future, dedicated PR.
+- **`database.types.ts` regenerated against staging, not applied to the
+  repo.** Same decision as before: staging's schema is a documented subset
+  of production's (see gap above), so overwriting the real file would
+  regress the app's type safety. The generated output was reviewed and shows
+  exactly the expected diff — `investment_plans.amount`/`plan_updated_at`
+  now correct, `asset_scores` present, `import_audit_logs`/
+  `transactions.import_id` present — and nothing unexpected.
+- **Auth setting difference found:** unlike production, `portify-staging`
+  requires email confirmation before a session is issued (the default for a
+  new Supabase project). A fresh sign-up returns `200` from
+  `/auth/v1/signup` but no session cookie is set until the email is
+  confirmed — the onboarding flow silently proceeds without an authenticated
+  session (PIN never actually saves; profile fields never actually write)
+  until this is noticed. Worked around here by confirming the test user's
+  email directly via SQL (`update auth.users set email_confirmed_at =
+  now()...`) since no real mailbox exists for a disposable test address.
+  Not a schema issue — an Auth-service setting — but worth knowing before
+  the next person tries to register a test user here and gets confused by a
+  PIN that "never sticks."
+- **XTB import smoke test — passed.** Test user `staging_real_user_a`,
+  file `xtb-test.xlsx` (1 `buy` AAPL.US, 1 `withholding_tax`, 1 `deposit`,
+  1 `interest_tax`, 1 unrecognized-type row). Preview showed "Nenhum dado
+  foi gravado ainda" before confirming; after confirming: toast "Importação
+  concluída… Importação registada com ID `af528242`"; `import_audit_logs`
+  row `status='completed'`, `total_rows=5`/`valid_rows=4`/`invalid_rows=1`/
+  `duplicate_rows=0`; all 4 transactions have `import_id` set to that log's
+  id and the correct `type`/`ticker`/`amount`. Re-uploading the identical
+  file: all 4 previously-valid rows now `duplicate`, the unrecognized row
+  still `error`, 0 valid rows, "Importar" button disabled — no second audit
+  log or transaction row was created (confirmed by count, unchanged at 1 and
+  4 respectively).
+- **RLS two-user smoke test — passed.** A second user, `staging_real_user_b`
+  (created directly via SQL — `insert into auth.users`, confirmed, relying
+  on the `handle_new_user` trigger for the `profiles` row — as a faster
+  equivalent to a second full browser registration), with its own audit log
+  and transaction. Simulated both sessions via `set local role authenticated`
+  / `request.jwt.claims`: A sees 0 of B's audit logs/transactions and vice
+  versa; each sees exactly their own; `delete` on the owner's own audit log
+  row affected 0 rows (blocked — no delete policy, same as production).
+- **Test data kept, not cleaned up.** Unlike the production incident above,
+  `portify-staging` exists specifically so disposable test data can live
+  there — there's no baseline to restore. Post-bootstrap counts: `auth.users`
+  2, `profiles` 2, `transactions` 5, `import_audit_logs` 2, `holdings` 1,
+  `investment_plans` 1, `asset_scores` 0.
+- **`.env.local` was temporarily pointed at staging** for the browser smoke
+  test (backed up first) and **reverted to production values before
+  finishing** — confirmed via diff against the backup. Never committed.
+- **Limitations:** `npx supabase login`/`link` still can't complete
+  non-interactively in this environment (same finding as every prior
+  session) — all real operations went through the Supabase MCP connector.
+  The two schema gaps above (profiles columns/view, and the
+  `investment_plans` column rename) mean `supabase-schema.sql` alone is not
+  yet a fully accurate "fresh install" script — this bootstrap documents
+  and works around that rather than fixing the source file, per explicit
+  scope.
+
 ## Objective
 
 Every *confirmed* XTB/CSV import must create a row in

@@ -80,9 +80,18 @@ the resulting production test-data cleanup.
       contagens totais voltaram exactamente à baseline pré-teste.
 
 **Produção está validada** (ver runbook, "Production validation log",
-2026-07-10/2026-07-11). Não há, neste momento, nenhum ambiente de staging
-real nesta organização Supabase — recomenda-se criar um antes da próxima
-alteração de schema (ver runbook, secção "Known risks").
+2026-07-10/2026-07-11).
+
+**Actualização, 2026-07-10:** existe agora um ambiente de staging real e
+independente, `portify-staging`, com o schema base aplicado, ligado ao
+repositório, e testado (importação XTB completa + RLS com dois
+utilizadores) — ver runbook, secção "`portify-staging` bootstrap". Uma
+divergência de schema bloqueante (`investment_plans.monthly_amount` vs.
+`amount`) foi encontrada e corrigida só em staging; um gap menor e não
+bloqueante (algumas colunas de `profiles` e a view `investor_profiles`,
+ausentes de `supabase-schema.sql`) continua documentado mas não corrigido —
+recomenda-se resolver `supabase-schema.sql` numa PR dedicada antes da
+próxima alteração de schema.
 
 ## Supabase environment guardrails
 

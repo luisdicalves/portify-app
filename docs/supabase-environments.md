@@ -29,20 +29,43 @@ the gap described above. As of this writing:
 
 - **`portify`** — production (`ACTIVE_HEALTHY`, `eu-west-1`). Unchanged.
 - **`portify-staging`** — the new project (`ACTIVE_HEALTHY`, `eu-west-1`,
-  masked ref `pqsl****ojgjd`). **Empty** — no migration has been applied to
-  it yet, and no production data has been copied into it. It is not yet
-  linked from this repo (`.env.local` still points at production; no
-  `supabase link` has been run against it).
+  masked ref `pqsl****ojgjd`). **Empty** at creation — no migration had been
+  applied to it, and no production data was copied into it.
 - **`portifyv1`** — unchanged, still `INACTIVE`, still not staging, still
   not used for anything.
 
 This closes the *naming* half of the gap (a project that actually satisfies
-the naming convention below now exists) but not the *linking* half — nothing
-in this repo has been pointed at `portify-staging` yet. See
+the naming convention below now exists). See
 `docs/import-audit-migration-runbook.md`'s "Production validation log" for
-the dated record of this creation and what's still needed before it's
-actually usable (link, migrate, regenerate types — none of that has
-happened yet, deliberately, as a separate step).
+the dated record of this creation.
+
+**Update, 2026-07-10 (later the same day) — staging bootstrapped and
+linked.** `portify-staging` is no longer empty or unlinked:
+
+- **Linked from this repo.** `supabase/.temp/linked-project.json` now points
+  at `portify-staging` (ref `pqsl****jgjd`), and
+  `npm run check:supabase-env -- --target=staging` passes cleanly against
+  it.
+- **Base schema applied** (`supabase-schema.sql` +
+  `supabase-migration-asset-scores.sql`, via the Supabase MCP connector —
+  `npx supabase link`'s non-interactive DB-password prompt still can't be
+  answered in this environment, same finding as every prior session).
+- **A schema gap vs. production was found and partially closed** — see
+  `docs/import-audit-migration-runbook.md`'s "`portify-staging` bootstrap"
+  entry for the full detail: a blocking `investment_plans.monthly_amount` vs.
+  `amount` mismatch was fixed (with explicit sign-off) since it prevented
+  *any* new user from finishing onboarding; several `profiles` columns and
+  the `investor_profiles` view are still missing and documented as a known,
+  unfixed gap.
+- **Smoke-tested for real**, in a browser, against staging: full
+  registration → PIN → onboarding flow, an XTB import (`buy`,
+  `withholding_tax`, `deposit`, `interest_tax`, one invalid row, one
+  duplicate re-upload), and a two-user RLS check (SQL session simulation) —
+  all passed. Test data was deliberately **kept**, not cleaned up — unlike
+  the production incident, staging exists specifically to hold this kind of
+  disposable data.
+- `.env.local` was temporarily pointed at staging for the browser test and
+  reverted to production values before finishing; never committed.
 
 ## Objective
 
@@ -214,7 +237,7 @@ Everything in the staging procedure, plus:
 
 If, at any point, the environment cannot be unambiguously identified as one
 of local/staging/production (the exact situation discovered in
-`chore/staging-import-audit-validation` — see the runbook's "Staging
+`chore/staging-import-audit-validation` — see the runbook's "Production
 validation log"):
 
 1. **Abort.** Do not proceed with the operation "just this once" or "to see
