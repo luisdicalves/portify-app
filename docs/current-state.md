@@ -134,6 +134,21 @@ is in [import-xtb.md](import-xtb.md#audit-log-persistente).
   been applied — this is what production validation confirmed works as
   designed, and remains true for any future environment (e.g. a proper
   staging project, if one is created) that hasn't run the migration yet.
+- **A real staging project (`portify-staging`) now exists and is
+  bootstrapped.** Base schema applied (`supabase-schema.sql` +
+  `supabase-migration-asset-scores.sql`, via the Supabase MCP connector),
+  linked from this repo, and smoke-tested end-to-end in a browser (register
+  → PIN → onboarding → XTB import with `buy`/`withholding_tax`/`deposit`/
+  `interest_tax`/an invalid row/a duplicate re-upload) plus a two-user RLS
+  check — all passed. A blocking `investment_plans.monthly_amount` vs.
+  `amount` schema drift (staging vs. production) was found and fixed
+  staging-side; a smaller, non-blocking gap (a few `profiles` columns and
+  the `investor_profiles` view, missing from `supabase-schema.sql`) remains
+  documented but unfixed. See
+  [import-audit-migration-runbook.md](import-audit-migration-runbook.md)'s
+  "`portify-staging` bootstrap" entry and
+  [docs/supabase-environments.md](supabase-environments.md) for the full
+  detail.
 - **Supabase environment guardrails** were added (`chore/supabase-environment-guardrails`)
   precisely because of the gap above: [docs/supabase-environments.md](supabase-environments.md)
   defines local/staging/production and the naming/`SUPABASE_ENVIRONMENT`
