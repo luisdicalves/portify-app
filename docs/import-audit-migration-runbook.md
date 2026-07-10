@@ -337,6 +337,130 @@ into staging, and no migration was applied to production.
   and works around that rather than fixing the source file, per explicit
   scope.
 
+### 2026-07-10 — Schema drift reconciliation
+
+Closes the two schema-gap items from the bootstrap entry above. Production
+(`portify`, masked ref `dwol****donk`) was read-only throughout — every
+query in this entry is a `select` against `information_schema`/`pg_catalog`;
+no `create`/`alter`/`insert`/`update`/`delete` ever ran against production.
+`portifyv1` (masked ref `xqsu****pcbz`) was not touched. No production data
+was copied anywhere.
+
+**Source of truth used:** real production schema, introspected read-only via
+the Supabase MCP connector (`information_schema.columns`, `pg_constraint`,
+`pg_policies`, `pg_trigger`, `pg_proc`, `pg_indexes`, `information_schema.views`)
+— not `lib/supabase/database.types.ts` alone, since types don't carry
+constraints/defaults/trigger logic.
+
+**Comparison — production vs. staging vs. `supabase-schema.sql` (pre-reconciliation):**
+
+| Object | Production (real) | `portify-staging` (pre-fix) | `supabase-schema.sql` (pre-fix) | Classification | Action |
+|---|---|---|---|---|---|
+| `profiles.allocated_stock/etf/bond_etf`, `estimated_rate`, `uninvested_cash`, `free_funds_annual_rate_pct`, `profile_updated_at` | present | missing | missing | blocking (settings page read 400s without them) | added to both |
+| `profiles.risk_score` type | `integer` | `numeric` | `numeric` | non-blocking | changed to `integer` in both |
+| `profiles.investment_goal` check constraint | present (6 values) | absent | absent | non-blocking (app already only sends valid values) | added to both |
+| `profiles.risk_score`/`allocated_*`/`estimated_rate` range checks | present | absent | absent | non-blocking | added to both |
+| `profiles.monthly_amount`, `preferred_assets` | absent | present | present | documentation-only residue | left in place (no-drop scope), documented |
+| `profiles_updated_at` trigger (`touch_profile_updated_at`) | present | absent | absent | non-blocking | added to both |
+| `investment_plans.amount` (vs. `monthly_amount`) | `amount` | `amount` (already fixed in prior bootstrap) | `monthly_amount` | blocking (already fixed staging-side; schema.sql now updated) | renamed in `supabase-schema.sql`; staging already correct |
+| `investment_plans.plan_updated_at` | present, default `now()` | present, no default | absent | blocking / non-blocking (see above) | added to `supabase-schema.sql`; default added to staging |
+| `investment_plans.preferred_asset_classes` default | none | `array['stock','etf','bond_etf']` | same | documentation-only | default dropped in both, for parity |
+| `investment_plans.preferred_asset_classes` check | present | absent | absent | non-blocking | added to both |
+| `investment_plans_frequency_check` | narrower (4 values, missing `biweekly`/`semiannual`) | wider (6 values) | wider (6 values) | **unknown — likely a production bug**, not schema.sql drift (see below) | **not changed** — kept wide in `supabase-schema.sql`, per explicit owner decision |
+| `investor_profiles` view | present | missing | missing | blocking-ish (confirmed unused by app code, but part of the real schema) | added to both |
+| `asset_scores`, `import_audit_logs`, `transactions.import_id`, `transactions_type_check` | present | present | present | intentional / already correct | no change |
+| RLS enabled + policies (all 6 tables) | matches | matches | matches | intentional / already correct | no change |
+
+**The `investment_plans_frequency_check` anomaly:** production's real
+constraint only allows `'weekly','monthly','quarterly','annual'` — narrower
+than what `lib/profileConstants.ts`'s `PLAN_FREQUENCIES` (and the plan-set
+UI) can actually produce (`'biweekly'`, `'semiannual'` are real, reachable
+UI choices). This means **selecting "Quinzenal" or "Semestral" in production
+today would fail** with a check-constraint violation. This looks like a bug
+in production itself, not schema drift to mirror — asked the project owner
+explicitly, and the decision was to **keep the wider 6-value check in
+`supabase-schema.sql`** (matching the app's real needs and staging's
+existing, already-wider constraint) rather than narrowing it to match
+production's gap. **Not fixed in production here** (out of scope — this task
+is schema reconciliation, not a production migration) — flagged as a
+follow-up: widen `investment_plans_frequency_check` in production to match
+the app.
+
+**`supabase-schema.sql` changes:** `profiles` — removed `preferred_assets`/
+`monthly_amount` (not in production), `risk_score` changed to `integer`,
+added `investment_goal` check, added `risk_score`/`allocated_*`/
+`estimated_rate` range checks, added the 6 missing columns, added
+`profile_updated_at` + its `touch_profile_updated_at` trigger.
+`investment_plans` — renamed `monthly_amount` → `amount`, added
+`plan_updated_at` (default `now()`), dropped the `preferred_asset_classes`
+default, added its containment check, added `touch_plan_updated_at` trigger.
+Added the `investor_profiles` view (exact production definition — a plain
+view, not `security_invoker`, confirmed unused by any app code via a repo
+grep, kept only for schema parity). `asset_scores`, `import_audit_logs`,
+`transactions` (including `transactions_type_check`'s `withholding_tax`/
+`wht`) — unchanged, already matched production.
+
+**Reconciliation migration:** `supabase-migration-reconcile-schema-drift.sql`
+— idempotent, additive-only (no columns dropped, no data deleted, no
+renames — the `investment_plans` rename had already been applied directly to
+staging in the prior bootstrap task). Applied **only** to `portify-staging`
+(masked ref `pqsl****jgjd`) via the Supabase MCP connector, after
+re-confirming `npm run check:supabase-env -- --target=staging` passed.
+**Not applied to production** — production is already the source of truth
+this migration reconciles other environments against.
+
+**Post-reconciliation verification (read-only, against staging):** all 7
+new `profiles` columns present with correct types/defaults;
+`investment_plans.plan_updated_at` now defaults to `now()`;
+`investor_profiles` view created and queryable (`select * from
+investor_profiles` returns correctly joined rows for both existing test
+users); both new triggers (`trg_touch_profile_updated_at`,
+`trg_touch_plan_updated_at`) present; row counts unchanged (`profiles` 2,
+`transactions` 5, `import_audit_logs` 2) — no data lost.
+
+**`database.types.ts` regeneration:** regenerated against the now-aligned
+staging project. The only diff from the file already committed in this repo
+is the two residual `profiles` columns (`monthly_amount`, `preferred_assets`)
+that exist only in staging (deliberately not dropped, see above) — no other
+difference. Since the repo's existing file already accurately reflects
+production (including `investment_plans.amount`/`plan_updated_at` and the
+`investor_profiles` view, from the original hand-written-then-regenerated
+history), **the repo's `database.types.ts` was left unchanged** — applying
+staging's version would have regressed it by introducing two columns that
+don't exist in production.
+
+**`scripts/check-import-audit-schema.mjs` strengthened** with new static
+checks: `profiles` has all the critical columns above,
+`investment_plans` uses `amount` (not `monthly_amount`) and has
+`plan_updated_at`, `supabase-schema.sql`/`database.types.ts` both declare
+the `investor_profiles` view. `npm run check:schema` passes.
+
+**Smoke tests, re-run in staging after reconciliation** (test user
+`staging_schema_recon_c`, created fresh — registration → email confirmed
+via SQL (staging still requires email confirmation, same limitation as the
+bootstrap task) → PIN → full 7-step onboarding → plan-set → finalize):
+- **Onboarding/plan finalize** — no `monthly_amount` error; `investment_plans`
+  row created with `amount = 250`, `plan_updated_at` populated automatically;
+  reached `/dashboard` cleanly.
+- **Profile/settings screens** — `/profile` and `/profile/settings` render
+  without error; the settings page's "Saldo não investido"/"Taxa de juro
+  anual" fields (which 400'd during the original bootstrap, before this
+  reconciliation) now load correctly (`0.00 €`/`0.00%`).
+- **XTB import** — re-run with the same test file (1 `buy`, 1
+  `withholding_tax`, 1 `deposit`, 1 `interest_tax`, 1 invalid row): preview
+  and confirm both worked identically to the bootstrap task; audit log
+  `status='completed'`, `4`/`5` rows imported, all 4 transactions correctly
+  tagged with `import_id`.
+- **RLS** — re-verified with the new test user against the two existing
+  ones (SQL session simulation): no cross-user visibility on `transactions`
+  or `profiles` in either direction; the new user correctly sees its own row
+  in `investor_profiles` (confirms RLS on the underlying tables still
+  applies through the view).
+- Test data kept, not cleaned up — same reasoning as the bootstrap task.
+- `.env.local` was temporarily pointed at staging again for this browser
+  round and reverted to production values before finishing, confirmed via
+  diff against the backup.
+
 ## Objective
 
 Every *confirmed* XTB/CSV import must create a row in

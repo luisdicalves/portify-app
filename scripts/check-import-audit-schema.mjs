@@ -97,6 +97,35 @@ if (schema !== null) {
   if (missing.length > 0) console.error('  missing in schema:', missing.join(', '));
 }
 
+// Schema drift reconciliation (2026-07-10) — see
+// docs/import-audit-migration-runbook.md's "Schema drift reconciliation"
+// entry. These columns/shapes were confirmed against real production;
+// catches this consolidated snapshot silently drifting from it again.
+const REQUIRED_PROFILES_COLUMNS = [
+  'allocated_stock', 'allocated_etf', 'allocated_bond_etf', 'estimated_rate',
+  'uninvested_cash', 'free_funds_annual_rate_pct', 'profile_updated_at',
+];
+
+if (schema !== null) {
+  const profilesMatch = schema.match(/create table if not exists public\.profiles \(([\s\S]*?)\n\);/);
+  const profilesBody = profilesMatch ? profilesMatch[1] : '';
+  const missingProfilesCols = REQUIRED_PROFILES_COLUMNS.filter(col => !new RegExp(`\\b${col}\\b`).test(profilesBody));
+  check('supabase-schema.sql profiles has all critical columns used by the app', profilesMatch !== null && missingProfilesCols.length === 0);
+  if (missingProfilesCols.length > 0) console.error('  missing in schema profiles:', missingProfilesCols.join(', '));
+
+  const plansMatch = schema.match(/create table if not exists public\.investment_plans \(([\s\S]*?)\n\);/);
+  const plansBody = plansMatch ? plansMatch[1] : '';
+  check('supabase-schema.sql investment_plans uses "amount" (not "monthly_amount")', /\bamount\s+numeric\s+not null\b/.test(plansBody) && !/\bmonthly_amount\b/.test(plansBody));
+  check('supabase-schema.sql investment_plans has plan_updated_at', /\bplan_updated_at\b/.test(plansBody));
+
+  check('supabase-schema.sql defines the investor_profiles view', /create or replace view public\.investor_profiles as/.test(schema));
+}
+
+if (types !== null) {
+  check('database.types.ts investment_plans Row has "amount" (not "monthly_amount")', /investment_plans:[\s\S]*?Row:\s*\{[\s\S]*?\bamount: number/.test(types));
+  check('database.types.ts declares the investor_profiles view', /investor_profiles:\s*\{/.test(types));
+}
+
 if (types !== null) {
   const missing = REQUIRED_COLUMNS.filter(col => !new RegExp(`\\b${col}\\b`).test(types));
   check(`database.types.ts mentions all ${REQUIRED_COLUMNS.length} expected import_audit_logs columns`, missing.length === 0);

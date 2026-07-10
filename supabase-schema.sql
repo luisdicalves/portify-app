@@ -4,6 +4,13 @@
 -- =============================================
 
 -- Profiles (extends auth.users)
+-- Reconciled against real production, 2026-07-10 (see
+-- docs/import-audit-migration-runbook.md's "Schema drift reconciliation"
+-- entry) — this snapshot previously carried "preferred_assets"/
+-- "monthly_amount", neither of which exist in production; "monthly_amount"
+-- lives on investment_plans as "amount" instead, and "preferred_assets" was
+-- never actually kept. risk_score is an integer in production (a 0–100
+-- score), not numeric.
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   first_name text,
@@ -12,19 +19,25 @@ create table if not exists public.profiles (
   avatar_url text,
   date_of_birth date,
   preferred_sectors text[],
-  preferred_assets  text[],
   pin_hash text,
   investor_since int default extract(year from now())::int,
   risk_profile text default 'moderate'
     check (risk_profile in ('very_conservative','conservative','moderate','aggressive','very_aggressive')),
-  investment_goal text default 'retirement',
+  investment_goal text default 'retirement'
+    check (investment_goal in ('emergency_fund','short_purchase','income','wealth_growth','retirement','legacy')),
   experience_level text default 'beginner'
     check (experience_level in ('none','beginner','intermediate','experienced','professional')),
   market_reaction  text check (market_reaction  in ('sell_all','sell_some','hold','buy_more')),
   financial_status text check (financial_status in ('unstable','stable','comfortable','wealthy')),
   liquidity_need   text check (liquidity_need   in ('critical','possible','unlikely','never')),
-  risk_score       numeric,
-  monthly_amount   numeric,
+  risk_score       integer check (risk_score >= 0 and risk_score <= 100),
+  allocated_stock    numeric check (allocated_stock    >= 0 and allocated_stock    <= 1),
+  allocated_etf      numeric check (allocated_etf      >= 0 and allocated_etf      <= 1),
+  allocated_bond_etf numeric check (allocated_bond_etf  >= 0 and allocated_bond_etf <= 1),
+  estimated_rate     numeric check (estimated_rate      >= 0 and estimated_rate     <= 1),
+  uninvested_cash    numeric default 0,
+  free_funds_annual_rate_pct numeric default 0,
+  profile_updated_at timestamptz default now(),
   created_at timestamptz default now()
 );
 
@@ -38,6 +51,19 @@ create policy "Users can update their own profile"
   on public.profiles for update
   using     (auth.uid() = id)
   with check (auth.uid() = id);
+
+-- Keeps profile_updated_at current whenever the profile is edited (e.g. the
+-- summary page's finalize write) — separate from created_at, which is set
+-- once at row creation and never touched again.
+create or replace function public.touch_profile_updated_at()
+returns trigger language plpgsql as $$
+begin new.profile_updated_at = now(); return new; end;
+$$;
+
+drop trigger if exists trg_touch_profile_updated_at on public.profiles;
+create trigger trg_touch_profile_updated_at
+  before update on public.profiles
+  for each row execute function public.touch_profile_updated_at();
 
 -- Auto-create profile on sign up
 create or replace function public.handle_new_user()
@@ -244,16 +270,26 @@ create policy "Users manage their own transactions"
   with check (auth.uid() = user_id);
 
 -- Investment plan
+-- Reconciled against real production, 2026-07-10: this snapshot's column was
+-- "monthly_amount", but the app (app/auth/summary/page.tsx) and production
+-- both use "amount"; "plan_updated_at" was also missing. See
+-- docs/import-audit-migration-runbook.md's "Schema drift reconciliation"
+-- entry. NOTE: production's own "frequency" check is narrower than this
+-- (missing 'biweekly'/'semiannual', which the app's plan-set UI can still
+-- produce) — that is treated as a bug in production to fix separately, not
+-- as drift to mirror here; this snapshot deliberately keeps the wider list.
 create table if not exists public.investment_plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade not null unique,
-  monthly_amount numeric not null,
+  amount numeric not null,
   frequency text not null check (frequency in ('weekly','biweekly','monthly','quarterly','semiannual','annual')),
   horizon_years int not null,
   goal_amount numeric,
-  preferred_asset_classes text[] default array['stock','etf','bond_etf'],
+  preferred_asset_classes text[]
+    check (preferred_asset_classes <@ array['stock','etf','bond_etf']),
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  plan_updated_at timestamptz default now()
 );
 
 alter table public.investment_plans enable row level security;
@@ -262,3 +298,45 @@ create policy "Users manage their own plan"
   on public.investment_plans for all
   using     (auth.uid() = user_id)
   with check (auth.uid() = user_id);
+
+-- Keeps plan_updated_at current whenever the plan is edited — separate from
+-- created_at/updated_at (updated_at isn't actually written by the app today,
+-- kept only for schema parity with what already existed).
+create or replace function public.touch_plan_updated_at()
+returns trigger language plpgsql as $$
+begin new.plan_updated_at = now(); return new; end;
+$$;
+
+drop trigger if exists trg_touch_plan_updated_at on public.investment_plans;
+create trigger trg_touch_plan_updated_at
+  before update on public.investment_plans
+  for each row execute function public.touch_plan_updated_at();
+
+-- Read-only convenience view joining a profile with its plan — not currently
+-- queried anywhere in the app (confirmed by grepping app/, lib/,
+-- components/), only appears in lib/supabase/database.types.ts as a
+-- generated foreign-key relation. Kept for schema parity with production;
+-- RLS on the underlying tables still applies to whoever queries it.
+create or replace view public.investor_profiles as
+select
+  p.id as user_id,
+  p.risk_profile,
+  p.investment_goal,
+  p.experience_level,
+  p.preferred_sectors,
+  p.market_reaction,
+  p.financial_status,
+  p.liquidity_need,
+  p.risk_score,
+  p.allocated_stock,
+  p.allocated_etf,
+  p.allocated_bond_etf,
+  p.estimated_rate,
+  ip.amount as monthly_amount,
+  ip.frequency,
+  ip.horizon_years,
+  ip.goal_amount,
+  ip.preferred_asset_classes,
+  (p.risk_score is not null and ip.amount is not null and ip.horizon_years is not null) as onboarding_complete
+from public.profiles p
+left join public.investment_plans ip on ip.user_id = p.id;
