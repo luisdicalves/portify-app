@@ -194,6 +194,38 @@ believed at the time; the actual target was production throughout.
   only" or "apply directly to production" — there is no safer middle step
   until a genuine staging project exists. See "Known risks" below.
 
+### 2026-07-10 — `portify-staging` created (closes the "outstanding" item above)
+
+- **What was created:** a new Supabase project, name `portify-staging`,
+  in the same organization as `portify` (`luisdicalves's Org`), region
+  `eu-west-1` — the same region as production. Masked ref: `pqsl****ojgjd`.
+  Status at creation: `ACTIVE_HEALTHY`. Created via the Supabase MCP
+  `create_project` tool, cost confirmed at $0/month (free plan) before
+  creation.
+- **Pre-creation check:** `list_projects` was re-run immediately before
+  creating anything, confirming only `portify` (production,
+  `ACTIVE_HEALTHY`) and `portifyv1` (`INACTIVE`) existed, and that no
+  `portify-staging` already existed.
+- **Post-creation check:** `list_projects` re-run again, confirming all
+  three projects: `portify` and `portifyv1` byte-for-byte unchanged (same
+  status, same `created_at`, same host), and the new `portify-staging`
+  present with its own distinct ref (not equal to either existing project's
+  ref).
+- **Nothing else was done.** No migration applied, no data copied from
+  `portify`, no tables created manually, `.env.local` not touched,
+  `supabase link` not run, `database.types.ts` not regenerated, no app code
+  changed. This project is currently an empty, fresh Supabase project with
+  only the default schema.
+- **Next steps (not done here, deliberately separate):** confirm
+  `SUPABASE_ENVIRONMENT=staging`/`SUPABASE_PROJECT_REF` for this project
+  pass `npm run check:supabase-env -- --target=staging` (should now pass
+  cleanly — the project's dashboard name genuinely contains `staging`, no
+  verbal-confirmation-only step required this time), then follow
+  "Recommended order of application" above to apply the migration here for
+  the first time against genuine staging, regenerate `database.types.ts`
+  against it, and re-run the smoke/RLS tests without needing to touch
+  production or clean up afterward.
+
 ## Objective
 
 Every *confirmed* XTB/CSV import must create a row in
