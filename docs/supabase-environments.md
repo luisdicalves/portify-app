@@ -84,6 +84,22 @@ not schema drift, per explicit owner decision. Full comparison table and
 smoke-test results in `docs/import-audit-migration-runbook.md`'s "Schema
 drift reconciliation" entry.
 
+**Update, 2026-07-10 (production fix) — the anomaly above is now fixed in
+production.** A dedicated migration
+(`supabase-migration-fix-investment-plans-frequency-check.sql`) widened
+`investment_plans_frequency_check` from 4 to 6 values, applied to
+`portify-staging` first, then to `portify` (production) only after
+`npm run check:supabase-env -- --target=production --confirm-production`
+passed cleanly. Confirmed, before applying: the guardrail correctly
+**failed** for production without `--confirm-production` (three reasons —
+missing flag, linked project name looked like staging, ref mismatch). No
+data was altered — `investment_plans` had exactly 2 rows before and after,
+both `frequency = 'monthly'`, and widening a check constraint never
+invalidates existing rows. See
+`docs/import-audit-migration-runbook.md`'s "Fixed in production:
+`investment_plans_frequency_check`" entry for the full before/after
+constraint definitions and verification detail.
+
 ## Objective
 
 Prevent a migration, a type regeneration, or any other write-shaped Supabase

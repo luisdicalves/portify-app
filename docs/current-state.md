@@ -152,9 +152,17 @@ is in [import-xtb.md](import-xtb.md#audit-log-persistente).
   (`supabase-migration-reconcile-schema-drift.sql`). One anomaly was found
   and deliberately left alone: production's `investment_plans_frequency_check`
   is narrower than what the app's UI can produce — treated as a production
-  bug to fix separately, not schema drift. See
+  bug to fix separately, not schema drift. **Update, 2026-07-10 (production
+  fix):** that bug is now fixed — a dedicated migration
+  (`supabase-migration-fix-investment-plans-frequency-check.sql`) widened
+  the constraint from 4 to 6 values (`weekly`/`biweekly`/`monthly`/
+  `quarterly`/`semiannual`/`annual`) in both `portify-staging` and `portify`
+  (production), applied to production only after the
+  `--confirm-production` guardrail passed. No data was altered — production
+  had exactly 2 `investment_plans` rows before and after. See
   [import-audit-migration-runbook.md](import-audit-migration-runbook.md)'s
-  "Schema drift reconciliation" entry and
+  "Schema drift reconciliation" and "Fixed in production:
+  `investment_plans_frequency_check`" entries, and
   [docs/supabase-environments.md](supabase-environments.md) for the full
   detail.
 - **Supabase environment guardrails** were added (`chore/supabase-environment-guardrails`)

@@ -461,6 +461,65 @@ bootstrap task) → PIN → full 7-step onboarding → plan-set → finalize):
   round and reverted to production values before finishing, confirmed via
   diff against the backup.
 
+### 2026-07-10 — Fixed in production: `investment_plans_frequency_check`
+
+Closes the follow-up flagged in the "Schema drift reconciliation" entry
+above. A dedicated migration, applied to staging first and then to
+production with the guardrail's `--confirm-production` gate.
+
+**Guardrail validated before touching anything:**
+- `SUPABASE_ENVIRONMENT=staging` — passed cleanly (linked ref `pqsl****jgjd`,
+  name `portify-staging`).
+- `SUPABASE_ENVIRONMENT=production` **without** `--confirm-production` —
+  failed with all three expected reasons (missing flag; linked project name
+  looked like staging at the time; ref mismatch).
+- `SUPABASE_ENVIRONMENT=production` **with** `--confirm-production`, once
+  actually linked to `portify` — passed cleanly (linked ref `dwol****donk`,
+  name `portify`).
+
+**Old constraint (production, confirmed via `pg_get_constraintdef` before
+any change):**
+```sql
+CHECK ((frequency = ANY (ARRAY['weekly'::text, 'monthly'::text, 'quarterly'::text, 'annual'::text])))
+```
+
+**New constraint (production and staging, after the migration):**
+```sql
+CHECK ((frequency = ANY (ARRAY['weekly'::text, 'biweekly'::text, 'monthly'::text, 'quarterly'::text, 'semiannual'::text, 'annual'::text])))
+```
+
+**Pre-migration read-only check:** production had exactly 2
+`investment_plans` rows, both `frequency = 'monthly'` — nothing existing
+could have violated the wider constraint, and widening a check constraint
+never invalidates existing rows regardless.
+
+**Migration:** `supabase-migration-fix-investment-plans-frequency-check.sql`
+— `drop constraint if exists` + `add constraint` with the 6-value list.
+Applied via the Supabase MCP connector, in order:
+1. **`portify-staging`** first. Verified via `pg_get_constraintdef` (matches
+   the new definition above) and a rollback-only transaction that updated a
+   test row through all 6 frequency values in turn (no error), then rolled
+   back — proves the constraint functionally accepts all 6 without leaving
+   any data changed. Row count unchanged (2).
+2. **`portify`** (production) only after the `--confirm-production`
+   guardrail passed. Verified the same way via `pg_get_constraintdef` (no
+   functional round-trip test performed against production — no test writes
+   were made there). `investment_plans` row count confirmed unchanged (2,
+   still both `monthly`); `profiles`/`transactions`/`holdings`/
+   `import_audit_logs` counts also read afterward (2/260/32/1) as a general
+   sanity check — this migration's DDL only touches `investment_plans`'
+   constraint, so no other table could plausibly have been affected.
+
+**`database.types.ts`:** regenerated against production and diffed —
+byte-for-byte identical to the file already in the repo. Expected: Supabase's
+type generator doesn't encode `CHECK` constraint values in the generated
+types (`frequency` is just `string` either way), so this kind of change
+never produces a types diff. Left unchanged.
+
+**`portifyv1` was not touched** at any point in this task. No production
+data was copied, read beyond the two read-only queries above, or altered
+outside the single constraint replacement.
+
 ## Objective
 
 Every *confirmed* XTB/CSV import must create a row in
