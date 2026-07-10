@@ -22,6 +22,28 @@ happened; it cannot verify that the confirmation itself is correct). See
 verbal answer alone is not enough, cross-check against a dashboard detail
 that cannot also be mistaken by the same person in the same way.
 
+**Update, 2026-07-10 — a real staging project now exists.** A new Supabase
+project, `portify-staging`, was created in the same organization as
+`portify` (region `eu-west-1`, matching production), specifically to close
+the gap described above. As of this writing:
+
+- **`portify`** — production (`ACTIVE_HEALTHY`, `eu-west-1`). Unchanged.
+- **`portify-staging`** — the new project (`ACTIVE_HEALTHY`, `eu-west-1`,
+  masked ref `pqsl****ojgjd`). **Empty** — no migration has been applied to
+  it yet, and no production data has been copied into it. It is not yet
+  linked from this repo (`.env.local` still points at production; no
+  `supabase link` has been run against it).
+- **`portifyv1`** — unchanged, still `INACTIVE`, still not staging, still
+  not used for anything.
+
+This closes the *naming* half of the gap (a project that actually satisfies
+the naming convention below now exists) but not the *linking* half — nothing
+in this repo has been pointed at `portify-staging` yet. See
+`docs/import-audit-migration-runbook.md`'s "Production validation log" for
+the dated record of this creation and what's still needed before it's
+actually usable (link, migrate, regenerate types — none of that has
+happened yet, deliberately, as a separate step).
+
 ## Objective
 
 Prevent a migration, a type regeneration, or any other write-shaped Supabase
@@ -68,11 +90,13 @@ Every real (non-local) Supabase project should satisfy **at least one** of:
 - An explicit `SUPABASE_ENVIRONMENT` variable is set in the environment
   actually running the command, and matches what's expected.
 
-**Today, neither is true** for the one project configured in this
+**Neither is true** for `portify`, the project currently configured in this
 repository's `.env.local` — it's named just `"portify"`, and no
 `SUPABASE_ENVIRONMENT` has ever been set for it. That's exactly the
 ambiguous state this document and its guardrail script exist to catch and
-block, not silently work around.
+block, not silently work around. `portify-staging` (created 2026-07-10, see
+above) does satisfy the naming convention, but nothing in this repo points
+at it yet — `.env.local` still points at `portify`.
 
 ## Recommended environment variables
 
