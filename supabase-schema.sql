@@ -274,10 +274,11 @@ create policy "Users manage their own transactions"
 -- "monthly_amount", but the app (app/auth/summary/page.tsx) and production
 -- both use "amount"; "plan_updated_at" was also missing. See
 -- docs/import-audit-migration-runbook.md's "Schema drift reconciliation"
--- entry. NOTE: production's own "frequency" check is narrower than this
--- (missing 'biweekly'/'semiannual', which the app's plan-set UI can still
--- produce) — that is treated as a bug in production to fix separately, not
--- as drift to mirror here; this snapshot deliberately keeps the wider list.
+-- entry. The "frequency" check below was, at the time, narrower in
+-- production than what the app's plan-set UI can produce (missing
+-- 'biweekly'/'semiannual') — since fixed in production by
+-- supabase-migration-fix-investment-plans-frequency-check.sql, so this
+-- snapshot's list matches production again.
 create table if not exists public.investment_plans (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.profiles(id) on delete cascade not null unique,

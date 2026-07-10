@@ -104,6 +104,19 @@ produção é mais restrito do que a própria UI da app consegue produzir
 passou. Ver runbook, secção "Schema drift reconciliation", para a
 comparação completa e os resultados dos testes.
 
+**Actualização, 2026-07-10 (correcção em produção):** esse bug está
+corrigido. Migration dedicada
+(`supabase-migration-fix-investment-plans-frequency-check.sql`) alargou o
+constraint de 4 para 6 valores (`weekly`/`biweekly`/`monthly`/`quarterly`/
+`semiannual`/`annual`), aplicada primeiro em `portify-staging` e só depois
+em `portify` (produção), após o guardrail `--confirm-production` ter
+passado — confirmado também que **falha** sem a flag (3 motivos: flag em
+falta, nome do projecto ligado parecia staging, ref não coincidia). Nenhum
+dado alterado — `investment_plans` tinha exactamente 2 linhas antes e
+depois, ambas `monthly`. Ver runbook, secção "Fixed in production:
+`investment_plans_frequency_check`", para as definições antiga/nova
+completas.
+
 ## Supabase environment guardrails
 
 Scope: any PR that applies a migration, regenerates
