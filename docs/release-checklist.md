@@ -32,11 +32,13 @@ this before merging or deploying any change that touches that schema or
 - [x] Importação com retenção na fonte (`withholding_tax`) testada em
       staging — **transacção real confirmada na tabela `transactions`**
       com `type = 'withholding_tax'`, `import_id` preenchido.
-- [ ] `interest_tax` e `deposit` — **não testados via UI nesta sessão**
-      (mesma função/mesmo constraint que `withholding_tax`, considerado
-      coberto por inferência + testes unitários existentes, mas não
-      empiricamente confirmado end-to-end). `'wht'` continua não produzível
-      pela UI de importação.
+- [x] `interest_tax` e `deposit` testados via UI — **transacções reais
+      confirmadas na tabela `transactions`** (`type = 'deposit'`,
+      `amount = 500`; `type = 'interest_tax'`, `amount = -0.5`; ambas com
+      `ticker: null` e `import_id` preenchido). `'wht'` continua não
+      produzível pela UI de importação (não é um gap — `normalizeXtbTransactionType()`
+      nunca o devolve; só existe via insert SQL directo, já coberto pela
+      query de definição do constraint).
 - [x] Importação duplicada persistente testada — reimportar o mesmo ficheiro
       correctamente marca as linhas `'duplicate'` e não duplica transactions.
       **Correcção do runbook**: quando 100% das linhas ficam duplicadas, o

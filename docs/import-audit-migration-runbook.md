@@ -103,14 +103,25 @@ don't overwrite previous entries.
      2) / 1 error, with **"Nenhuma linha válida para importar."** shown and
      the **"Importar" button disabled** — see step 10 of "Functional smoke
      test" below, which this corrects.
-- **`'wht'` and standalone `interest_tax`/`deposit` rows**: not separately
-  smoke-tested via the UI in this session (time-boxed) — `'wht'` specifically
-  is not producible via the import UI anyway (see "Functional smoke test"
-  below); `interest_tax`/`deposit` follow the exact same code path as
-  `withholding_tax` (`mapXtbRowToTransaction()`, same function, same
-  constraint), so this is considered adequately covered by the
-  `withholding_tax` result above plus the pre-existing unit tests in
-  `lib/holdingsImport.test.ts`.
+- **`interest_tax`/`deposit` — closed the same day, second pass.** The first
+  pass of this entry (above) left these two untested via the UI, reasoning
+  they share `mapXtbRowToTransaction()`/the same constraint as
+  `withholding_tax`. Re-checked properly rather than left as an inference:
+  logged back in as the same test user (`staging_rls_user_a`), uploaded a
+  second XLSX (`Deposit` + `Free funds Interest Tax` rows, no ticker on
+  either, matching `normalizeXtbTransactionType()`'s exact match rules).
+  Preview: 2/2 valid, 0 error, 0 duplicate, 0 warning. Confirmed import:
+  "2 importadas" in **Últimas importações**. Verified directly in the
+  database — both transactions written with `import_id` set to the same new
+  audit log (`status: completed, total_rows: 2, valid_rows: 2,
+  imported_rows: 2`): `type: 'deposit'`, `amount: 500`, `ticker: null`; and
+  `type: 'interest_tax'`, `amount: -0.5`, `ticker: null`. Both exactly as
+  expected. **`'wht'` remains untested and unreachable via the UI** — this
+  was re-confirmed, not newly re-verified, since `normalizeXtbTransactionType()`
+  simply never returns `'wht'` for any input string; producing a `'wht'`-typed
+  transaction requires a direct SQL insert (already covered by the
+  `transactions_type_check` constraint definition query above), not an import
+  file.
 - **Cleanup:** all throwaway rows created purely to exercise constraints/RLS
   (one `import_audit_logs` row, one `transactions` row) were deleted
   immediately after use — confirmed back to 0 extra rows. The smoke-test
@@ -633,12 +644,16 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
   correctly scoped by `import_id` per user).
 - `get_advisors` (security) before and after the migration — identical
   results, no new advisory introduced.
+- `deposit` and `interest_tax`, smoke-tested through the UI in a second pass
+  the same day: both written to `transactions` with the correct type,
+  `ticker: null`, and `import_id` set — see "Staging validation log".
 
 **Still not validated:**
-- `'wht'` and standalone `interest_tax`/`deposit` rows were not separately
-  smoke-tested through the UI (time-boxed; considered adequately covered by
-  the `withholding_tax` result plus existing unit tests — see "Staging
-  validation log").
+- `'wht'` — genuinely can't be smoke-tested through the import UI;
+  `normalizeXtbTransactionType()` never produces it for any input, so the
+  only way to get a `'wht'`-typed row is a direct SQL insert, which is what
+  the `transactions_type_check` constraint-definition query above already
+  exercises.
 - Production. Everything above was staging only, per this task's explicit
   scope — see [release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
   for what's still required before production.
