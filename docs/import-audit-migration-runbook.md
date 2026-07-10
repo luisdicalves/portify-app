@@ -6,28 +6,55 @@ correctly, and roll it back if needed. See
 [import-xtb.md](import-xtb.md#audit-log-persistente) for what the feature
 does and why; this document is only about the migration's operational side.
 
-**Update, 2026-07-10: this migration has now been applied to and validated
-against a real, explicitly-confirmed staging project.** See "Staging
-validation log" immediately below for the full result. Everything that used
-to say "not yet validated" in this document has been re-verified for real —
-where a real result differs from what was previously assumed, that's called
-out explicitly rather than silently corrected.
+**Update, 2026-07-11 — environment relabeling correction.** The entries
+below (originally dated 2026-07-10) described `portify` as "staging"
+because its owner confirmed it as staging at the time. That confirmation was
+**itself mistaken** — the owner later clarified `portify` is actually
+**production**. This means:
 
-## Staging validation log
+- The migration and all validation described below were performed for real
+  **against production**, not staging. Nothing needs to be re-applied — the
+  work already happened, it was just mislabeled while it was happening.
+- This repository still has **no real staging project** — `list_projects`
+  has only ever shown `portify` (now confirmed production) and `portifyv1`
+  (`INACTIVE`, never confirmed as anything). Every "staging first" step in
+  this runbook was, in this one case, unintentionally skipped — there was no
+  staging to go to first. See "Known risks" for what this means going
+  forward.
+- All test/smoke-test data created during this validation (a disposable
+  test user and its holdings/transactions/audit logs) has since been
+  **deleted from production** (2026-07-11, via `auth.users` cascade —
+  confirmed back to exactly the pre-test row counts). See the new
+  2026-07-11 entry below.
 
-Dated entries recording what was actually done against a real Supabase
-project. Add a new entry each time this migration is applied/re-validated —
-don't overwrite previous entries.
+The section below is kept as "Production validation log" (renamed from its
+original title, "Staging validation log") with the original entries
+corrected in place —
+they are **not** duplicated as a separate staging-vs-production pair, since
+there was only ever one real event, against one real (production) database.
 
-### 2026-07-10 — applied and validated against confirmed staging (`portify` / masked ref `dwol****donk`)
+## Production validation log
+
+Dated entries recording what was actually done against the real production
+Supabase project (`portify`). Add a new entry each time this migration is
+applied/re-validated — don't overwrite previous entries.
+
+### 2026-07-10 — applied and validated against production (`portify` / masked ref `dwol****donk`), originally logged as "staging"
+
+**Corrected 2026-07-11: this was production, not staging — see the note at
+the top of this document.** Every "staging" below describes what was
+believed at the time; the actual target was production throughout.
 
 - **Environment confirmation:** the project previously flagged as ambiguous
   (named plainly `"portify"`, no staging/prod suffix — see the prior
-  `chore/staging-import-audit-validation` finding) was **explicitly confirmed
-  by the project owner, in this conversation, as staging** before anything
-  was touched. `npm run check:supabase-env -- --target=staging` was run
-  locally with `SUPABASE_ENVIRONMENT=staging` and `SUPABASE_PROJECT_REF`
-  matching this project's masked ref, and passed.
+  `chore/staging-import-audit-validation` finding) was confirmed by the
+  project owner, in that conversation, as staging — **a confirmation later
+  found to be incorrect; the project is production** (corrected 2026-07-11).
+  `npm run check:supabase-env -- --target=staging` was run locally with
+  `SUPABASE_ENVIRONMENT=staging` and `SUPABASE_PROJECT_REF` matching this
+  project's masked ref, and passed — the guardrail did exactly what it was
+  designed to do (block on missing/mismatched confirmation), it just can't
+  detect a human confirming the *wrong* environment name in good faith.
 - **Access method:** a Supabase MCP connector available in this environment
   (tools like `list_projects`/`apply_migration`/`execute_sql`/
   `generate_typescript_types`), not the `supabase` CLI's `login`/`link` flow —
@@ -38,9 +65,10 @@ don't overwrite previous entries.
 - **Pre-migration state:** `list_tables` confirmed `import_audit_logs` did
   not exist yet; `profiles` had 2 rows, `holdings` 16, `transactions` 130 —
   **this project already holds non-trivial real-looking data**, not an empty
-  disposable database. Proceeded anyway per the explicit staging
-  confirmation, but this is worth knowing before treating this project as
-  freely disposable in the future.
+  disposable database — because it's production. Proceeded anyway per the
+  explicit environment confirmation given at the time (later found to be
+  mistaken — see the correction note above); this pre-existing data is
+  exactly why it should never have been treated as freely disposable.
 - **Migration applied** via the MCP `apply_migration` tool (registers
   properly in this project's tracked migration history, consistent with how
   every prior migration on this project was applied — confirmed via
@@ -122,13 +150,49 @@ don't overwrite previous entries.
   transaction requires a direct SQL insert (already covered by the
   `transactions_type_check` constraint definition query above), not an import
   file.
-- **Cleanup:** all throwaway rows created purely to exercise constraints/RLS
-  (one `import_audit_logs` row, one `transactions` row) were deleted
-  immediately after use — confirmed back to 0 extra rows. The smoke-test
-  user (`staging_rls_user_a`) and its resulting data (2 audit log rows, 2
-  transactions, 2 holdings) were **left in place** as evidence of a
-  successful real test, not cleaned up — flagged here so whoever administers
-  this project knows it's safe to delete later.
+- **Cleanup (original, 2026-07-10):** all throwaway rows created purely to
+  exercise constraints/RLS (one `import_audit_logs` row, one `transactions`
+  row) were deleted immediately after use — confirmed back to 0 extra rows.
+  The smoke-test user (`staging_rls_user_a`) and its resulting data (3 audit
+  log rows across both passes, 4 transactions, 3 holdings) were **left in
+  place** at the time, on the belief this was disposable staging data.
+- **Cleanup (corrected, 2026-07-11):** now that `portify` is known to be
+  production, the smoke-test user and all its data were deleted for real —
+  see the 2026-07-11 entry below for the exact query and confirmed result.
+
+### 2026-07-11 — environment correction and production test-data cleanup
+
+- **What changed:** the project owner clarified that `portify` is
+  **production**, not staging as previously confirmed. No separate staging
+  project exists in this Supabase organization (`list_projects` still shows
+  only `portify` and the `INACTIVE` `portifyv1`).
+- **Documentation corrected in place:** the 2026-07-10 entry above (and
+  every other "staging" reference describing this specific event throughout
+  this runbook and `docs/release-checklist.md`) was relabeled to production,
+  with an explicit note rather than a silent edit.
+- **Test data removed from production:** the disposable test user created
+  during the 2026-07-10 smoke tests (`staging_rls_user_a`, `user_id` masked
+  `8afb****b4a0`) and everything it owned were deleted:
+  ```sql
+  delete from auth.users where id = '8afb8580-...-...';  -- full id not repeated here, already masked above
+  ```
+  `on delete cascade` (auth.users → profiles → holdings/transactions/
+  import_audit_logs) removed all of it in one statement. Verified
+  immediately after: the test user's own row counts (auth.users, profiles,
+  holdings, transactions, import_audit_logs) were all confirmed at **0**,
+  and the project's *total* row counts returned to exactly their
+  pre-validation baseline: `profiles: 2`, `transactions: 130`,
+  `holdings: 16` — matching the numbers recorded in the pre-migration state
+  note in the 2026-07-10 entry above. No real user's data was touched.
+- **No other migration was applied.** Only the already-applied
+  `supabase-migration-import-audit-log.sql` (from 2026-07-10) exists in this
+  project's migration history — nothing new was applied on 2026-07-11, this
+  entry is documentation and cleanup only.
+- **Outstanding:** this Supabase organization still has no real staging
+  environment. Every future schema change to this project is, today,
+  necessarily either "validate by careful reading + local static checks
+  only" or "apply directly to production" — there is no safer middle step
+  until a genuine staging project exists. See "Known risks" below.
 
 ## Objective
 
@@ -192,15 +256,19 @@ policy this enforces — this section is just the checklist.
    - **Dashboard URL** — matches the ref/name above.
    - **Owner** — you know who administers this project and that it's the
      one actually meant for this purpose.
-   - **Environment** — cross-checked against the runbook's "Staging
+   - **Environment** — cross-checked against the runbook's "Production
      validation log" below, or added as a new entry there if this is the
-     first time this project is being confirmed.
+     first time this project is being confirmed. A human confirming the
+     wrong environment name in good faith is exactly what happened on
+     2026-07-10 (see that log) — cross-checking against a *written* prior
+     confirmation, not just asking again, is what would have caught it.
 3. **Abort** (do not apply the migration) if any of the following is true:
    - The environment is ambiguous by any of the checks above.
    - The only project available is the one named plainly `"portify"` (the
-     exact situation found in this repository as of 2026-07-09 — see
-     "Staging validation log") — that project has not been confirmed as
-     staging by this procedure and must not be treated as such.
+     exact situation found in this repository as of 2026-07-09, and now
+     known to be production — see "Production validation log") — do not
+     treat a plainly-named project as staging (or as production) on a
+     single verbal confirmation alone; see "Known risks" for why.
    - There's no clear staging/production separation at all.
    - `lib/supabase/database.types.ts` cannot be regenerated against the
      confirmed environment immediately after applying the migration (if type
@@ -245,14 +313,14 @@ Rollback (see below) is a manual, deliberate action, not a scripted inverse.
 `lib/supabase/database.types.ts` was originally updated **by hand**, because
 no real Supabase project was reachable when the migration was first written.
 **Update, 2026-07-10:** it has since been regenerated against the real,
-migrated `portify` staging project (via the Supabase MCP
-`generate_typescript_types` tool) and found byte-for-byte identical to the
-hand-written version already in the repo — see "Staging validation log"
-above. If you're applying this migration to a *different* project (e.g.
-production, or a future dedicated staging project), still regenerate and
-diff — this result confirms the hand-written version was accurate for the
-schema this migration produces, not that regeneration can be skipped for a
-different project:
+migrated `portify` project — production, though believed to be staging at
+the time (via the Supabase MCP `generate_typescript_types` tool) — and found
+byte-for-byte identical to the hand-written version already in the repo —
+see "Production validation log" above. If you're applying this migration to
+a *different* project (e.g. a future dedicated staging project, once one
+exists), still regenerate and diff — this result confirms the hand-written
+version was accurate for the schema this migration produces, not that
+regeneration can be skipped for a different project:
 
 ```bash
 npx supabase login
@@ -260,7 +328,7 @@ npx supabase link --project-ref <target-project-ref>
 npx supabase gen types typescript --linked > lib/supabase/database.types.ts
 ```
 
-(Or, without linking, `npx supabase gen types typescript --project-id <ref> --schema public > lib/supabase/database.types.ts` using a personal access token. A Supabase MCP connector, if available in your environment, can also do this without either the CLI or a token — see "Staging validation log" for how this was done here.)
+(Or, without linking, `npx supabase gen types typescript --project-id <ref> --schema public > lib/supabase/database.types.ts` using a personal access token. A Supabase MCP connector, if available in your environment, can also do this without either the CLI or a token — see "Production validation log" for how this was done here.)
 
 After regenerating, diff it against the current file. Expect it to match
 almost exactly for `import_audit_logs`/`transactions.import_id` — a
@@ -322,11 +390,16 @@ Also acceptable as a quick sanity pass, without SQL access: run
 files agree with each other (it does **not** touch the real database; it's a
 static text check, complementary to the queries above, not a replacement).
 
-## Functional smoke test (staging)
+## Functional smoke test
 
-Manual, against the deployed staging app, after the migration is applied.
-Use two separate test accounts (**user A**, **user B**) — user B is only
-needed for the RLS checklist further down, not for steps 1–9 below.
+Manual, against the confirmed target environment (staging if one exists,
+production otherwise — see "Known risks": this Supabase organization
+currently has no staging, so this was in practice run against production on
+2026-07-10), after the migration is applied. Use two separate test accounts
+(**user A**, **user B**) — user B is only needed for the RLS checklist
+further down, not for steps 1–9 below. **If run against production, delete
+both test accounts and everything they created immediately after** — see
+the 2026-07-11 cleanup entry in "Production validation log" for exactly how.
 
 1. Log in as **user A**, a test user with no existing transactions.
 2. Go to **Perfil → Definições → Importar Portfólio**.
@@ -385,7 +458,7 @@ needed for the RLS checklist further down, not for steps 1–9 below.
     **same** file again — confirm rows are flagged `'duplicate'` in the
     preview and are not re-imported (checked against the user's already-saved
     transactions this time, not just within-file). **Corrected by real
-    testing on 2026-07-10** (see "Staging validation log"): if *every* row in
+    testing on 2026-07-10** (see "Production validation log"): if *every* row in
     the file is now a duplicate (or invalid), `validRows` is 0 and the
     **"Importar" button is disabled** — `confirmImport()` never runs, so
     **no new audit log row is created** in that case. This only differs from
@@ -404,7 +477,7 @@ needed for the RLS checklist further down, not for steps 1–9 below.
     step if no such environment exists — the e2e test is the fallback
     coverage.
 
-## RLS checklist (staging, two users)
+## RLS checklist (two users)
 
 Requires two distinct authenticated test accounts, **user A** and **user
 B**, each with at least one completed import from the smoke test above.
@@ -509,7 +582,7 @@ log (data-integrity spot-check, any time):**
 existed** — those older transactions legitimately have `external_id` set
 (they came from a parsed file, via the pre-audit-log single-step import
 flow) but `import_id` null, since the column didn't exist yet when they were
-written. On `portify` staging, this baseline was **130** — matching exactly
+written. On `portify` (production), this baseline was **130** — matching exactly
 the transaction count already in the table before this migration was ever
 applied here. **A non-zero result on its own is not a problem** — what
 matters is whether the count *increases* after this migration is live, which
@@ -535,16 +608,28 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
 
 ## Known risks
 
+- **This Supabase organization has no real staging environment.** The only
+  two projects that exist are `portify` (production) and `portifyv1`
+  (`INACTIVE`, never confirmed as anything). This entire migration —
+  schema change, constraint tests, RLS tests, functional smoke tests — was
+  validated directly against production because there was nowhere lower-risk
+  to do it first, and a verbal "yes this is staging" confirmation from the
+  project owner turned out to be mistaken (see "Production validation log",
+  2026-07-10/2026-07-11). Recommendation for next time: create and clearly
+  name (`-staging` or similar) a second project before the next schema
+  change, so `npm run check:supabase-env`'s naming heuristic has something
+  to actually cross-check against, and confirmations aren't the only line of
+  defense.
 - ~~`database.types.ts` was hand-written, not generated.~~ **Resolved
-  2026-07-10** — regenerated against the real, migrated `portify` staging
-  project and found byte-for-byte identical (see "Staging validation log").
-  Still true for any *other* project this migration is applied to (e.g.
-  production): regenerate and diff there too, don't assume this result
-  transfers.
+  2026-07-10** — regenerated against the real, migrated `portify` project
+  (production) and found byte-for-byte identical (see "Production validation
+  log"). Still true for any *other* project this migration is applied to
+  (e.g. a future dedicated staging project, once one exists): regenerate and
+  diff there too, don't assume this result transfers.
 - ~~No automated test exercises the migration SQL itself.~~ **Resolved
-  2026-07-10** for staging — the migration was actually applied to a real
+  2026-07-10** for production — the migration was actually applied to a real
   Postgres instance and every post-migration query, constraint, and RLS
-  check was re-run for real (see "Staging validation log"). Still true that
+  check was re-run for real (see "Production validation log"). Still true that
   there's no *automated/repeatable* test of the migration SQL (e.g. in CI) —
   this was a manual, one-time validation, not a regression-proof harness.
 - **The `transactions_type_check` widening is a live-traffic-affecting
@@ -621,8 +706,9 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
   transaction types are present in the `transactions_type_check` definition,
   and all the docs/test files this runbook depends on actually exist.
 
-**Validated for real, 2026-07-10, against confirmed staging (`portify`) — see
-"Staging validation log" above for full detail:**
+**Validated for real, 2026-07-10, against `portify` — production, though
+believed to be staging at the time (corrected 2026-07-11) — see "Production
+validation log" above for full detail:**
 - The migration was actually applied (via the Supabase MCP `apply_migration`
   tool) and every post-migration query re-run for real, all matching
   expectations exactly.
@@ -646,7 +732,11 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
   results, no new advisory introduced.
 - `deposit` and `interest_tax`, smoke-tested through the UI in a second pass
   the same day: both written to `transactions` with the correct type,
-  `ticker: null`, and `import_id` set — see "Staging validation log".
+  `ticker: null`, and `import_id` set — see "Production validation log".
+- All test data created during the above (a disposable test user and its
+  holdings/transactions/audit logs) was deleted from production on
+  2026-07-11 once the environment mislabeling was caught — see "Production
+  validation log", 2026-07-11 entry.
 
 **Still not validated:**
 - `'wht'` — genuinely can't be smoke-tested through the import UI;
@@ -654,11 +744,17 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
   only way to get a `'wht'`-typed row is a direct SQL insert, which is what
   the `transactions_type_check` constraint-definition query above already
   exercises.
-- Production. Everything above was staging only, per this task's explicit
-  scope — see [release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
-  for what's still required before production.
+- **A genuine staging environment never existed for any of this** — every
+  validation above ran directly against the only real project this Supabase
+  organization has, which turned out to be production. There is currently
+  no lower-risk environment to validate a *future* schema change against
+  before it hits production — see "Known risks" and
+  [release-checklist.md](release-checklist.md#import-audit-log-release-checklist).
 
-## Checklist before production
+## Checklist status
 
-See [release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
-for the full pre-production checklist.
+Production is done (see "Production validation log" above) — this
+migration's rollout for this feature is complete. See
+[release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
+for the itemized checklist and its final state, and for what to do
+differently next time given there's no staging environment yet.

@@ -11,26 +11,36 @@ Scope: `import_audit_logs` table, `transactions.import_id`, and everything in
 this before merging or deploying any change that touches that schema or
 `lib/db/importAudit.ts`.
 
+**Correction, 2026-07-11:** every item below that says "staging" originally
+described `portify`, which the project owner had confirmed as staging on
+2026-07-10. That confirmation was mistaken — `portify` is production. The
+work described below genuinely happened exactly as described; only the
+environment label was wrong. See
+[import-audit-migration-runbook.md](import-audit-migration-runbook.md#production-validation-log)
+("Production validation log", 2026-07-11 entry) for the full correction and
+the resulting production test-data cleanup.
+
 - [x] PR inclui a migration SQL (`supabase-migration-import-audit-log.sql`,
       já em `main` desde PR #129 — sem alterações nesta validação).
-- [x] Migration testada — **em staging real** (`portify`, 2026-07-10), não
-      apenas localmente. Ver runbook, "Staging validation log".
+- [x] Migration testada — **em produção real** (`portify`, aplicada
+      2026-07-10, ambiente correctamente identificado 2026-07-11), não
+      apenas localmente. Ver runbook, "Production validation log".
 - [x] `lib/supabase/database.types.ts` regenerado contra o projecto real —
-      byte-a-byte idêntico à versão já existente. Ver runbook, "Staging
+      byte-a-byte idêntico à versão já existente. Ver runbook, "Production
       validation log".
 - [x] RLS revista e **testada com dois utilizadores reais** (ver abaixo).
-- [x] Supabase staging migrado (migration aplicada via Supabase MCP,
+- [x] Supabase production migrado (migration aplicada via Supabase MCP,
       queries de verificação do runbook todas corridas com sucesso).
-- [x] Importação XTB testada em staging com um ficheiro pequeno válido —
+- [x] Importação XTB testada em produção com um ficheiro pequeno válido —
       CSV genérico (2 linhas, holdings) e XLSX rico (`buy` real) ambos
-      confirmados na app real e na base de dados (runbook, "Staging
+      confirmados na app real e na base de dados (runbook, "Production
       validation log").
 - [x] Importação com linhas inválidas testada — linha com tipo não
       reconhecido correctamente marcada `'error'` e não gravada.
 - [x] Importação com duplicados internos (dentro do próprio ficheiro)
       testada — a segunda ocorrência foi marcada `'duplicate'` e não gravada.
 - [x] Importação com retenção na fonte (`withholding_tax`) testada em
-      staging — **transacção real confirmada na tabela `transactions`**
+      produção — **transacção real confirmada na tabela `transactions`**
       com `type = 'withholding_tax'`, `import_id` preenchido.
 - [x] `interest_tax` e `deposit` testados via UI — **transacções reais
       confirmadas na tabela `transactions`** (`type = 'deposit'`,
@@ -47,8 +57,8 @@ this before merging or deploying any change that touches that schema or
 - [x] Falha de audit log testada — coberta por `e2e/notifications.spec.ts`
       (mock de 500); segundo ambiente não migrado não estava disponível
       nesta sessão para reconfirmar contra um backend real.
-- [x] RLS testada com dois utilizadores distintos e reais do próprio
-      staging (simulação de sessão via `set local role authenticated` +
+- [x] RLS testada com dois utilizadores distintos e reais da própria
+      produção (simulação de sessão via `set local role authenticated` +
       `request.jwt.claims`): utilizador A não vê nem actualiza imports de B,
       `delete` bloqueado mesmo para o dono, `transactions.import_id`
       correctamente associado por utilizador.
@@ -62,13 +72,17 @@ this before merging or deploying any change that touches that schema or
       `file_hash`, contagens, `summary`/`warnings`/`errors` agregados),
       nunca o ficheiro em si nem uma cópia linha-a-linha do seu conteúdo.
 - [x] Rollback documentado e revisto (ver runbook — secção "Rollback
-      (manual)") — **ainda não exercido em produção**, nem precisa de o ser
-      para este PR (só staging foi tocado).
+      (manual)").
+- [x] Dados de teste criados durante a validação (utilizador descartável +
+      holdings/transactions/audit logs) removidos da produção real
+      (2026-07-11) — ver runbook, "Production validation log", entrada de
+      2026-07-11, incluindo a query de remoção e a confirmação de que as
+      contagens totais voltaram exactamente à baseline pré-teste.
 
-Staging está agora validado (ver runbook, "Staging validation log",
-2026-07-10). **Produção continua por fazer** — repetir a mesma sequência lá,
-com backup/PITR confirmado e `--confirm-production` no guardrail, só depois
-de reviste a lista acima novamente para esse ambiente especificamente.
+**Produção está validada** (ver runbook, "Production validation log",
+2026-07-10/2026-07-11). Não há, neste momento, nenhum ambiente de staging
+real nesta organização Supabase — recomenda-se criar um antes da próxima
+alteração de schema (ver runbook, secção "Known risks").
 
 ## Supabase environment guardrails
 
@@ -79,27 +93,46 @@ sensitive operation against Supabase. See
 policy and [scripts/check-supabase-environment.mjs](../scripts/check-supabase-environment.mjs)
 (`npm run check:supabase-env`) for the automated check.
 
+**Correction, 2026-07-11:** the confirmation described below
+(`SUPABASE_ENVIRONMENT=staging`, ref matching `portify`) was run correctly
+and passed exactly as designed — the guardrail did its job. What failed was
+the human confirmation feeding it: the project owner said "staging" in good
+faith about a project that is actually production. The guardrail script
+cannot detect a human confirming the wrong environment name; it can only
+enforce that *some* explicit confirmation happened. See
+[docs/supabase-environments.md](supabase-environments.md) for whether this
+changes the recommended confirmation procedure.
+
 - [x] `SUPABASE_ENVIRONMENT=staging` definido localmente e
       `npm run check:supabase-env -- --target=staging` corrido e a passar
-      antes de qualquer operação sensível (2026-07-10).
+      antes de qualquer operação sensível (2026-07-10) — **valor correcto
+      seria `production`, dado o que se veio a confirmar em 2026-07-11**;
+      o comando em si passou correctamente para o valor então indicado.
 - [x] `SUPABASE_PROJECT_REF` confirmado — **explicitamente pelo dono do
       projecto**, nesta conversa, para o projecto anteriormente ambíguo
-      `"portify"` (masked `dwol****donk`). Ver runbook, "Staging validation
+      `"portify"` (masked `dwol****donk`) — **confirmado em 2026-07-11 como
+      sendo produção**, não staging. Ver runbook, "Production validation
       log".
 - [x] Linked project ref (`supabase/.temp/linked-project.json`) coincide com
       `SUPABASE_PROJECT_REF` — confirmado, sem divergência.
-- [x] Staging confirmado manualmente antes da migration — por decisão
+- [x] Ambiente confirmado manualmente antes da migration — por decisão
       explícita do dono do projecto (não pela heurística de nome, que não
       teria apanhado este caso — ver limitação já documentada em
-      `docs/supabase-environments.md`) — e registado no runbook.
-- [ ] Produção exige confirmação explícita — **não aplicável a este PR**,
-      produção não foi tocada.
+      `docs/supabase-environments.md`) — e registado no runbook. **A
+      confirmação inicial estava errada** (disse staging, era produção);
+      corrigida e registada em 2026-07-11.
+- [x] Produção exigiu confirmação explícita — retroactivamente, dado que o
+      ambiente afinal sempre foi produção: `--confirm-production` não foi
+      usado na altura (o comando corrido foi `--target=staging`), porque a
+      produção não tinha sido identificada como tal. Nenhuma migration nova
+      foi aplicada depois da correcção — só documentação e limpeza de dados
+      de teste, que não exigem o guardrail de migration.
 - [x] Output de `npm run check:supabase-env` registado no runbook, secção
-      "Staging validation log" — refs sempre mascarados.
+      "Production validation log" — refs sempre mascarados.
 - [x] Nenhum secret (anon key, service role key, JWT secret, database
       URL/password, ou project ref não mascarado) aparece nos logs, no PR,
       ou em qualquer documento deste repositório — confirmado por inspecção
       de todo o output usado nesta validação.
 - [x] `lib/supabase/database.types.ts` regenerado depois da migration
-      (já estava aplicada) contra o ambiente confirmado (`portify` staging)
-      — byte-a-byte idêntico ao já existente.
+      (já estava aplicada) contra o ambiente confirmado (`portify`,
+      produção) — byte-a-byte idêntico ao já existente.

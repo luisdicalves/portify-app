@@ -3,13 +3,24 @@
 How to tell environments apart, and why this repository refuses to run
 sensitive Supabase operations (migrations, `database.types.ts` regeneration)
 against a project it can't unambiguously identify. Written after a real
-attempt to validate the import-audit-log migration in staging discovered
-that **this environment currently has only one Supabase project configured,
-named plainly `"portify"`, with no staging/production distinction anywhere**
-(see [import-audit-migration-runbook.md](import-audit-migration-runbook.md#staging-validation-log)).
+attempt to validate the import-audit-log migration discovered that **this
+environment currently has only one real Supabase project, named plainly
+`"portify"`, with no staging/production distinction anywhere**
+(see [import-audit-migration-runbook.md](import-audit-migration-runbook.md#production-validation-log)).
 This document is the guardrail for that gap — not a fix for it. Someone
 still has to actually create/name a separate staging project; see
 "Procedure — confirming staging" below for what that person needs to do.
+
+**Update, 2026-07-11 — this exact failure mode happened for real.** The
+project owner verbally confirmed `"portify"` as staging on 2026-07-10; that
+confirmation was mistaken — `portify` is production, and a migration plus a
+full round of smoke/RLS testing (with disposable test data, since cleaned
+up) ran against it in the belief it was staging. `check:supabase-env`
+performed exactly as designed (it enforces that *an* explicit confirmation
+happened; it cannot verify that the confirmation itself is correct). See
+"Procedure — confirming staging" below, which now reflects the lesson: a
+verbal answer alone is not enough, cross-check against a dashboard detail
+that cannot also be mistaken by the same person in the same way.
 
 ## Objective
 
@@ -96,8 +107,8 @@ not as a best-effort guess — see the guardrail script's behavior below.
   script output, or log.** When a project ref must appear in output for
   debugging, mask it (e.g. `abcd****wxyz` — first/last 4 characters only).
   `scripts/check-supabase-environment.mjs` does this automatically; do the
-  same by hand in runbook entries (see the "Staging validation log" pattern
-  in [import-audit-migration-runbook.md](import-audit-migration-runbook.md)).
+  same by hand in runbook entries (see the "Production validation log"
+  pattern in [import-audit-migration-runbook.md](import-audit-migration-runbook.md)).
 - **Never apply a migration if `SUPABASE_ENVIRONMENT` is absent.** No
   default, no "assume local if unset" — an unset variable means the
   operator hasn't gone through the confirmation procedure, full stop.
@@ -110,29 +121,45 @@ not as a best-effort guess — see the guardrail script's behavior below.
 
 ## Procedure — confirming staging
 
+**Retrospective, 2026-07-11:** on 2026-07-10, this procedure was not
+actually followed to the letter — step 2 below was skipped (`"portify"`
+does not contain `staging` anywhere, and it was not renamed before
+proceeding) and step 4 had nothing to cross-check against (no production
+ref had ever been recorded either, since this was the first project this
+repository ever confirmed as *anything*). A verbal "yes, that's staging"
+was accepted on its own. The result: a migration and a full smoke-test round
+ran against production. Steps 2 and 4 below are now written as **hard
+blockers**, not suggestions, precisely because of this.
+
 Before running any command against a project as "staging" (including
 running the guardrail script with `--target=staging`), a human must:
 
 1. **Confirm the project ref in the Supabase dashboard** — open the target
    project's dashboard, note the ref (Settings → General), and check it
    matches `SUPABASE_PROJECT_REF`/`supabase/.temp/linked-project.json`.
-2. **Confirm the project name** — it should say `staging` somewhere, per
-   the naming convention above. If it doesn't yet, rename it in the
-   dashboard before proceeding (this alone is a safe, reversible, non-data
-   operation) rather than proceeding against an ambiguously-named project.
+2. **Confirm the project name actually contains `staging`.** If it doesn't,
+   **stop and rename it in the dashboard first** (a safe, reversible,
+   non-data operation) — do not proceed on a verbal assurance alone. A
+   project named plainly (e.g. `"portify"`) is not staging until it's
+   renamed; treating it as staging anyway is exactly what went wrong on
+   2026-07-10.
 3. **Confirm the URL** — `NEXT_PUBLIC_SUPABASE_URL`'s host should match the
    ref confirmed in step 1.
 4. **Confirm this is *not* production** — cross-check against the known
-   production project ref (kept by whoever administers the Supabase
-   organization; not written down in this repo for exactly the reason this
-   whole document exists — a written-down "the prod ref is X" is one typo
-   away from being used by accident. If you don't know the production ref,
-   ask before proceeding, don't guess.).
-5. **Record the confirmation** in the runbook's "Staging validation log"
-   ([import-audit-migration-runbook.md](import-audit-migration-runbook.md#staging-validation-log))
+   production project ref, recorded in the runbook's "Production validation
+   log" ([import-audit-migration-runbook.md](import-audit-migration-runbook.md#production-validation-log))
+   once one exists. **If no project has ever been confirmed as production
+   yet, that is not license to assume the current one isn't it** — ask the
+   person who actually administers the Supabase organization, in a way that
+   requires them to look something up (dashboard, billing, DNS) rather than
+   just answer from memory.
+5. **Record the confirmation** in the runbook's "Production validation log"
+   ([import-audit-migration-runbook.md](import-audit-migration-runbook.md#production-validation-log))
    — masked ref, project name, date, who confirmed it. This is what makes
    the next person's job step 1 "read the log" instead of "repeat this
-   whole procedure from scratch."
+   whole procedure from scratch." (Yes, "Production validation log" is the
+   right link even for a *staging* confirmation — see that file's top note
+   for why there's only one log, not a staging/production pair.)
 
 Only after all five are done should `SUPABASE_ENVIRONMENT=staging` actually
 be exported and `npm run check:supabase-env -- --target=staging` be run.
@@ -171,9 +198,9 @@ validation log"):
    automatically for anything that calls it; for anything that doesn't
    (e.g. a manual SQL Editor session), the same rule applies by hand.
 2. **Document the block** — add or update an entry in the runbook's
-   "Staging validation log" explaining exactly what was ambiguous (missing
-   `SUPABASE_ENVIRONMENT`? project ref mismatch? no staging/prod naming at
-   all?), following the same format as the existing 2026-07-09 entry.
+   "Production validation log" explaining exactly what was ambiguous
+   (missing `SUPABASE_ENVIRONMENT`? project ref mismatch? no staging/prod
+   naming at all?), following the same format as the existing entries.
 3. **Ask the project owner to resolve the ambiguity** — typically by
    creating/naming a proper staging project and recording its ref, or by
    setting `SUPABASE_ENVIRONMENT` correctly for the environment actually
