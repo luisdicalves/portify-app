@@ -6,10 +6,129 @@ correctly, and roll it back if needed. See
 [import-xtb.md](import-xtb.md#audit-log-persistente) for what the feature
 does and why; this document is only about the migration's operational side.
 
-**As of this writing, this migration has not been applied to any real
-Supabase project by this task.** No Supabase access (staging or production)
-was performed while preparing this runbook — everything below was validated
-by static review only (see "What was and wasn't validated").
+**Update, 2026-07-10: this migration has now been applied to and validated
+against a real, explicitly-confirmed staging project.** See "Staging
+validation log" immediately below for the full result. Everything that used
+to say "not yet validated" in this document has been re-verified for real —
+where a real result differs from what was previously assumed, that's called
+out explicitly rather than silently corrected.
+
+## Staging validation log
+
+Dated entries recording what was actually done against a real Supabase
+project. Add a new entry each time this migration is applied/re-validated —
+don't overwrite previous entries.
+
+### 2026-07-10 — applied and validated against confirmed staging (`portify` / masked ref `dwol****donk`)
+
+- **Environment confirmation:** the project previously flagged as ambiguous
+  (named plainly `"portify"`, no staging/prod suffix — see the prior
+  `chore/staging-import-audit-validation` finding) was **explicitly confirmed
+  by the project owner, in this conversation, as staging** before anything
+  was touched. `npm run check:supabase-env -- --target=staging` was run
+  locally with `SUPABASE_ENVIRONMENT=staging` and `SUPABASE_PROJECT_REF`
+  matching this project's masked ref, and passed.
+- **Access method:** a Supabase MCP connector available in this environment
+  (tools like `list_projects`/`apply_migration`/`execute_sql`/
+  `generate_typescript_types`), not the `supabase` CLI's `login`/`link` flow —
+  no CLI OAuth login was needed or performed. `list_projects` also revealed a
+  **second** project in the same organization, `portifyv1` (ref masked
+  `xqsu****opcbz`, status `INACTIVE`) — not used for anything here, noted for
+  awareness only.
+- **Pre-migration state:** `list_tables` confirmed `import_audit_logs` did
+  not exist yet; `profiles` had 2 rows, `holdings` 16, `transactions` 130 —
+  **this project already holds non-trivial real-looking data**, not an empty
+  disposable database. Proceeded anyway per the explicit staging
+  confirmation, but this is worth knowing before treating this project as
+  freely disposable in the future.
+- **Migration applied** via the MCP `apply_migration` tool (registers
+  properly in this project's tracked migration history, consistent with how
+  every prior migration on this project was applied — confirmed via
+  `list_migrations` beforehand).
+- **Post-migration validation:** every query in "Post-migration validation"
+  below was run for real. Result: **all as expected** — `import_audit_logs`
+  has exactly the 20 documented columns with matching types/nullability, RLS
+  is enabled, exactly 3 policies exist (select/insert/update, no delete),
+  the `status` check constraint and `transactions_type_check` (including
+  `withholding_tax` and `wht`) match exactly what the migration file
+  specifies, and both foreign keys (`import_audit_logs.user_id → profiles`,
+  `transactions.import_id → import_audit_logs`) are in place.
+- **`get_advisors` (security)** was run before and after the migration — the
+  two results are identical (same pre-existing, unrelated advisories:
+  `investor_profiles` security-definer view, a few `search_path`-mutable
+  functions, leaked-password-protection disabled). The migration introduced
+  no new advisory, in particular no missing-RLS warning for the new table.
+- **Constraint enforcement, tested with real inserts** (a throwaway row was
+  inserted, verified, then deleted — no lasting data): a valid insert
+  succeeded; an insert with `status = 'not_a_real_status'` failed with
+  Postgres error `23514` (check constraint violation); an insert omitting
+  `user_id` failed with `23502` (not-null violation). All three match the
+  documented expectations exactly.
+- **RLS, tested with the two real pre-existing profiles** (session simulated
+  via `set local role authenticated; set local request.jwt.claims`, a
+  throwaway audit log + transaction row created and deleted afterward — see
+  "RLS checklist" below for exactly which 5 checks were run and their
+  results, all passed).
+- **`database.types.ts` regenerated** via the MCP `generate_typescript_types`
+  tool and compared against the file already in the repo: **byte-for-byte
+  identical, zero diff.** The hand-written version from the original feature
+  task was already fully accurate.
+- **Functional smoke test, done for real through the actual deployed app
+  code** (local dev server pointed at this project via the existing
+  `.env.local`, driven through a real browser — not a mock): a fresh,
+  disposable test user (`staging_rls_user_a` / `StagingTest UserA`,
+  `user_id` masked `8afb****b4a0`) was registered through the real sign-up
+  flow, then:
+  1. **Valid generic CSV** (`ticker,units,avg_price`, 2 rows) — preview
+     showed "Nenhum dado foi gravado ainda", confirmed import created audit
+     log id `ef96****3b1` (`status: completed`, `imported_rows: 0` — correct
+     for this path, which produces holdings not transactions), toast showed
+     the ID, "Últimas importações" updated, `holdings` table confirmed to
+     match the file exactly.
+  2. **Rich XTB-style XLSX** ("CASH OPERATION HISTORY" sheet, 4 rows: one
+     `buy`, one `withholding_tax`, one unrecognized type, one duplicate of
+     the `buy` row) — preview correctly showed 2 valid / 1 error / 1
+     duplicate / 1 warning, with the exact error message
+     `Tipo de operação não reconhecido: "Some Unknown Operation Type"`.
+     Confirming created audit log id `6e27****3f4`
+     (`status: completed, total_rows: 4, valid_rows: 2, invalid_rows: 1,
+     duplicate_rows: 1, imported_rows: 2, skipped_rows: 2`), and both real
+     transactions were verified in the DB: `type: 'buy'` (AAPL.US, 10 units
+     @150.5, `import_id` set) and **`type: 'withholding_tax'`** (MSFT.US,
+     amount -5, `import_id` set) — this is the first real, end-to-end
+     confirmation that `withholding_tax` writes successfully past the
+     widened `transactions_type_check`.
+  3. **Persistent duplicate (same file, re-uploaded)** — preview now showed
+     0 valid / 3 duplicate (against the already-saved transactions from step
+     2) / 1 error, with **"Nenhuma linha válida para importar."** shown and
+     the **"Importar" button disabled** — see step 10 of "Functional smoke
+     test" below, which this corrects.
+- **`interest_tax`/`deposit` — closed the same day, second pass.** The first
+  pass of this entry (above) left these two untested via the UI, reasoning
+  they share `mapXtbRowToTransaction()`/the same constraint as
+  `withholding_tax`. Re-checked properly rather than left as an inference:
+  logged back in as the same test user (`staging_rls_user_a`), uploaded a
+  second XLSX (`Deposit` + `Free funds Interest Tax` rows, no ticker on
+  either, matching `normalizeXtbTransactionType()`'s exact match rules).
+  Preview: 2/2 valid, 0 error, 0 duplicate, 0 warning. Confirmed import:
+  "2 importadas" in **Últimas importações**. Verified directly in the
+  database — both transactions written with `import_id` set to the same new
+  audit log (`status: completed, total_rows: 2, valid_rows: 2,
+  imported_rows: 2`): `type: 'deposit'`, `amount: 500`, `ticker: null`; and
+  `type: 'interest_tax'`, `amount: -0.5`, `ticker: null`. Both exactly as
+  expected. **`'wht'` remains untested and unreachable via the UI** — this
+  was re-confirmed, not newly re-verified, since `normalizeXtbTransactionType()`
+  simply never returns `'wht'` for any input string; producing a `'wht'`-typed
+  transaction requires a direct SQL insert (already covered by the
+  `transactions_type_check` constraint definition query above), not an import
+  file.
+- **Cleanup:** all throwaway rows created purely to exercise constraints/RLS
+  (one `import_audit_logs` row, one `transactions` row) were deleted
+  immediately after use — confirmed back to 0 extra rows. The smoke-test
+  user (`staging_rls_user_a`) and its resulting data (2 audit log rows, 2
+  transactions, 2 holdings) were **left in place** as evidence of a
+  successful real test, not cleaned up — flagged here so whoever administers
+  this project knows it's safe to delete later.
 
 ## Objective
 
@@ -123,10 +242,17 @@ Rollback (see below) is a manual, deliberate action, not a scripted inverse.
 
 ## Regenerating `database.types.ts`
 
-`lib/supabase/database.types.ts` was updated **by hand** in the same task
-that wrote this migration, because no real Supabase project was reachable
-from that environment. Treat it as a best-effort draft, not a verified
-artifact, until it's regenerated against the real, migrated project:
+`lib/supabase/database.types.ts` was originally updated **by hand**, because
+no real Supabase project was reachable when the migration was first written.
+**Update, 2026-07-10:** it has since been regenerated against the real,
+migrated `portify` staging project (via the Supabase MCP
+`generate_typescript_types` tool) and found byte-for-byte identical to the
+hand-written version already in the repo — see "Staging validation log"
+above. If you're applying this migration to a *different* project (e.g.
+production, or a future dedicated staging project), still regenerate and
+diff — this result confirms the hand-written version was accurate for the
+schema this migration produces, not that regeneration can be skipped for a
+different project:
 
 ```bash
 npx supabase login
@@ -134,7 +260,7 @@ npx supabase link --project-ref <target-project-ref>
 npx supabase gen types typescript --linked > lib/supabase/database.types.ts
 ```
 
-(Or, without linking, `npx supabase gen types typescript --project-id <ref> --schema public > lib/supabase/database.types.ts` using a personal access token.)
+(Or, without linking, `npx supabase gen types typescript --project-id <ref> --schema public > lib/supabase/database.types.ts` using a personal access token. A Supabase MCP connector, if available in your environment, can also do this without either the CLI or a token — see "Staging validation log" for how this was done here.)
 
 After regenerating, diff it against the current file. Expect it to match
 almost exactly for `import_audit_logs`/`transactions.import_id` — a
@@ -217,14 +343,24 @@ needed for the RLS checklist further down, not for steps 1–9 below.
      shows `status = 'completed'`, `imported_rows` matching what the toast said.
    - The imported transactions have `import_id` set to that row's `id`
      (`select import_id, count(*) from transactions where user_id = '<user-a-id>' group by import_id;`).
-6. **Invalid rows:** upload a file with at least one row that fails
-   validation (e.g. a "CASH OPERATION" row with an unrecognized `Type`, or a
-   `buy` row missing units/price). Confirm the preview marks that row
-   `'error'` with a reason, **"Importar" still only writes the valid rows**,
-   and the audit log's `invalid_rows`/`error_count` reflect the bad row(s)
-   (`status` should still be `'completed'` if at least the valid rows made
-   it in — an all-invalid file is `'completed'` with `imported_rows: 0`, not
-   `'failed'`; see "Status lifecycle" in import-xtb.md).
+6. **Invalid rows:** upload a file with **some, but not all, rows** failing
+   validation (e.g. one unrecognized `Type` among otherwise-valid rows).
+   Confirm the preview marks that row `'error'` with a reason, **"Importar"
+   still only writes the valid rows**, and the audit log's
+   `invalid_rows`/`error_count` reflect the bad row(s) (`status: 'completed'`
+   since at least one eligible row made it in). **Correction from real
+   testing on 2026-07-10:** the "Importar" button is disabled whenever
+   `ImportPreview.validRows === 0`
+   (`app/profile/settings/page.tsx`'s `disabled={importing ||
+   importPreview.validRows === 0}`) — this is *any* combination of
+   error/duplicate rows that leaves zero `'valid'`/`'warning'` rows, not just
+   the "all rows are duplicates" case. **A file where every single row is
+   invalid never gets to `confirmImport()` at all** — no audit log is
+   created for it, contradicting what an earlier version of this runbook
+   assumed (`'completed'` with `imported_rows: 0`). If you need to confirm
+   this specific all-invalid-file behavior, watch the button's disabled
+   state in the preview rather than trying to click "Importar" and reading
+   the result.
 7. **Internal duplicates:** upload a file where two rows resolve to the same
    `[date, type, ticker, units, price, amount]` key (see
    [import-xtb.md](import-xtb.md#duplicate-policy)). Confirm the preview
@@ -246,11 +382,17 @@ needed for the RLS checklist further down, not for steps 1–9 below.
    `'wht'` (covered by the post-migration validation query above) — don't
    try to manufacture a `'wht'` row through the UI, it can't happen.
 10. **Persistent duplicate (same file, re-imported):** re-upload the
-    **same** file from step 5 again — confirm rows are flagged `'duplicate'`
-    in the preview and are not re-imported (checked against the user's
-    already-saved transactions this time, not just within-file), and that a
-    **new** audit log row is still created (`status: 'completed'`,
-    `imported_rows: 0`, since there was nothing eligible to write).
+    **same** file again — confirm rows are flagged `'duplicate'` in the
+    preview and are not re-imported (checked against the user's already-saved
+    transactions this time, not just within-file). **Corrected by real
+    testing on 2026-07-10** (see "Staging validation log"): if *every* row in
+    the file is now a duplicate (or invalid), `validRows` is 0 and the
+    **"Importar" button is disabled** — `confirmImport()` never runs, so
+    **no new audit log row is created** in that case. This only differs from
+    the case in step 6/9 above (all-invalid file) if the file has zero
+    eligible rows for *any* reason (all error, all duplicate, or a mix) —
+    an audit log is only ever created once the user can actually press
+    "Importar", which requires at least one `'valid'`/`'warning'` row.
 11. **Unmigrated DB simulation:** if you have access to a *second*,
     not-yet-migrated staging-like project (or can temporarily revoke the
     app's grants on `import_audit_logs` in a disposable project), point the
@@ -361,12 +503,24 @@ after being applied:
 
 **How to confirm no transaction was ever written without a matching audit
 log (data-integrity spot-check, any time):**
+
+**Correction from real testing on 2026-07-10:** this query returns a
+**non-zero baseline on any project that imported data before this migration
+existed** — those older transactions legitimately have `external_id` set
+(they came from a parsed file, via the pre-audit-log single-step import
+flow) but `import_id` null, since the column didn't exist yet when they were
+written. On `portify` staging, this baseline was **130** — matching exactly
+the transaction count already in the table before this migration was ever
+applied here. **A non-zero result on its own is not a problem** — what
+matters is whether the count *increases* after this migration is live, which
+would mean a new transaction was written by the current code without an
+audit trail (an invariant break). Compare against a known-good baseline
+(recorded once, right after migrating) rather than expecting zero:
 ```sql
--- Should always return zero rows: a transaction written by an import
--- (external_id not null, i.e. came from a parsed file, not a manual trade)
--- with no import_id at all would mean the invariant broke somewhere.
--- Manually-entered trades (external_id is null) are expected to have
--- import_id = null and are correctly excluded by this filter.
+-- Not "should always be zero" — record this once, right after migrating, as
+-- your baseline (transactions imported before this feature existed will
+-- legitimately have external_id set and import_id null). Re-run later and
+-- compare: the count should never grow past this baseline.
 select count(*) from transactions
 where external_id is not null and import_id is null;
 
@@ -381,17 +535,18 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
 
 ## Known risks
 
-- **`database.types.ts` was hand-written, not generated.** Until it's
-  regenerated against a real migrated project (see above), there's a
-  (currently believed low, but unverified) risk of a subtle type mismatch —
-  e.g. a column's nullability or default not exactly matching what Postgres
-  actually enforces. `npm run check:schema` only checks textual presence of
-  fields, not their exact types/nullability against a live schema.
-- **No automated test exercises the migration SQL itself.** This task's
-  validation was static (read-through comparison of the migration, the
-  consolidated schema, and the types file — see "What was and wasn't
-  validated"), not an actual `psql`/Supabase run. The SQL has not been
-  executed anywhere as part of preparing this runbook.
+- ~~`database.types.ts` was hand-written, not generated.~~ **Resolved
+  2026-07-10** — regenerated against the real, migrated `portify` staging
+  project and found byte-for-byte identical (see "Staging validation log").
+  Still true for any *other* project this migration is applied to (e.g.
+  production): regenerate and diff there too, don't assume this result
+  transfers.
+- ~~No automated test exercises the migration SQL itself.~~ **Resolved
+  2026-07-10** for staging — the migration was actually applied to a real
+  Postgres instance and every post-migration query, constraint, and RLS
+  check was re-run for real (see "Staging validation log"). Still true that
+  there's no *automated/repeatable* test of the migration SQL (e.g. in CI) —
+  this was a manual, one-time validation, not a regression-proof harness.
 - **The `transactions_type_check` widening is a live-traffic-affecting
   change**, not purely additive: it's a `drop constraint` + `add constraint`
   on an existing table. On a large `transactions` table this is normally a
@@ -466,20 +621,42 @@ where status = 'pending' and created_at < now() - interval '10 minutes';
   transaction types are present in the `transactions_type_check` definition,
   and all the docs/test files this runbook depends on actually exist.
 
-**Not validated (pending, needs a real or local Postgres/Supabase instance):**
-- Actually executing the migration SQL against any Postgres instance (local
-  or remote) — the Supabase CLI is not installed in the environment this
-  runbook was written in, and the local Docker daemon was not running.
-  Starting either was avoided deliberately, per this task's scope (no heavy
-  service installs without a clear need, no real Supabase access without
-  explicit instruction).
-- Constraint-violation behavior under a real engine (e.g. confirming the
-  `status` check actually rejects an out-of-whitelist value, confirming
-  `user_id not null` actually rejects a missing value) — believed correct by
-  inspection (standard Postgres `check`/`not null` semantics, nothing exotic
-  in the DDL), but not empirically exercised in this task.
-- Regenerating `database.types.ts` against a real project.
-- The functional smoke test above, against a real staging deploy.
+**Validated for real, 2026-07-10, against confirmed staging (`portify`) — see
+"Staging validation log" above for full detail:**
+- The migration was actually applied (via the Supabase MCP `apply_migration`
+  tool) and every post-migration query re-run for real, all matching
+  expectations exactly.
+- Constraint-violation behavior under the real engine: a bad `status` value
+  correctly raised Postgres `23514`; a missing `user_id` correctly raised
+  `23502`.
+- `database.types.ts` regenerated against the real project — byte-for-byte
+  identical to the hand-written version already in the repo.
+- The functional smoke test, run for real through the actual app UI in a
+  browser (not mocked): valid CSV import, a rich XTB-style import
+  (`buy` + `withholding_tax` + an unrecognized-type error + an internal
+  duplicate), and a persistent-duplicate re-import — with one correction to
+  what this document previously assumed (see step 10 of "Functional smoke
+  test").
+- The RLS checklist, run for real with two of the project's existing real
+  users (session simulated via `set local role authenticated` /
+  `request.jwt.claims`) — all 5 checks passed (cross-user select blocked,
+  cross-user update blocked, delete blocked even for the owner, transactions
+  correctly scoped by `import_id` per user).
+- `get_advisors` (security) before and after the migration — identical
+  results, no new advisory introduced.
+- `deposit` and `interest_tax`, smoke-tested through the UI in a second pass
+  the same day: both written to `transactions` with the correct type,
+  `ticker: null`, and `import_id` set — see "Staging validation log".
+
+**Still not validated:**
+- `'wht'` — genuinely can't be smoke-tested through the import UI;
+  `normalizeXtbTransactionType()` never produces it for any input, so the
+  only way to get a `'wht'`-typed row is a direct SQL insert, which is what
+  the `transactions_type_check` constraint-definition query above already
+  exercises.
+- Production. Everything above was staging only, per this task's explicit
+  scope — see [release-checklist.md](release-checklist.md#import-audit-log-release-checklist)
+  for what's still required before production.
 
 ## Checklist before production
 

@@ -11,59 +11,64 @@ Scope: `import_audit_logs` table, `transactions.import_id`, and everything in
 this before merging or deploying any change that touches that schema or
 `lib/db/importAudit.ts`.
 
-- [ ] PR inclui a migration SQL (`supabase-migration-import-audit-log.sql`
-      atualizado, ou uma nova migration incremental se for uma alteração
-      subsequente).
-- [ ] Migration testada localmente (Postgres/Supabase local) **ou**, se isso
-      não estiver disponível, revista manualmente campo a campo contra
-      `supabase-schema.sql` e `lib/supabase/database.types.ts`
-      (`npm run check:schema` corrido e a passar).
-- [ ] `lib/supabase/database.types.ts` regenerado contra o projecto real
-      (`npx supabase gen types ...`) **ou**, se ainda não for possível,
-      justificação documentada no runbook (ver secção "What was and wasn't
-      validated" do runbook).
-- [ ] RLS revista: `select`/`insert`/`update` policies scoped a
-      `auth.uid() = user_id`, **sem** policy de `delete` (decisão
-      deliberada — ver runbook).
-- [ ] Supabase staging migrado (migration aplicada e queries de verificação
-      do runbook corridas com sucesso).
-- [ ] Importação XTB testada em staging com um ficheiro pequeno válido
-      (poucas linhas) — audit log criado, transactions com `import_id`
-      preenchido (ver runbook, "Functional smoke test", passos 1–5).
-- [ ] Importação com linhas inválidas testada — linhas com erro não são
-      gravadas, `invalid_rows`/`error_count` no audit log reflectem-nas
-      (runbook, passo 6).
-- [ ] Importação com duplicados internos (dentro do próprio ficheiro)
-      testada — só a primeira ocorrência é gravada (runbook, passo 7).
-- [ ] Importação com retenção na fonte (`withholding_tax`) testada em
-      staging — confirma que o `transactions_type_check` alargado aceita o
-      tipo (bug pré-existente corrigido por esta migration; runbook, passo 8).
-- [ ] `interest_tax` e `deposit` testados (runbook, passo 9). `'wht'` não é
-      produzível pela UI de importação — não tentar simular via ficheiro,
-      ver runbook para o porquê.
-- [ ] Importação duplicada persistente testada — reimportar o mesmo ficheiro
-      já confirmado não duplica transactions, e continua a criar um novo
-      audit log (`imported_rows: 0`, `status: 'completed'`; runbook, passo 10).
-- [ ] Falha de audit log testada — com `import_audit_logs` indisponível
-      (ou RLS a bloquear), a importação aborta e nada é gravado
-      (ver `e2e/notifications.spec.ts`, e runbook passo 11 se houver um
-      segundo ambiente não migrado disponível).
-- [ ] RLS testada com dois utilizadores distintos (ver runbook, secção "RLS
-      checklist (staging, two users)"): utilizador A não vê nem actualiza
-      imports de B, `delete` não é permitido para ninguém, e
-      `transactions.import_id` fica correctamente associado por utilizador.
-- [ ] Confirmado, com a query do runbook ("Troubleshooting / mitigation"),
-      que não existe nenhuma transacção com `external_id` preenchido e
-      `import_id` nulo (i.e. nenhuma transacção importada sem audit trail).
-- [ ] Confirmado que nenhum conteúdo bruto do ficheiro é guardado —
+- [x] PR inclui a migration SQL (`supabase-migration-import-audit-log.sql`,
+      já em `main` desde PR #129 — sem alterações nesta validação).
+- [x] Migration testada — **em staging real** (`portify`, 2026-07-10), não
+      apenas localmente. Ver runbook, "Staging validation log".
+- [x] `lib/supabase/database.types.ts` regenerado contra o projecto real —
+      byte-a-byte idêntico à versão já existente. Ver runbook, "Staging
+      validation log".
+- [x] RLS revista e **testada com dois utilizadores reais** (ver abaixo).
+- [x] Supabase staging migrado (migration aplicada via Supabase MCP,
+      queries de verificação do runbook todas corridas com sucesso).
+- [x] Importação XTB testada em staging com um ficheiro pequeno válido —
+      CSV genérico (2 linhas, holdings) e XLSX rico (`buy` real) ambos
+      confirmados na app real e na base de dados (runbook, "Staging
+      validation log").
+- [x] Importação com linhas inválidas testada — linha com tipo não
+      reconhecido correctamente marcada `'error'` e não gravada.
+- [x] Importação com duplicados internos (dentro do próprio ficheiro)
+      testada — a segunda ocorrência foi marcada `'duplicate'` e não gravada.
+- [x] Importação com retenção na fonte (`withholding_tax`) testada em
+      staging — **transacção real confirmada na tabela `transactions`**
+      com `type = 'withholding_tax'`, `import_id` preenchido.
+- [x] `interest_tax` e `deposit` testados via UI — **transacções reais
+      confirmadas na tabela `transactions`** (`type = 'deposit'`,
+      `amount = 500`; `type = 'interest_tax'`, `amount = -0.5`; ambas com
+      `ticker: null` e `import_id` preenchido). `'wht'` continua não
+      produzível pela UI de importação (não é um gap — `normalizeXtbTransactionType()`
+      nunca o devolve; só existe via insert SQL directo, já coberto pela
+      query de definição do constraint).
+- [x] Importação duplicada persistente testada — reimportar o mesmo ficheiro
+      correctamente marca as linhas `'duplicate'` e não duplica transactions.
+      **Correcção do runbook**: quando 100% das linhas ficam duplicadas, o
+      botão "Importar" fica desactivado e **nenhum novo audit log é criado**
+      (não "completed com imported_rows: 0", como se assumia antes).
+- [x] Falha de audit log testada — coberta por `e2e/notifications.spec.ts`
+      (mock de 500); segundo ambiente não migrado não estava disponível
+      nesta sessão para reconfirmar contra um backend real.
+- [x] RLS testada com dois utilizadores distintos e reais do próprio
+      staging (simulação de sessão via `set local role authenticated` +
+      `request.jwt.claims`): utilizador A não vê nem actualiza imports de B,
+      `delete` bloqueado mesmo para o dono, `transactions.import_id`
+      correctamente associado por utilizador.
+- [x] Confirmado, com a query do runbook, o número de transacções sem
+      audit log — **130, correspondendo exactamente aos dados pré-existentes
+      anteriores a esta migration** (baseline esperado, não uma violação;
+      ver correcção na secção "Troubleshooting / mitigation" do runbook).
+      Nenhum `import_audit_logs` preso em `'pending'`.
+- [x] Confirmado que nenhum conteúdo bruto do ficheiro é guardado —
       `import_audit_logs` só guarda metadados/sumários (`filename`,
       `file_hash`, contagens, `summary`/`warnings`/`errors` agregados),
       nunca o ficheiro em si nem uma cópia linha-a-linha do seu conteúdo.
-- [ ] Rollback documentado e revisto (ver runbook — secção "Rollback
-      (manual)") antes de aplicar em produção.
+- [x] Rollback documentado e revisto (ver runbook — secção "Rollback
+      (manual)") — **ainda não exercido em produção**, nem precisa de o ser
+      para este PR (só staging foi tocado).
 
-Only after every box above is checked for **staging** should the same
-sequence be repeated for **production**.
+Staging está agora validado (ver runbook, "Staging validation log",
+2026-07-10). **Produção continua por fazer** — repetir a mesma sequência lá,
+com backup/PITR confirmado e `--confirm-production` no guardrail, só depois
+de reviste a lista acima novamente para esse ambiente especificamente.
 
 ## Supabase environment guardrails
 
@@ -74,25 +79,27 @@ sensitive operation against Supabase. See
 policy and [scripts/check-supabase-environment.mjs](../scripts/check-supabase-environment.mjs)
 (`npm run check:supabase-env`) for the automated check.
 
-- [ ] `SUPABASE_ENVIRONMENT` definido (exactamente `local`, `staging`, ou
-      `production`) no ambiente onde o comando sensível vai correr.
-- [ ] `SUPABASE_PROJECT_REF` confirmado — coincide com o projecto visto no
-      dashboard Supabase, não apenas assumido a partir do `.env.local`.
-- [ ] Linked project ref (`supabase/.temp/linked-project.json`, se existir)
-      coincide com `SUPABASE_PROJECT_REF` — `npm run check:supabase-env`
-      falha automaticamente se não coincidir.
-- [ ] Staging confirmado manualmente antes da migration (project ref, nome,
-      URL, owner — ver runbook, secção "Environment confirmation gate") e
-      registado no runbook.
-- [ ] Produção exige confirmação explícita —
-      `npm run check:supabase-env -- --target=production --confirm-production`
-      corrido e a passar, mais backup/PITR confirmado.
-- [ ] Output de `npm run check:supabase-env` anexado ao PR ou registado no
-      runbook (secção "Staging validation log") — refs sempre mascarados,
-      nunca em texto completo.
-- [ ] Nenhum secret (anon key, service role key, JWT secret, database
+- [x] `SUPABASE_ENVIRONMENT=staging` definido localmente e
+      `npm run check:supabase-env -- --target=staging` corrido e a passar
+      antes de qualquer operação sensível (2026-07-10).
+- [x] `SUPABASE_PROJECT_REF` confirmado — **explicitamente pelo dono do
+      projecto**, nesta conversa, para o projecto anteriormente ambíguo
+      `"portify"` (masked `dwol****donk`). Ver runbook, "Staging validation
+      log".
+- [x] Linked project ref (`supabase/.temp/linked-project.json`) coincide com
+      `SUPABASE_PROJECT_REF` — confirmado, sem divergência.
+- [x] Staging confirmado manualmente antes da migration — por decisão
+      explícita do dono do projecto (não pela heurística de nome, que não
+      teria apanhado este caso — ver limitação já documentada em
+      `docs/supabase-environments.md`) — e registado no runbook.
+- [ ] Produção exige confirmação explícita — **não aplicável a este PR**,
+      produção não foi tocada.
+- [x] Output de `npm run check:supabase-env` registado no runbook, secção
+      "Staging validation log" — refs sempre mascarados.
+- [x] Nenhum secret (anon key, service role key, JWT secret, database
       URL/password, ou project ref não mascarado) aparece nos logs, no PR,
-      ou em qualquer documento deste repositório.
-- [ ] `lib/supabase/database.types.ts` regenerado depois da migration ser
-      aplicada ao ambiente confirmado (não antes, e não contra um ambiente
-      diferente do que foi migrado).
+      ou em qualquer documento deste repositório — confirmado por inspecção
+      de todo o output usado nesta validação.
+- [x] `lib/supabase/database.types.ts` regenerado depois da migration
+      (já estava aplicada) contra o ambiente confirmado (`portify` staging)
+      — byte-a-byte idêntico ao já existente.
