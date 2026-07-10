@@ -143,10 +143,18 @@ is in [import-xtb.md](import-xtb.md#audit-log-persistente).
   check — all passed. A blocking `investment_plans.monthly_amount` vs.
   `amount` schema drift (staging vs. production) was found and fixed
   staging-side; a smaller, non-blocking gap (a few `profiles` columns and
-  the `investor_profiles` view, missing from `supabase-schema.sql`) remains
-  documented but unfixed. See
+  the `investor_profiles` view, missing from `supabase-schema.sql`) was
+  documented at the time. **Update, 2026-07-10 (schema drift
+  reconciliation):** that remaining gap is now closed —
+  `supabase-schema.sql` was reconciled against real production (read-only
+  introspection, no production writes) and `portify-staging` aligned via a
+  new additive-only migration
+  (`supabase-migration-reconcile-schema-drift.sql`). One anomaly was found
+  and deliberately left alone: production's `investment_plans_frequency_check`
+  is narrower than what the app's UI can produce — treated as a production
+  bug to fix separately, not schema drift. See
   [import-audit-migration-runbook.md](import-audit-migration-runbook.md)'s
-  "`portify-staging` bootstrap" entry and
+  "Schema drift reconciliation" entry and
   [docs/supabase-environments.md](supabase-environments.md) for the full
   detail.
 - **Supabase environment guardrails** were added (`chore/supabase-environment-guardrails`)

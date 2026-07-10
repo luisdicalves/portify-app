@@ -67,6 +67,23 @@ linked.** `portify-staging` is no longer empty or unlinked:
 - `.env.local` was temporarily pointed at staging for the browser test and
   reverted to production values before finishing; never committed.
 
+**Update, 2026-07-10 (schema drift reconciliation) — the gap above is now
+closed.** `supabase-schema.sql` was reconciled against real production
+(introspected read-only via the Supabase MCP connector — production was
+never written to) and `portify-staging` was brought up to match via a new,
+additive-only migration (`supabase-migration-reconcile-schema-drift.sql`).
+`profiles` now has all the columns production has (`allocated_*`,
+`estimated_rate`, `uninvested_cash`, `free_funds_annual_rate_pct`,
+`profile_updated_at`) plus the missing constraints/trigger; `investment_plans`
+uses `amount` (not `monthly_amount`) with `plan_updated_at`; the
+`investor_profiles` view now exists in both. One anomaly was found and
+deliberately **not** mirrored: production's own `investment_plans_frequency_check`
+is narrower than what the app's plan-set UI can produce (missing
+`biweekly`/`semiannual`) — treated as a production bug to fix separately,
+not schema drift, per explicit owner decision. Full comparison table and
+smoke-test results in `docs/import-audit-migration-runbook.md`'s "Schema
+drift reconciliation" entry.
+
 ## Objective
 
 Prevent a migration, a type regeneration, or any other write-shaped Supabase

@@ -89,9 +89,20 @@ utilizadores) — ver runbook, secção "`portify-staging` bootstrap". Uma
 divergência de schema bloqueante (`investment_plans.monthly_amount` vs.
 `amount`) foi encontrada e corrigida só em staging; um gap menor e não
 bloqueante (algumas colunas de `profiles` e a view `investor_profiles`,
-ausentes de `supabase-schema.sql`) continua documentado mas não corrigido —
-recomenda-se resolver `supabase-schema.sql` numa PR dedicada antes da
-próxima alteração de schema.
+ausentes de `supabase-schema.sql`) ficou documentado nessa altura.
+
+**Actualização, 2026-07-10 (reconciliação de schema):** esse gap está
+fechado. `supabase-schema.sql` foi reconciliado contra a produção real
+(introspecção apenas de leitura, produção nunca alterada) e `portify-staging`
+foi alinhado via uma nova migration aditiva
+(`supabase-migration-reconcile-schema-drift.sql`). Encontrada uma anomalia
+deliberadamente não corrigida: o `investment_plans_frequency_check` real da
+produção é mais restrito do que a própria UI da app consegue produzir
+(falta `biweekly`/`semiannual`) — tratado como um bug de produção a corrigir
+à parte, não como schema drift a espelhar. Testado de novo em staging
+(onboarding completo, importação XTB, RLS) após a reconciliação — tudo
+passou. Ver runbook, secção "Schema drift reconciliation", para a
+comparação completa e os resultados dos testes.
 
 ## Supabase environment guardrails
 
