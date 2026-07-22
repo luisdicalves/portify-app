@@ -16,6 +16,8 @@ This document lists the official commands for validating a change before it's co
 
 `npm run check` stops at the first failing step (typecheck → lint → test), so a red `lint` step means typecheck already passed, etc. `check:schema` and `check:supabase-env` are intentionally separate from it: both are narrow (one feature's schema; Supabase environment identification) rather than a general project gate, and neither touches Supabase over the network — they only read local files/env vars.
 
+<!-- test: temporary note for the skip-e2e required-check experiment; removed before merge -->
+
 ## Current status (as of this baseline)
 
 As of this change, the codebase is clean on all three gates:
