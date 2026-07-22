@@ -10,14 +10,26 @@ jobs:
   e2e-guard:
     name: E2E coverage guard
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-e2e')
+    # Corre sempre em pull_request — o short-circuit do label skip-e2e é feito
+    # dentro do step, não pela condição do job. Um job saltado por `if:` reporta
+    # conclusion "skipped" ao Checks API, e branch protection NÃO trata
+    # "skipped" como um required status check satisfeito: o PR fica bloqueado
+    # em "blocked"/pending para sempre. Reportar sempre success/failure evita isso.
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Check E2E coverage
-        run: bash ci/check-e2e-coverage.sh
+        env:
+          SKIP_E2E: ${{ contains(github.event.pull_request.labels.*.name, 'skip-e2e') }}
+        run: |
+          if [ "$SKIP_E2E" = "true" ]; then
+            echo "⏭️  Label 'skip-e2e' presente — a ignorar a verificação de cobertura E2E."
+            exit 0
+          fi
+          bash ci/check-e2e-coverage.sh
 
   checks:
     runs-on: ubuntu-latest
