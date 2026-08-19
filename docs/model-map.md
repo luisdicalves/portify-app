@@ -325,7 +325,7 @@ marked **governed** below.
   caller first.
 - **Tests:** `lib/models/riskFundingGate.test.ts`.
 
-## `lib/models/performanceEngine.ts` — library
+## `lib/models/performanceEngine.ts` — active
 
 - **Function:** `evaluatePerformance(input)` — Performance Engine:
   `calcTWR` (chain-linked sub-period, unit-price method) + `calcXIRR`
@@ -338,14 +338,23 @@ marked **governed** below.
   I/O; `externalFlows: CashFlow[]` — contributions/withdrawals only, not
   buy/sell/dividend/interest).
 - **Outputs:** `PerformanceResult` (adds `meta`).
-- **Consumers:** none yet. `app/dashboard/performance` still uses the
-  **legacy** `lib/portfolioMetrics.ts` (`calcWeightedAvgDaysHeld`/
-  `calcAnnualizedReturn` — an approximate, buy-amount-weighted annualization,
-  not real TWR/XIRR) — rewiring that page to assemble a real
-  `valuationSeries` is a separate, not-yet-started task. See
-  PORTIFY-KNOWLEDGE `04-financial-models/PERFORMANCE/PERFORMANCE-ENGINE-V1.md`
+- **Consumers:** `app/dashboard/performance/page.tsx` — **XIRR only, not
+  TWR yet**. That page assembles a 2-point `valuationSeries` (account
+  inception — value 0 — and today's `calcTotalValue()`) plus `externalFlows`
+  from `deposit`-type transactions (`lib/db/transactions.ts`'s
+  `getTransactions()`), giving a real "since inception" money-weighted
+  return in place of the old `calcWeightedAvgDaysHeld`/`calcAnnualizedReturn`
+  approximation. TWR still has no consumer — it needs a multi-point
+  valuation series (historical prices across held *and* sold tickers),
+  which is still out of scope; see the file header. The page labels the
+  XIRR card as an estimate (`performanceXirrCaption` in `lib/dict/*.ts`),
+  since inception is assumed at the earliest recorded transaction (may
+  understate true inception for holdings imported without a matching
+  deposit). See PORTIFY-KNOWLEDGE
+  `04-financial-models/PERFORMANCE/PERFORMANCE-ENGINE-V1.md`
   §18 for the full spec; maturity there is engine-level `UNDEFINED`
-  (RCR-002B/MODEL-016), not `PRODUCTION_APPROVED`.
+  (RCR-002B/MODEL-016), not `PRODUCTION_APPROVED` — the UI treats the
+  number as an estimate accordingly, never as confirmed.
 - **Tests:** `lib/models/performanceEngine.test.ts`.
 - **Scope note:** Gross/Net/after-tax return layers (needs a `fee`
   transaction type this app's schema doesn't have), Funding Ratio/Plan

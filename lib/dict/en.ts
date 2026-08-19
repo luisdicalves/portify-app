@@ -288,6 +288,10 @@ export const en: typeof pt = {
   netWorthCardLabel: 'Net worth',
   totalReturn: 'Total return',
   todayHighlights: "Today's highlights",
+  // Performance page
+  performanceAnnualizedLabel: 'Annualized',
+  performanceXirrCaption: 'Estimate (XIRR) since the first recorded transaction.',
+  performanceXirrUnavailable: '—',
   // Profile — riskScore
   riskScoreLabel: 'Risk score',
   riskScoreVeryConservative: 'Very conservative',

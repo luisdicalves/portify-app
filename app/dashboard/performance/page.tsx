@@ -6,12 +6,15 @@ import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
 import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
+import { getTransactions } from '@/lib/db/transactions';
 import {
-  calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath,
-  calcWeightedAvgDaysHeld, calcAnnualizedReturn, type Holding,
+  calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath, type Holding,
 } from '@/lib/portfolioMetrics';
+import { evaluatePerformance, type CashFlow, type ValuationPoint } from '@/lib/models/performanceEngine';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
 import { useUser } from '@/lib/hooks/useUser';
+import { useApp } from '@/lib/context';
+import { useDict } from '@/lib/dict';
 
 const TIMEFRAMES = ['1S', '1M', '3M', '6M', '1A', 'Max'];
 const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
@@ -22,10 +25,13 @@ const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 0, maximumFr
 export default function PerformancePage() {
   const router = useRouter();
   const { user } = useUser();
+  const { lang } = useApp();
+  const t = useDict(lang);
   const [tf, setTf] = useState(4);
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
-  const [avgDaysHeld, setAvgDaysHeld] = useState(365);
+  const [externalFlows, setExternalFlows] = useState<CashFlow[]>([]);
+  const [inceptionDate, setInceptionDate] = useState<string | null>(null);
   const [chartValues, setChartValues] = useState<number[] | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -34,15 +40,22 @@ export default function PerformancePage() {
     (async () => {
       const supabase = createClient();
 
-      const [hs, { data: buys }] = await Promise.all([
+      const [hs, { data: transactions }] = await Promise.all([
         getHoldings(supabase, user.id),
-        supabase.from('transactions').select('amount, executed_at').eq('user_id', user.id).eq('type', 'buy'),
+        getTransactions(supabase, user.id), // descending by executed_at
       ]);
       setHoldings(hs);
 
-      const validBuys = (buys ?? []).filter((b): b is typeof b & { executed_at: string } => b.executed_at != null);
-      if (validBuys.length > 0) {
-        setAvgDaysHeld(calcWeightedAvgDaysHeld(validBuys));
+      const validTransactions = (transactions ?? []).filter(
+        (tx): tx is typeof tx & { executed_at: string } => tx.executed_at != null,
+      );
+      if (validTransactions.length > 0) {
+        setInceptionDate(validTransactions[validTransactions.length - 1].executed_at);
+        setExternalFlows(
+          validTransactions
+            .filter(tx => tx.type === 'deposit' && Number.isFinite(tx.amount))
+            .map(tx => ({ date: tx.executed_at, amount: Math.abs(tx.amount) })),
+        );
       }
 
       const quoteResults = await Promise.all(hs.map(h => fetchQuote(h.ticker)));
@@ -65,8 +78,23 @@ export default function PerformancePage() {
   const totalValue = calcTotalValue(holdings, ticker => quotes[ticker]?.price);
   const totalInvested = calcTotalInvested(holdings);
   const totalReturn = totalValue - totalInvested;
-  const totalReturnPct = totalInvested > 0 ? (totalReturn / totalInvested) * 100 : 0;
-  const annualizedPct = totalInvested > 0 ? calcAnnualizedReturn(totalReturnPct, avgDaysHeld) : 0;
+
+  // XIRR "desde o início": só 2 pontos de valorização (início da conta,
+  // hoje) — suficiente para um money-weighted return real e datado, mas
+  // não para TWR (precisaria de preços históricos para tickers já
+  // vendidos, fora de âmbito aqui — ver lib/models/performanceEngine.ts).
+  // Assume valor 0 antes da primeira transação registada; pode subestimar
+  // a data de início real para carteiras importadas sem depósito
+  // correspondente, por isso a UI rotula isto como estimativa.
+  const xirr = inceptionDate
+    ? evaluatePerformance({
+        valuationSeries: [
+          { date: inceptionDate, value: 0 },
+          { date: new Date().toISOString(), value: totalValue },
+        ] satisfies ValuationPoint[],
+        externalFlows,
+      }).xirr
+    : null;
 
   const movers = holdings
     .filter(h => quotes[h.ticker] !== undefined)
@@ -98,23 +126,26 @@ export default function PerformancePage() {
             </div>
           </div>
           <div style={{ flex: 1, background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-            <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>Anualizado</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: annualizedPct >= 0 ? 'var(--on-surface)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? <Skeleton width={50} height={22} /> : `${annualizedPct >= 0 ? '+' : ''}${annualizedPct.toFixed(1)}%`}
+            <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>{t.performanceAnnualizedLabel}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: xirr === null || xirr >= 0 ? 'var(--on-surface)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+              {loading ? <Skeleton width={50} height={22} /> : xirr === null ? t.performanceXirrUnavailable : `${xirr >= 0 ? '+' : ''}${(xirr * 100).toFixed(1)}%`}
             </div>
+            {!loading && xirr !== null && (
+              <div style={{ fontSize: 10, color: 'var(--on-surface-variant)', marginTop: 2 }}>{t.performanceXirrCaption}</div>
+            )}
           </div>
         </div>
 
         <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
           <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 3, marginBottom: 12 }}>
-            {TIMEFRAMES.map((t, i) => (
-              <button key={t} onClick={() => setTf(i)} style={{
+            {TIMEFRAMES.map((label, i) => (
+              <button key={label} onClick={() => setTf(i)} style={{
                 flex: 1, padding: '6px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
                 background: tf === i ? 'var(--surface-lowest)' : 'transparent',
                 color: tf === i ? 'var(--primary)' : 'var(--on-surface-variant)',
                 boxShadow: tf === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              }}>{t}</button>
+              }}>{label}</button>
             ))}
           </div>
           {chartValues && chartValues.length > 1 ? (
