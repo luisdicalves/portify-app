@@ -17,7 +17,8 @@ export type ModelName =
   | 'safetyReserve'
   | 'debtAdapter'
   | 'riskFundingGate'
-  | 'performanceEngine';
+  | 'performanceEngine'
+  | 'allocationRiskEngine';
 
 export type ModelVersion = string;
 
@@ -34,6 +35,7 @@ export const MODEL_VERSIONS: Record<ModelName, ModelVersion> = {
   debtAdapter: '1.0.0',
   riskFundingGate: '1.0.0',
   performanceEngine: '1.0.0',
+  allocationRiskEngine: '1.0.0',
 };
 
 export interface ModelRunMeta {

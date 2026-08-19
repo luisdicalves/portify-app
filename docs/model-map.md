@@ -354,6 +354,34 @@ marked **governed** below.
   Performance (needs a benchmark series) are not implemented — see the
   file header for the full list.
 
+## `lib/models/allocationRiskEngine.ts` — library
+
+- **Function:** `evaluateAllocationRisk(input)` — Horizon Growth Cap + Risk
+  Tolerance Growth Cap (band tables) combined via
+  `riskAllowedPct = MIN(horizon, riskTolerance, objective, global)`, plus
+  the Loss Capacity band's max stress-loss and Satellite Risk Budget
+  (separate band tables).
+- **Inputs:** `AllocationRiskInput` (`horizonYears`, `lossCapacity` (LC1-5),
+  `riskTolerance` (RT1-5), `objectiveCapPct`/`globalCapPct` — these last two
+  are caller-supplied direct inputs since PORTIFY-KNOWLEDGE doesn't give a
+  table/formula for either, only for Horizon/LC/RT).
+- **Outputs:** `AllocationRiskResult` (adds `meta`).
+- **Consumers:** none yet. **Deliberately does not touch/reconcile
+  `lib/planCalculator.ts`** — that module is **active** (wired to
+  `plan-set`/`summary`/`app/profile/page.tsx`) and uses a different
+  mechanism (a 0-100 `riskScore` → allocation band, not these Horizon/LC/RT
+  bands). Reconciling the two would be a migration of a piece already in
+  production — a separate, not-yet-started decision, not something this
+  library module does on its own. See PORTIFY-KNOWLEDGE
+  `04-financial-models/ALLOCATION/ALLOCATION-RISK-FEASIBILITY-V1.md`
+  §7.4-7.6; bands there are "v1-draft", not `PRODUCTION_APPROVED`.
+- **Tests:** `lib/models/allocationRiskEngine.test.ts`.
+- **Scope note:** the §7.4 "stress test contra LC" (validating the
+  resulting allocation against the Loss Capacity band's max stress loss)
+  is not run here — it needs the portfolio stress engine, out of scope for
+  the same reason as Safety Reserve §6.9. `lossCapacityMaxStressLossPct` is
+  informative only.
+
 ## `lib/engines/*` — removed (2026-08-18)
 
 "Portify Investment Engine v1.0" (`classification.ts`, `qualityEngine.ts`,
