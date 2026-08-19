@@ -325,6 +325,35 @@ marked **governed** below.
   caller first.
 - **Tests:** `lib/models/riskFundingGate.test.ts`.
 
+## `lib/models/performanceEngine.ts` — library
+
+- **Function:** `evaluatePerformance(input)` — Performance Engine:
+  `calcTWR` (chain-linked sub-period, unit-price method) + `calcXIRR`
+  (Newton-Raphson with bisection fallback, treating the starting/ending
+  `valuationSeries` values as an implicit initial outflow/terminal inflow
+  alongside `externalFlows`) + `calcWealthChangeWaterfall` (arithmetic
+  decomposition of start/end value against contributions/withdrawals).
+- **Inputs:** `PerformanceInput` (`valuationSeries: ValuationPoint[]` —
+  caller-assembled dated portfolio values, this module does no price/history
+  I/O; `externalFlows: CashFlow[]` — contributions/withdrawals only, not
+  buy/sell/dividend/interest).
+- **Outputs:** `PerformanceResult` (adds `meta`).
+- **Consumers:** none yet. `app/dashboard/performance` still uses the
+  **legacy** `lib/portfolioMetrics.ts` (`calcWeightedAvgDaysHeld`/
+  `calcAnnualizedReturn` — an approximate, buy-amount-weighted annualization,
+  not real TWR/XIRR) — rewiring that page to assemble a real
+  `valuationSeries` is a separate, not-yet-started task. See
+  PORTIFY-KNOWLEDGE `04-financial-models/PERFORMANCE/PERFORMANCE-ENGINE-V1.md`
+  §18 for the full spec; maturity there is engine-level `UNDEFINED`
+  (RCR-002B/MODEL-016), not `PRODUCTION_APPROVED`.
+- **Tests:** `lib/models/performanceEngine.test.ts`.
+- **Scope note:** Gross/Net/after-tax return layers (needs a `fee`
+  transaction type this app's schema doesn't have), Funding Ratio/Plan
+  Progress (depends on Glide Path, itself unclosed — see
+  `ALLOCATION-RISK-FEASIBILITY-V1.md` §8.1) and Benchmark Relative
+  Performance (needs a benchmark series) are not implemented — see the
+  file header for the full list.
+
 ## `lib/engines/*` — removed (2026-08-18)
 
 "Portify Investment Engine v1.0" (`classification.ts`, `qualityEngine.ts`,
