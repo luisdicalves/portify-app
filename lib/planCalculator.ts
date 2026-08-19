@@ -11,6 +11,12 @@
  */
 
 import { createModelRunMeta, type ModelRunMeta } from '@/lib/models/modelMeta';
+import type { AssetClass } from '@/lib/assetUniverse';
+
+// AssetClass is defined once, in lib/assetUniverse.ts — re-exported here so
+// existing `import { AssetClass } from '@/lib/planCalculator'` call sites
+// keep working unchanged (see docs/model-map.md for the cleanup this closes).
+export type { AssetClass };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -25,8 +31,6 @@ export interface UserProfile {
   liquidity_need:    'critical' | 'possible' | 'unlikely' | 'never';
   horizon_years:     number;
 }
-
-export type AssetClass = 'stock' | 'etf' | 'bond_etf';
 
 export interface Allocation {
   stock:    number; // 0–1
