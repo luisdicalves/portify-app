@@ -268,56 +268,21 @@ marked **governed** below.
   value/invested numbers.
 - **Tests:** `lib/portfolioMetrics.test.ts`.
 
-## `lib/engines/classification.ts` — experimental
+## `lib/engines/*` — removed (2026-08-18)
 
-- **Function:** `classifyHoldingType(ticker, assetClass)` — core vs satellite
-  classification (curated broad-index ticker list + bond_etf catch-all).
-- **Inputs:** ticker, optional asset class.
-- **Outputs:** `HoldingType` (`'core' | 'satellite'`).
-- **Consumers:** `app/api/asset-scores/route.ts`. No UI reads
-  `/api/asset-scores` yet.
-- **Tests:** `lib/engines/classification.test.ts`.
+"Portify Investment Engine v1.0" (`classification.ts`, `qualityEngine.ts`,
+`riskEngine.ts`, `convictionEngine.ts`, `types.ts`) was a second, parallel
+scoring implementation alongside `qualityScore.ts`/`riskScore.ts`, never
+reconciled with it. Its only consumer was `app/api/asset-scores/route.ts`,
+which had zero UI callers — confirmed dead code, not an in-progress
+feature. Removed rather than kept as an unused parallel path, per the
+cleanup that also unified the `AssetClass` type (previously declared
+independently in this module too).
 
-## `lib/engines/qualityEngine.ts` — experimental
+`supabase-migration-asset-scores.sql` (the `asset_scores` table this
+module wrote to) is left in place as historical record — no database
+schema change was made as part of this cleanup.
 
-- **Function:** "Portify Investment Engine v1.0" quality score — valuation
-  35% / financial health 35% / growth 30%, reusing `band()` from
-  `riskScore.ts`. A parallel, differently-shaped model from `qualityScore.ts`
-  (not currently reconciled with it).
-- **Inputs:** `QualityEngineInput`.
-- **Outputs:** `QualityEngineResult`.
-- **Consumers:** `app/api/asset-scores/route.ts`.
-- **Tests:** `lib/engines/qualityEngine.test.ts`.
-
-## `lib/engines/riskEngine.ts` — experimental
-
-- **Function:** "Portify Investment Engine v1.0" market-risk score — beta 25%
-  / 1y volatility 25% / max drawdown 20% / debt ratio 15% / liquidity 15%
-  (100 = safest). Explicitly documented as *not* reusing `riskScore.ts`,
-  since that's a fundamentals/quality score, not a market-risk score.
-- **Inputs:** `RiskEngineInput` (beta, daily closes, D/E, market cap).
-- **Outputs:** `RiskEngineResult`.
-- **Consumers:** `app/api/asset-scores/route.ts`.
-- **Tests:** `lib/engines/riskEngine.test.ts`.
-
-## `lib/engines/convictionEngine.ts` — experimental
-
-- **Function:** "Portify Investment Engine v1.0" conviction score — earnings
-  surprise consistency 30% / revenue growth stability 25% / margin stability
-  20% / analyst consensus 15% / EPS stability 10%, via coefficient-of-variation
-  on quarterly series.
-- **Inputs:** `ConvictionEngineInput` (quarterly series, analyst counts).
-- **Outputs:** `ConvictionEngineResult`.
-- **Consumers:** `app/api/asset-scores/route.ts`.
-- **Tests:** `lib/engines/convictionEngine.test.ts`.
-
----
-
-**Not governed by `lib/models/modelMeta.ts` (yet):** `lib/engines/*` and
-`lib/assetUniverse.ts`/`lib/sectorMap.ts`/`lib/holdingsImport.ts`/
-`lib/marketData.ts`/`lib/marketApi.ts`/`lib/portfolioMetrics.ts` don't carry a
-`ModelRunMeta`. The `lib/engines/*` outputs are plain score breakdowns with no
-wrapper object of their own yet (`QualityEngineResult`/`RiskEngineResult`/
-`ConvictionEngineResult` are the return values directly, not nested under a
-`result` key) and aren't consumed by any UI yet, so extending them was left
-out of this task's scope rather than guessed at.
+`qualityScore.ts`/`riskScore.ts` (documented above) remain the single,
+active scoring implementation, feeding `recommendationEngine.ts` and the
+live `/for-you` page.
