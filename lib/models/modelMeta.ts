@@ -13,7 +13,10 @@ export type ModelName =
   | 'qualityScore'
   | 'recommendationEngine'
   | 'cashFlowForecast'
-  | 'portfolioState';
+  | 'portfolioState'
+  | 'safetyReserve'
+  | 'debtAdapter'
+  | 'riskFundingGate';
 
 export type ModelVersion = string;
 
@@ -26,6 +29,9 @@ export const MODEL_VERSIONS: Record<ModelName, ModelVersion> = {
   recommendationEngine: '3.1.0', // 3.0.0 -> 3.1.0: additive Recommendation.explanation (RecommendationExplanation) — no formula/weight/threshold change, see docs/model-governance.md
   cashFlowForecast: '1.0.0',
   portfolioState: '1.0.0',
+  safetyReserve: '1.0.0',
+  debtAdapter: '1.0.0',
+  riskFundingGate: '1.0.0',
 };
 
 export interface ModelRunMeta {

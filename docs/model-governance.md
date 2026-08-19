@@ -8,6 +8,12 @@ This document explains the governance layer added on top of the Portify models
 formula, weight, or threshold — see [current-state.md](current-state.md) for
 what has and hasn't been migrated in terms of actual calculation logic.
 
+`lib/models/safetyReserve.ts`, `lib/models/debtAdapter.ts` and
+`lib/models/riskFundingGate.ts` follow this same governance layer (`meta`,
+`MODEL_VERSIONS`, semver policy) but — unlike the six models above — have no
+route/UI consumer yet; see their `model-map.md` entries (status **library**)
+for why.
+
 For a per-file map of every model in the codebase (not just the six covered
 here), see [model-map.md](model-map.md).
 
@@ -82,6 +88,9 @@ functions.
 | `qualityScore` | `1.0.0` | `lib/qualityScore.ts` |
 | `cashFlowForecast` | `1.0.0` | `lib/cashFlowForecast.ts` |
 | `recommendationEngine` | `3.1.0` | `lib/recommendationEngine.ts` |
+| `safetyReserve` | `1.0.0` | `lib/models/safetyReserve.ts` |
+| `debtAdapter` | `1.0.0` | `lib/models/debtAdapter.ts` |
+| `riskFundingGate` | `1.0.0` | `lib/models/riskFundingGate.ts` |
 
 `recommendationEngine` starts at `3.0.0` rather than `1.0.0` because the file
 already documented itself as "modelo v3.0" (the `preferred_asset_classes`
