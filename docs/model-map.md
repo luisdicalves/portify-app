@@ -9,6 +9,7 @@ marked **governed** below.
 - **active** — wired into a real page/API route a user hits today.
 - **experimental** — wired into a real API route, but no UI reads its output yet.
 - **legacy** — superseded by something else but still in use by at least one call site (kept, not dead code).
+- **library** — implemented, tested and governed, but no route/UI wired to it yet (a pure calculation module awaiting a data-collection layer — e.g. new onboarding/settings screens to gather its inputs). Different from **experimental**: there isn't even a route yet, not just a missing UI.
 - **deprecated** — none currently; nothing in this map has been fully retired.
 
 ---
@@ -267,6 +268,62 @@ marked **governed** below.
   still active for this), no longer used for Dashboard's headline
   value/invested numbers.
 - **Tests:** `lib/portfolioMetrics.test.ts`.
+
+## `lib/models/safetyReserve.ts` — library
+
+- **Function:** `evaluateSafetyReserve(input)` — Safety Gate & Reserve Engine:
+  `calcTargetReserveMonths`/`calcImmediateMonths` (add-on tables) →
+  `calcRiskFundingCapFromCoverage` (MODEL-018 continuous restriction) → hard
+  gates (payment arrears, immediate/near-term coverage floors, high-cost
+  revolving debt, no-reliable-income without a sustainable source, critical
+  data status) → `gateResult`/`riskFundingCap`.
+- **Inputs:** `SafetyReserveInput` (income stability, dependents, debt ratio,
+  essential outlays, reserve/liquidity amounts in €, hard-gate flags).
+- **Outputs:** `SafetyReserveResult` (adds `meta`).
+- **Consumers:** none yet — no onboarding/settings screen collects its
+  inputs (income €, debt, essential outlays, dependents, liquid assets) in
+  this app today. See PORTIFY-KNOWLEDGE
+  `04-financial-models/SAFETY/SAFETY-RESERVE-V1.md` for the full spec;
+  maturity there is "CALIBRATED — structural core", not `PRODUCTION_APPROVED`.
+- **Tests:** `lib/models/safetyReserve.test.ts`.
+- **Scope note:** §6.6 Liquidity Runway Matching (per-asset L0-L3
+  eligibility) and §6.8/§6.9 (intra-contribution reevaluation, stress model)
+  are not implemented — this v1 uses direct € amounts instead of the
+  per-asset liquidity sub-engine. See the file header for the full list.
+
+## `lib/models/debtAdapter.ts` — library
+
+- **Function:** `evaluateDebtAdapter(input)` — Debt Adapter: `classifyDebtCost`
+  (D3 bands) + `classifyDebtMateriality` (D4) → `calcCostMaterialityCap`
+  (D6.2 continuous restriction) combined via `MIN` with `calcDebtBurdenCap`
+  (D7/D8 affordability, evaluated current and stressed +200bp per D12.1) →
+  `debtRiskFundingCap`, overridden to 0 on payment arrears/stress (D1).
+- **Inputs:** `DebtAdapterInput` (effective cost %, ECB Deposit Facility Rate
+  — caller-supplied, never hardcoded, since it's a temporal macro input per
+  D3 — balances, sustainable income, essential expenses, rate type).
+- **Outputs:** `DebtAdapterResult` (adds `meta`).
+- **Consumers:** none yet — same reason as `safetyReserve.ts` above. See
+  PORTIFY-KNOWLEDGE `04-financial-models/DEBT/DEBT-ADAPTER-V1.md`; maturity
+  there is "CALIBRATED STRUCTURAL CORE / PARAMETER VALIDATION PENDING".
+- **Tests:** `lib/models/debtAdapter.test.ts`.
+- **Scope note:** D9/D10 (deriving `sustainableMonthlyIncome` from 12/24
+  months of income history) is not implemented — this v1 accepts it as a
+  direct input. D13 (RepaymentReturnEquivalent/REPAY_FIRST) and D14
+  (persistence cycles) are also out of scope — they're repayment-recommendation
+  logic, not the risk-cap calculation. See the file header for the full list.
+
+## `lib/models/riskFundingGate.ts` — library
+
+- **Function:** `evaluateRiskFundingGate(safety, debt)` — combines a
+  `SafetyReserveResult` and a `DebtAdapterResult` into one
+  `effectiveRiskFundingCap = MIN(safety.riskFundingCap, debt.debtRiskFundingCap)`,
+  with `gateResult` precedence `BLOCK > CONDITIONAL > PASS` across both —
+  the "Decision Oracle" pattern from PORTIFY-KNOWLEDGE §3B.1.
+- **Inputs:** the two upstream results (no I/O of its own).
+- **Outputs:** `RiskFundingGateResult` (adds `meta`).
+- **Consumers:** none yet — depends on both upstream engines having a real
+  caller first.
+- **Tests:** `lib/models/riskFundingGate.test.ts`.
 
 ## `lib/engines/*` — removed (2026-08-18)
 
