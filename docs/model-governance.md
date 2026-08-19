@@ -9,8 +9,9 @@ formula, weight, or threshold — see [current-state.md](current-state.md) for
 what has and hasn't been migrated in terms of actual calculation logic.
 
 `lib/models/safetyReserve.ts`, `lib/models/debtAdapter.ts`,
-`lib/models/riskFundingGate.ts`, `lib/models/performanceEngine.ts` and
-`lib/models/allocationRiskEngine.ts` follow this same governance layer
+`lib/models/riskFundingGate.ts`, `lib/models/performanceEngine.ts`,
+`lib/models/allocationRiskEngine.ts` and `lib/models/portfolioFitEngine.ts`
+follow this same governance layer
 (`meta`, `MODEL_VERSIONS`, semver policy) but —
 unlike the six models above — have no route/UI consumer yet; see their
 `model-map.md` entries (status **library**) for why.
@@ -94,6 +95,7 @@ functions.
 | `riskFundingGate` | `1.0.0` | `lib/models/riskFundingGate.ts` |
 | `performanceEngine` | `1.0.0` | `lib/models/performanceEngine.ts` |
 | `allocationRiskEngine` | `1.0.0` | `lib/models/allocationRiskEngine.ts` |
+| `portfolioFitEngine` | `1.0.0` | `lib/models/portfolioFitEngine.ts` |
 
 `recommendationEngine` starts at `3.0.0` rather than `1.0.0` because the file
 already documented itself as "modelo v3.0" (the `preferred_asset_classes`

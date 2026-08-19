@@ -382,6 +382,33 @@ marked **governed** below.
   the same reason as Safety Reserve §6.9. `lossCapacityMaxStressLossPct` is
   informative only.
 
+## `lib/models/portfolioFitEngine.ts` — library
+
+- **Function:** `evaluatePortfolioFit(input)` — plus standalone `calcHHI`/
+  `calcEffectiveN` (concentration math), `calcExposureDelta` (before/after,
+  including the §10 bootstrap-empty-portfolio case) and
+  `calcWeightedOverlap` (overlap coefficient between two exposure vectors).
+- **Inputs:** `PortfolioFitInput` — `dimensionScores` (5 values, each 0-1,
+  **caller-supplied, not derived**: the spec names the 5 Portfolio Fit Score
+  dimensions and their weights but gives a formula for none of them except
+  the combination itself) and `riskBudgetCheck` (reuses an
+  `AllocationRiskResult` from `lib/models/allocationRiskEngine.ts` —
+  first engine in this sequence to compose with another instead of
+  duplicating logic).
+- **Outputs:** `PortfolioFitResult` — `score` (weighted 35/25/20/15/5% sum)
+  plus `riskBudgetFail`/`satelliteBudgetFail`/`hardFail`. **No
+  IMPROVES_PORTFOLIO/NEUTRAL_FIT/WORSENS_PORTFOLIO/FAIL classification** —
+  PORTIFY-KNOWLEDGE explicitly leaves those thresholds `UNDEFINED` (§10.1),
+  so this doesn't invent them.
+- **Consumers:** none yet. See PORTIFY-KNOWLEDGE
+  `04-financial-models/PORTFOLIO-FIT/PORTFOLIO-FIT-V1.md` §10.
+- **Tests:** `lib/models/portfolioFitEngine.test.ts`.
+- **Scope note:** `calcWeightedOverlap` uses `Σ min(wA_i, wB_i)` over the
+  union of exposure keys — an implementation decision (a standard overlap
+  coefficient), since the spec names the "Weighted Overlap" concept without
+  giving its exact formula. Flagged in the file header, same discipline as
+  `debtAdapter.ts`'s CostPressure interpolation.
+
 ## `lib/engines/*` — removed (2026-08-18)
 
 "Portify Investment Engine v1.0" (`classification.ts`, `qualityEngine.ts`,
