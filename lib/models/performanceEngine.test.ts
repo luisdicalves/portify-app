@@ -176,4 +176,27 @@ describe('evaluatePerformance', () => {
     const result = evaluatePerformance(HAPPY_INPUT);
     expect(result.meta?.modelName).toBe('performanceEngine');
   });
+
+  it('computes a real xirr (not null) when the series starts at exactly 0 — regression for the -0 sign-check bug', () => {
+    // A starting value of 0 makes the (skipped) initial outflow "-0", which
+    // fails a strict `< 0` sign check in calcXIRR if not handled — this
+    // covers a since-inception account that began with no capital.
+    const result = evaluatePerformance({
+      valuationSeries: [{ date: '2025-01-01', value: 0 }, { date: '2026-01-01', value: 1500 }],
+      externalFlows: [{ date: '2025-01-01', amount: 1000 }],
+    });
+    expect(result.xirr).not.toBeNull();
+  });
+
+  it('flips externalFlows to the investor-perspective sign before feeding calcXIRR', () => {
+    // A €1000 contribution (account-perspective positive) growing to €1500
+    // over ~1 year must read as investing -1000 and getting back +1500 —
+    // roughly +50% — not the other way around.
+    const result = evaluatePerformance({
+      valuationSeries: [{ date: '2025-01-01', value: 0 }, { date: '2026-01-01', value: 1500 }],
+      externalFlows: [{ date: '2025-01-01', amount: 1000 }],
+    });
+    expect(result.xirr).toBeGreaterThan(0);
+    expect(result.xirr).toBeCloseTo(0.5, 1);
+  });
 });

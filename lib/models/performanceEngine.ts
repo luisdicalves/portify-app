@@ -218,10 +218,18 @@ export function evaluatePerformance(input: PerformanceInput): PerformanceResult 
     // the ending value as a terminal inflow — the standard framing for a
     // period money-weighted return (equivalent to "as if you bought in at
     // first.value and cashed out at last.value"), on top of whatever
-    // external flows happened in between.
-    const initialFlow: CashFlow = { date: first.date, amount: -first.value };
+    // external flows happened in between. Skipped when first.value is 0
+    // (nothing was invested yet) — `-0` would otherwise fail calcXIRR's
+    // strict `< 0` sign check and spuriously report "no solution".
+    const initialFlow: CashFlow[] = first.value !== 0 ? [{ date: first.date, amount: -first.value }] : [];
     const terminalFlow: CashFlow = { date: last.date, amount: last.value };
-    xirr = calcXIRR([initialFlow, ...externalFlows, terminalFlow]);
+    // externalFlows use the account-perspective sign (positive = money INTO
+    // the account, per CashFlow's own doc comment) — calcXIRR expects the
+    // investor-perspective sign (negative = money OUT of the investor's
+    // pocket), the same convention Excel/Sheets' XIRR uses. A contribution
+    // must be flipped to negative here, or it would look like a return.
+    const investorPerspectiveFlows = externalFlows.map(f => ({ date: f.date, amount: -f.amount }));
+    xirr = calcXIRR([...initialFlow, ...investorPerspectiveFlows, terminalFlow]);
     if (xirr === null) reasons.push('XIRR_NO_SOLUTION');
   } else {
     reasons.push('XIRR_NO_SOLUTION');
