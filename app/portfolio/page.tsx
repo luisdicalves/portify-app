@@ -7,6 +7,9 @@ import Fab from '@/components/ui/Fab';
 import TradeDateDialog from '@/components/ui/TradeDateDialog';
 import TransactionCard, { Transaction, TransactionType } from '@/components/ui/TransactionCard';
 import { SkeletonRow } from '@/components/ui/Skeleton';
+import Card from '@/components/ui/Card';
+import Badge from '@/components/ui/Badge';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { buildCashFlowForecast } from '@/lib/cashFlowForecast';
@@ -197,17 +200,11 @@ export default function PortfolioPage() {
         </div>
 
         {/* Posições / Dividendos / Histórico */}
-        <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 4 }}>
-          {TAB_IDS.map(id => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              flex: 1, padding: '8px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
-              fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
-              background: tab === id ? 'var(--surface-lowest)' : 'transparent',
-              color: tab === id ? 'var(--primary)' : 'var(--on-surface-variant)',
-              boxShadow: tab === id ? '0 1px 3px rgba(0,0,0,0.14)' : 'none',
-            }}>{t[id]}</button>
-          ))}
-        </div>
+        <SegmentedControl
+          options={TAB_IDS.map(id => ({ id, label: t[id] }))}
+          value={tab}
+          onChange={setTab}
+        />
 
         {/* Posições tab */}
         {tab === 'positions' && (
@@ -230,20 +227,22 @@ export default function PortfolioPage() {
               <div style={{ textAlign: 'center', color: 'var(--on-surface-variant)', padding: 24 }}>{t.noPositions}</div>
             )}
             {sortedAssets.map(a => (
-              <div key={a.ticker} onClick={() => router.push(`/portfolio/${a.ticker}`)} style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
-                  {a.letter}
+              <Card key={a.ticker} onClick={() => router.push(`/portfolio/${a.ticker}`)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                    {a.letter}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700 }}>{a.ticker}</div>
+                    <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} {t.sharesUnit}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eur.format(a.value)} €</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: a.gain ? 'var(--gain)' : 'var(--loss)' }}>{a.gain ? '+' : ''}{(a.gainPct * 100).toFixed(2)}%</div>
+                  </div>
+                  <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>chevron_right</span>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 16, fontWeight: 700 }}>{a.ticker}</div>
-                  <div style={{ fontSize: 12, color: 'var(--on-surface-variant)' }}>{a.units} {t.sharesUnit}</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 15, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{eur.format(a.value)} €</div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: a.gain ? 'var(--gain)' : 'var(--loss)' }}>{a.gain ? '+' : ''}{(a.gainPct * 100).toFixed(2)}%</div>
-                </div>
-                <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--outline)' }}>chevron_right</span>
-              </div>
+              </Card>
             ))}
           </>
         )}
@@ -283,9 +282,7 @@ export default function PortfolioPage() {
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <span style={{ fontSize: 14, fontWeight: 700 }}>{d.ticker}</span>
                           {d.confidence === 'low' && (
-                            <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 'var(--radius-full)', background: 'var(--surface-high)', color: 'var(--on-surface-variant)' }}>
-                              {t.lowConfidence}
-                            </span>
+                            <Badge label={t.lowConfidence} intent="neutral" size="sm" />
                           )}
                         </div>
                         <div style={{ fontSize: 11, color: 'var(--on-surface-variant)' }}>
@@ -531,11 +528,7 @@ export default function PortfolioPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ fontSize: 20, fontWeight: 700 }}>{t.bsSellTitle}</span>
-                  {selectedAsset && (
-                    <span style={{ fontSize: 13, fontWeight: 600, padding: '3px 9px', borderRadius: 'var(--radius-full)', color: 'var(--loss)', background: 'var(--loss-container)' }}>
-                      {sellTicker}
-                    </span>
-                  )}
+                  {selectedAsset && <Badge label={sellTicker} intent="critical" size="md" />}
                 </span>
                 <span onClick={closeSell} className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface-variant)', cursor: 'pointer' }}>close</span>
               </div>
