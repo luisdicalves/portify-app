@@ -53,6 +53,10 @@ export const pt = {
   and: 'e a',
   privacy: 'Política de Privacidade',
   haveAccount: 'Já tem conta?',
+  discardChangesTitle: 'Descartar alterações?',
+  discardChangesBody: 'Vais perder o que preencheste até agora neste formulário.',
+  discardChangesConfirm: 'Descartar',
+  discardChangesCancel: 'Continuar a editar',
   // PIN
   pinTitle: 'Introduza o PIN',
   pinSub: 'Use o código de 6 dígitos para entrar',
