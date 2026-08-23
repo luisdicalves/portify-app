@@ -54,3 +54,42 @@ test.describe('Dashboard totals', () => {
     await expect(page.getByText('AAPL')).toBeVisible();
   });
 });
+
+test.describe('Dashboard timeframe SegmentedControl', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ id: 'h1', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'AAPL', units: 10, avg_price: 100, currency: 'EUR' }]),
+      }),
+    );
+    await page.route('**/api/quote**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ price: 150, change: 5, changePercent: 3.45, companyName: 'Apple Inc.' }) }),
+    );
+    await page.route('**/api/history**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ history: [] }) }),
+    );
+    await page.route('**/api/dividends**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ dividends: [] }) }),
+    );
+  });
+
+  test('timeframe buttons are real role=button elements with the correct active state', async ({ page }) => {
+    await loginAndReachDashboard(page);
+
+    const defaultTab = page.getByRole('button', { name: '1A', exact: true });
+    const oneMonthTab = page.getByRole('button', { name: '1M', exact: true });
+
+    // "1A" (index 4) is the default timeframe.
+    await expect(defaultTab).toHaveAttribute('aria-pressed', 'true');
+    await expect(oneMonthTab).toHaveAttribute('aria-pressed', 'false');
+
+    await oneMonthTab.click();
+
+    await expect(oneMonthTab).toHaveAttribute('aria-pressed', 'true');
+    await expect(defaultTab).toHaveAttribute('aria-pressed', 'false');
+  });
+});
