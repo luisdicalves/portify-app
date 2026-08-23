@@ -70,19 +70,19 @@ body {
   --loss-strong: #c4302b;
   --loss-container: #ffe5e2;
 
-  /* Information — PDS-040/PDS-036: reuses the historical primary blue,
-     explicitly licensed for the Information semantic once retired as brand. */
-  --information: #003d9b;
-  --information-strong: #0052cc;
-  --information-container: #dae2ff;
+  /* Information — PDS-040/PDS-036, values from the approved RUNTIME baseline
+     (PDS-491..507, DESIGN-SYSTEM/RUNTIME/portify-shared.css --info*). */
+  --information: #b8d0ff;
+  --information-strong: #003d9b;
+  --information-container: #eef4ff;
   --on-information-container: #001848;
 
-  /* Warning — PDS-039: independent amber family, candidate values (same
-     derivation used across the Fase 2 mockups for visual consistency). */
-  --warning: #7a5900;
-  --warning-strong: #7a5900;
-  --warning-container: rgba(160, 110, 0, 0.10);
-  --on-warning-container: #7a5900;
+  /* Warning — PDS-039, values from the approved RUNTIME baseline
+     (PDS-491..507, DESIGN-SYSTEM/RUNTIME/portify-shared.css --warning*). */
+  --warning: #e8d18a;
+  --warning-strong: #6b4e00;
+  --warning-container: #fff6d8;
+  --on-warning-container: #6b4e00;
 
   --card-border: rgba(0, 0, 0, 0.07);
   --hairline: rgba(0, 0, 0, 0.08);
@@ -90,6 +90,11 @@ body {
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
   --bezel: #d9cfc8;
   --panel: #f6ece6;
+
+  /* Focus ring — value from the approved RUNTIME baseline (PDS-491..507,
+     DESIGN-SYSTEM/RUNTIME/portify-shared.css --focus); closes the
+     FOCUS_ACCESSIBILITY_VALIDATION gate left open in RUNTIME-MANIFEST.json. */
+  --focus: 0 0 0 3px rgba(2, 89, 99, 0.24);
 
   /* Radius */
   --radius-xs: 4px;
@@ -148,15 +153,15 @@ body {
   --loss-strong: #cf4138;
   --loss-container: rgba(255, 180, 171, 0.15);
 
-  --information: #b2c5ff;
-  --information-strong: #5b8dff;
-  --information-container: #0040a2;
+  --information: #516989;
+  --information-strong: #a9c7ff;
+  --information-container: #172033;
   --on-information-container: #dae2ff;
 
-  --warning: #e6b43c;
-  --warning-strong: #e6b43c;
-  --warning-container: rgba(230, 180, 60, 0.15);
-  --on-warning-container: #e6b43c;
+  --warning: #786b35;
+  --warning-strong: #f2d170;
+  --warning-container: #2d2714;
+  --on-warning-container: #f2d170;
 
   --card-border: rgba(255, 255, 255, 0.09);
   --hairline: rgba(255, 255, 255, 0.09);
@@ -164,6 +169,8 @@ body {
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   --bezel: #2a2c34;
   --panel: #15171f;
+
+  --focus: 0 0 0 3px rgba(78, 139, 146, 0.42);
 }
 
 /* ── Utility ────────────────────────────────── */
@@ -174,6 +181,15 @@ input, button, textarea, select {
 }
 
 a { text-decoration: none; color: inherit; }
+
+/* Focus-visible ring — outline AND box-shadow so keyboard focus stays
+   visible regardless of which property a given component already sets
+   inline (many buttons set boxShadow, many inputs set outline: 'none'). */
+:focus-visible {
+  outline: 2px solid var(--primary-strong);
+  outline-offset: 2px;
+  box-shadow: var(--focus);
+}
 
 /* Phone shell — centers app on large screens */
 .phone-shell {

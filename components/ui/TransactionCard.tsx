@@ -98,7 +98,7 @@ export default function TransactionCard({
               </div>
             )}
             {onDelete && (
-              <button onClick={onDelete} title={labels.delete} style={{ flex: 'none', width: 38, height: 38, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--loss-container)', color: 'var(--loss)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <button onClick={onDelete} title={labels.delete} style={{ flex: 'none', width: 44, height: 44, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'var(--loss-container)', color: 'var(--loss)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', fontFamily: 'inherit' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 19 }}>delete</span>
               </button>
             )}

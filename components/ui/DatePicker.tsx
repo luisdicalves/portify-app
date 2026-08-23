@@ -183,10 +183,10 @@ export default function DatePicker({
                 <span style={{ fontSize: 17, fontWeight: 700 }}>{months[viewMonth]} {viewYear}</span>
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)', transition: 'transform .2s', transform: yearsView ? 'rotate(180deg)' : 'none' }}>expand_more</span>
               </button>
-              <button type="button" disabled={yearsView} onClick={() => shiftMonth(-1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: yearsView ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: yearsView ? 0.35 : 1 }}>
+              <button type="button" disabled={yearsView} onClick={() => shiftMonth(-1)} style={{ width: 44, height: 44, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: yearsView ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: yearsView ? 0.35 : 1 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_left</span>
               </button>
-              <button type="button" disabled={yearsView || viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: (yearsView || viewIsAtOrAfterMaxMonth) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: (yearsView || viewIsAtOrAfterMaxMonth) ? 0.35 : 1 }}>
+              <button type="button" disabled={yearsView || viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(1)} style={{ width: 44, height: 44, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: (yearsView || viewIsAtOrAfterMaxMonth) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: (yearsView || viewIsAtOrAfterMaxMonth) ? 0.35 : 1 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span>
               </button>
             </div>

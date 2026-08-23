@@ -1,7 +1,8 @@
 'use client';
 
 type IconButtonVariant = 'filled' | 'tonal' | 'plain';
-type IconButtonSize = 34 | 40 | 46 | 60;
+// PDS-131: minimum touch target is 44x44, so no size below that is offered.
+type IconButtonSize = 44 | 48 | 52 | 60;
 
 const VARIANT_STYLE: Record<IconButtonVariant, { background: string; color: string }> = {
   filled: { background: 'var(--primary-strong)', color: '#fff' },
@@ -9,12 +10,12 @@ const VARIANT_STYLE: Record<IconButtonVariant, { background: string; color: stri
   plain: { background: 'transparent', color: 'var(--on-surface-variant)' },
 };
 
-const ICON_SIZE: Record<IconButtonSize, number> = { 34: 18, 40: 20, 46: 22, 60: 26 };
+const ICON_SIZE: Record<IconButtonSize, number> = { 44: 20, 48: 22, 52: 24, 60: 26 };
 
 // IconButton — PDS-131/132: 14px radius, NEVER circular by default.
 export default function IconButton({
   icon,
-  size = 40,
+  size = 44,
   variant = 'tonal',
   onClick,
   ariaLabel,
