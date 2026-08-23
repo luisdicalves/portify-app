@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
 import { Skeleton, SkeletonChart } from '@/components/ui/Skeleton';
+import Card from '@/components/ui/Card';
+import SegmentedControl from '@/components/ui/SegmentedControl';
 import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
 import { getPlan } from '@/lib/db/plans';
@@ -155,17 +157,13 @@ export default function DashboardPage() {
         </div>
 
         {/* Performance chart */}
-        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-          <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 3, marginBottom: 12 }}>
-            {t.timeframes.map((label, i) => (
-              <button key={label} onClick={() => setTf(i)} style={{
-                flex: 1, padding: '6px 0', borderRadius: 'var(--radius-full)', border: 'none', cursor: 'pointer',
-                fontSize: 12, fontWeight: 600, fontFamily: 'inherit',
-                background: tf === i ? 'var(--surface-lowest)' : 'transparent',
-                color: tf === i ? 'var(--primary)' : 'var(--on-surface-variant)',
-                boxShadow: tf === i ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-              }}>{label}</button>
-            ))}
+        <Card>
+          <div style={{ marginBottom: 12 }}>
+            <SegmentedControl
+              options={t.timeframes.map((label, i) => ({ id: String(i), label }))}
+              value={String(tf)}
+              onChange={id => setTf(Number(id))}
+            />
           </div>
           <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
             {loadingChart ? (
@@ -187,26 +185,30 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
+        </Card>
 
         {/* Stat cards row */}
         <div style={{ display: 'flex', gap: 12 }}>
-          <div onClick={() => router.push('/dashboard/net-worth')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>savings</span>
-            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.netWorthCardLabel}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? <Skeleton width={70} height={16} /> : `${eurCompact.format(totalValue)} €`}</div>
+          <div style={{ flex: 1 }}>
+            <Card onClick={() => router.push('/dashboard/net-worth')}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)' }}>savings</span>
+              <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.netWorthCardLabel}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{loading ? <Skeleton width={70} height={16} /> : `${eurCompact.format(totalValue)} €`}</div>
+            </Card>
           </div>
-          <div onClick={() => router.push('/dashboard/performance')} style={{ flex: 1, cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
-            <span className="material-symbols-outlined" style={{ fontSize: 20, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>trending_up</span>
-            <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.totalReturn}</div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
-              {loading ? <Skeleton width={50} height={16} /> : `${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
-            </div>
+          <div style={{ flex: 1 }}>
+            <Card onClick={() => router.push('/dashboard/performance')}>
+              <span className="material-symbols-outlined" style={{ fontSize: 20, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)' }}>trending_up</span>
+              <div style={{ fontSize: 12, color: 'var(--on-surface-variant)', marginTop: 6 }}>{t.totalReturn}</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: totalReturnPct >= 0 ? 'var(--gain)' : 'var(--loss)', fontVariantNumeric: 'tabular-nums' }}>
+                {loading ? <Skeleton width={50} height={16} /> : `${totalReturnPct >= 0 ? '+' : ''}${totalReturnPct.toFixed(1)}%`}
+              </div>
+            </Card>
           </div>
         </div>
 
         {/* Daily performance */}
-        <div style={{ background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14 }}>
+        <Card>
           <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 12 }}>{t.todayHighlights}</div>
 
           {loading && <div style={{ display: 'flex', flexDirection: 'column', gap: 9 }}><Skeleton height={52} radius="var(--radius-md)" /><Skeleton height={52} radius="var(--radius-md)" /></div>}
@@ -245,50 +247,48 @@ export default function DashboardPage() {
               </span>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Upcoming dividends insight — only shown when there are dividends in the next 7 days */}
         {!loading && upcomingDividends.length > 0 && (
-          <div
-            onClick={() => router.push('/portfolio?tab=dividends')}
-            style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}
-          >
-            <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--gain-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-              <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--gain)' }}>payments</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>
-                {upcomingDividends.length === 1
-                  ? `${upcomingDividends[0].ticker.split('.')[0]} paga dividendo esta semana`
-                  : `${upcomingDividends.length} dividendos esta semana`}
+          <Card onClick={() => router.push('/portfolio?tab=dividends')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--gain-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--gain)' }}>payments</span>
               </div>
-              <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>
-                {upcomingDividends.map(d => d.ticker.split('.')[0]).join(', ')}
-                {' · '}
-                +{eur.format(upcomingDividends.reduce((s, d) => s + d.netAmount, 0))} € líq.
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  {upcomingDividends.length === 1
+                    ? `${upcomingDividends[0].ticker.split('.')[0]} paga dividendo esta semana`
+                    : `${upcomingDividends.length} dividendos esta semana`}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>
+                  {upcomingDividends.map(d => d.ticker.split('.')[0]).join(', ')}
+                  {' · '}
+                  +{eur.format(upcomingDividends.reduce((s, d) => s + d.netAmount, 0))} € líq.
+                </div>
               </div>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
             </div>
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
-          </div>
+          </Card>
         )}
 
         {/* Investment plan insight */}
         {!loading && monthlyPlan !== null && (
-          <div
-            onClick={() => router.push('/profile')}
-            style={{ cursor: 'pointer', background: 'var(--surface-lowest)', border: '1px solid var(--card-border)', borderRadius: 'var(--radius-lg)', padding: 14, display: 'flex', alignItems: 'center', gap: 12 }}
-          >
-            <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
-              <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--primary)' }}>autorenew</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600 }}>{t.insightPlanTitle}</div>
-              <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>
-                {eur.format(monthlyPlan)} € {lang === 'pt' ? 'serão investidos a 1 de cada mês' : 'will be invested on the 1st each month'}
+          <Card onClick={() => router.push('/profile')}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 'var(--radius-full)', background: 'var(--primary-container)', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}>
+                <span className="material-symbols-outlined icf" style={{ fontSize: 20, color: 'var(--primary)' }}>autorenew</span>
               </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{t.insightPlanTitle}</div>
+                <div style={{ fontSize: 11, color: 'var(--on-surface-variant)', marginTop: 1 }}>
+                  {eur.format(monthlyPlan)} € {lang === 'pt' ? 'serão investidos a 1 de cada mês' : 'will be invested on the 1st each month'}
+                </div>
+              </div>
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
             </div>
-            <span className="material-symbols-outlined" style={{ fontSize: 18, color: 'var(--on-surface-variant)' }}>chevron_right</span>
-          </div>
+          </Card>
         )}
 
       </div>
