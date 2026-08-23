@@ -132,6 +132,28 @@ test.describe('Portfolio positions sorting', () => {
   });
 });
 
+test.describe('Portfolio tab SegmentedControl', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+  });
+
+  test('tab buttons are real role=button elements with the correct active state', async ({ page }) => {
+    await loginAndReachPortfolio(page);
+
+    const positionsTab = page.getByRole('button', { name: 'Posições', exact: true });
+    const dividendsTab = page.getByRole('button', { name: 'Dividendos', exact: true });
+
+    // "Posições" is the default tab.
+    await expect(positionsTab).toHaveAttribute('aria-pressed', 'true');
+    await expect(dividendsTab).toHaveAttribute('aria-pressed', 'false');
+
+    await dividendsTab.click();
+
+    await expect(dividendsTab).toHaveAttribute('aria-pressed', 'true');
+    await expect(positionsTab).toHaveAttribute('aria-pressed', 'false');
+  });
+});
+
 test.describe('Portfolio dividends tab', () => {
   test.beforeEach(async ({ page }) => {
     await mockSupabase(page);

@@ -56,11 +56,11 @@ body {
   --outline: #737685;
   --outline-variant: #c3c6d6;
 
-  --primary: #003d9b;
-  --primary-strong: #0052cc;
+  --primary: #025963;
+  --primary-strong: #025963;
   --on-primary: #ffffff;
-  --primary-container: #dae2ff;
-  --on-primary-container: #001848;
+  --primary-container: rgba(2, 89, 99, 0.10);
+  --on-primary-container: #013f47;
 
   --gain: #006e28;
   --gain-strong: #047a3d;
@@ -69,6 +69,20 @@ body {
   --loss: #ba1a1a;
   --loss-strong: #c4302b;
   --loss-container: #ffe5e2;
+
+  /* Information — PDS-040/PDS-036: reuses the historical primary blue,
+     explicitly licensed for the Information semantic once retired as brand. */
+  --information: #003d9b;
+  --information-strong: #0052cc;
+  --information-container: #dae2ff;
+  --on-information-container: #001848;
+
+  /* Warning — PDS-039: independent amber family, candidate values (same
+     derivation used across the Fase 2 mockups for visual consistency). */
+  --warning: #7a5900;
+  --warning-strong: #7a5900;
+  --warning-container: rgba(160, 110, 0, 0.10);
+  --on-warning-container: #7a5900;
 
   --card-border: rgba(0, 0, 0, 0.07);
   --hairline: rgba(0, 0, 0, 0.08);
@@ -85,6 +99,7 @@ body {
   --radius-xl: 20px;
   --radius-2xl: 24px;
   --radius-full: 999px;
+  --radius-button: 14px;
 
   /* Safe area (notch / Dynamic Island / home indicator) */
   --safe-top: env(safe-area-inset-top, 0px);
@@ -119,11 +134,11 @@ body {
   --outline: #8d90a0;
   --outline-variant: #434654;
 
-  --primary: #b2c5ff;
-  --primary-strong: #0052cc;
+  --primary: #4e8b92;
+  --primary-strong: #1b6a73;
   --on-primary: #ffffff;
-  --primary-container: #0040a2;
-  --on-primary-container: #dae2ff;
+  --primary-container: rgba(78, 139, 146, 0.16);
+  --on-primary-container: #bfe0e3;
 
   --gain: #53e16f;
   --gain-strong: #2e9e54;
@@ -132,6 +147,16 @@ body {
   --loss: #ffb4ab;
   --loss-strong: #cf4138;
   --loss-container: rgba(255, 180, 171, 0.15);
+
+  --information: #b2c5ff;
+  --information-strong: #5b8dff;
+  --information-container: #0040a2;
+  --on-information-container: #dae2ff;
+
+  --warning: #e6b43c;
+  --warning-strong: #e6b43c;
+  --warning-container: rgba(230, 180, 60, 0.15);
+  --on-warning-container: #e6b43c;
 
   --card-border: rgba(255, 255, 255, 0.09);
   --hairline: rgba(255, 255, 255, 0.09);
@@ -200,7 +225,7 @@ a { text-decoration: none; color: inherit; }
   background: var(--primary-strong);
   color: #fff;
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-button);
   padding: 16px;
   font-size: 16px;
   font-weight: 600;
@@ -220,7 +245,7 @@ a { text-decoration: none; color: inherit; }
   background: var(--surface-high);
   color: var(--on-surface);
   border: none;
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-button);
   padding: 14px;
   font-size: 15px;
   font-weight: 600;
