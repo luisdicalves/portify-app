@@ -7,6 +7,7 @@ import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { createClient } from '@/lib/supabase/client';
 import DatePicker from '@/components/ui/DatePicker';
+import Dialog from '@/components/ui/Dialog';
 
 const MIN_USERNAME_LENGTH = 3;
 
@@ -27,6 +28,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [terms, setTerms] = useState(false);
+  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
 
   const [usernameError, setUsernameError] = useState('');
   const [checkingUsername, setCheckingUsername] = useState(false);
@@ -81,10 +83,16 @@ export default function RegisterPage() {
       router.push('/auth/pin-set');
     } catch (err: unknown) {
       setError(friendlySignUpError(err));
+      // Secret fields are never silently retained after a failed submission.
+      setForm(f => ({ ...f, password: '' }));
     } finally {
       setLoading(false);
     }
   }
+
+  const hasUnsavedChanges = Boolean(
+    form.firstName || form.lastName || form.dob || form.username || form.email || form.password || terms,
+  );
 
   // Password strength — 4 segments
   const pwLen = form.password.length;
@@ -111,7 +119,7 @@ export default function RegisterPage() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
         {/* Header */}
         <div style={{ padding: '16px 24px 8px' }}>
-          <button onClick={() => router.back()} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block', marginBottom: 8 }}>
+          <button onClick={() => (hasUnsavedChanges ? setShowDiscardDialog(true) : router.back())} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, display: 'block', marginBottom: 8 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 24, color: 'var(--on-surface)' }}>arrow_back_ios_new</span>
           </button>
           <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.02em', lineHeight: 1.1 }}>{t.registerTitle}</div>
@@ -219,6 +227,15 @@ export default function RegisterPage() {
           </div>
         </form>
       </div>
+
+      <Dialog
+        open={showDiscardDialog}
+        onClose={() => setShowDiscardDialog(false)}
+        title={t.discardChangesTitle}
+        description={t.discardChangesBody}
+        primaryAction={{ label: t.discardChangesConfirm, variant: 'critical', onClick: () => router.back() }}
+        secondaryAction={{ label: t.discardChangesCancel, onClick: () => {} }}
+      />
     </div>
   );
 }

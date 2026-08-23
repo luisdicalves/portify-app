@@ -11,6 +11,17 @@ async function selectFirst(page: import('@playwright/test').Page) {
   await page.locator('[data-testid="select-item"]').first().click();
 }
 
+async function fillRegisterForm(page: import('@playwright/test').Page) {
+  await page.getByPlaceholder('Ricardo').fill('Teste');
+  await page.getByPlaceholder('Ferreira').fill('E2E');
+  await page.getByPlaceholder('DD / MM / AAAA').fill('01011990');
+  await page.getByPlaceholder('o_teu_username').fill('teste_e2e');
+  await page.getByPlaceholder('nome@exemplo.com').fill('e2e@test.portify.app');
+  await page.getByPlaceholder('••••••••').fill('Teste1234!');
+  await page.waitForTimeout(600);
+  await page.locator('[data-testid="terms-checkbox"]').click();
+}
+
 test.describe('Onboarding flow', () => {
   test.beforeEach(async ({ page }) => {
     await mockSupabase(page);
@@ -170,5 +181,58 @@ test.describe('Onboarding flow', () => {
     // When selected, the button has white text; when unselected it has on-surface text
     await expect(tech).toHaveCSS('color', 'rgb(255, 255, 255)');
     await expect(saude).toHaveCSS('color', 'rgb(255, 255, 255)');
+  });
+});
+
+test.describe('Register page — SCR-011 regression tests', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+  });
+
+  test('password field is cleared after a failed submission', async ({ page }) => {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/auth/v1/signup`, route =>
+      route.fulfill({
+        status: 422, contentType: 'application/json',
+        body: JSON.stringify({ error_code: 'user_already_exists', msg: 'User already registered' }),
+      }),
+    );
+
+    await page.goto('/auth/register');
+    await fillRegisterForm(page);
+    await page.getByRole('button', { name: 'Criar conta' }).click();
+
+    await expect(page.getByText(/Já existe uma conta/i)).toBeVisible();
+    await expect(page.getByPlaceholder('••••••••')).toHaveValue('');
+  });
+
+  test('back navigation with unsaved changes shows a discard confirmation', async ({ page }) => {
+    await page.goto('/auth/login');
+    await page.getByText('Criar conta').click();
+    await expect(page).toHaveURL('/auth/register');
+
+    await page.getByPlaceholder('Ricardo').fill('Teste');
+
+    await page.locator('text=arrow_back_ios_new').click();
+    await expect(page.getByText('Descartar alterações?')).toBeVisible();
+
+    // Cancelling keeps the user on the page with the field intact.
+    await page.getByRole('button', { name: 'Continuar a editar' }).click();
+    await expect(page.getByPlaceholder('Ricardo')).toHaveValue('Teste');
+
+    // Confirming discards and actually navigates back.
+    await page.locator('text=arrow_back_ios_new').click();
+    await page.getByRole('button', { name: 'Descartar' }).click();
+    await expect(page).toHaveURL('/auth/login');
+  });
+
+  test('back navigation with no changes navigates immediately, no dialog', async ({ page }) => {
+    await page.goto('/auth/login');
+    await page.getByText('Criar conta').click();
+    await expect(page).toHaveURL('/auth/register');
+
+    await page.locator('text=arrow_back_ios_new').click();
+    await expect(page.getByText('Descartar alterações?')).not.toBeVisible();
+    await expect(page).toHaveURL('/auth/login');
   });
 });
