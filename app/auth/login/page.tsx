@@ -93,12 +93,6 @@ export default function LoginPage() {
         <button type="submit" disabled={loading} style={{ background: 'var(--primary-strong)', color: '#fff', border: 'none', borderRadius: 'var(--radius-lg)', padding: 16, fontSize: 16, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4, opacity: loading ? 0.7 : 1 }}>
           {t.signIn}
         </button>
-
-        <button type="button" onClick={() => router.push('/dashboard')}
-          style={{ background: 'var(--surface-high)', color: 'var(--on-surface)', border: 'none', borderRadius: 'var(--radius-lg)', padding: 14, fontSize: 15, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9 }}>
-          <span className="material-symbols-outlined" style={{ fontSize: 22, color: 'var(--primary)' }}>face</span>
-          {t.faceId}
-        </button>
       </form>
 
       <div style={{ flex: 1 }} />
