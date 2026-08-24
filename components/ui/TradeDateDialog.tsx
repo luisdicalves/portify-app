@@ -50,11 +50,11 @@ export default function TradeDateDialog({
     <div onClick={onClose} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 110, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl)', padding: 20, boxShadow: 'var(--shadow)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-          <button type="button" onClick={() => shiftMonth(-1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)' }}>
+          <button type="button" onClick={() => shiftMonth(-1)} style={{ width: 44, height: 44, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)' }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_left</span>
           </button>
           <div style={{ flex: 1, textAlign: 'center', fontSize: 16, fontWeight: 700 }}>{months[viewMonth]} {viewYear}</div>
-          <button type="button" disabled={viewIsAtOrAfterCurrentMonth} onClick={() => shiftMonth(1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: viewIsAtOrAfterCurrentMonth ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: viewIsAtOrAfterCurrentMonth ? 0.35 : 1 }}>
+          <button type="button" disabled={viewIsAtOrAfterCurrentMonth} onClick={() => shiftMonth(1)} style={{ width: 44, height: 44, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: viewIsAtOrAfterCurrentMonth ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: viewIsAtOrAfterCurrentMonth ? 0.35 : 1 }}>
             <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span>
           </button>
         </div>

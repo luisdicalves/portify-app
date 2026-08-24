@@ -25,7 +25,7 @@ export default function BottomNav() {
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
       background: 'var(--surface-lowest)',
       borderTop: '1px solid var(--hairline)',
-      padding: '10px 8px', zIndex: 10,
+      padding: '10px 8px 12px', zIndex: 10,
     }}>
       {TABS.map(tab => {
         const active = pathname === tab.path || pathname.startsWith(tab.path + '/');
@@ -37,7 +37,7 @@ export default function BottomNav() {
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
               background: 'none', border: 'none', cursor: 'pointer', color, fontFamily: 'inherit', flex: 1,
             }}>
-            <span className={`material-symbols-outlined${active ? ' icf' : ''}`} style={{ fontSize: 22 }}>{tab.icon}</span>
+            <span className={`material-symbols-outlined${active ? ' icf' : ''}`} style={{ fontSize: 20 }}>{tab.icon}</span>
             <span style={{ fontSize: 10, fontWeight: 600 }}>{tab.label}</span>
           </button>
         );

@@ -52,21 +52,21 @@ export default function Dialog({
         aria-describedby="dialog-description"
         style={{
           width: '100%', maxWidth: 360,
-          background: 'var(--surface-lowest)', borderRadius: 'var(--radius-xl)',
+          background: 'var(--surface-lowest)', borderRadius: 'var(--radius-panel)',
           padding: 20, boxShadow: 'var(--shadow)',
         }}
       >
         <div id="dialog-title" style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>{title}</div>
         <div id="dialog-description" style={{ fontSize: 13, color: 'var(--on-surface-variant)', lineHeight: 1.5, marginBottom: 18 }}>{description}</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <Button variant={primaryAction.variant ?? 'primary'} onClick={() => { primaryAction.onClick(); onClose(); }}>
-            {primaryAction.label}
-          </Button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           {secondaryAction && (
-            <Button variant="tertiary" onClick={() => { secondaryAction.onClick(); onClose(); }}>
+            <Button variant="tertiary" fullWidth={false} onClick={() => { secondaryAction.onClick(); onClose(); }}>
               {secondaryAction.label}
             </Button>
           )}
+          <Button variant={primaryAction.variant ?? 'primary'} fullWidth={false} onClick={() => { primaryAction.onClick(); onClose(); }}>
+            {primaryAction.label}
+          </Button>
         </div>
       </div>
     </div>

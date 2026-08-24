@@ -55,6 +55,16 @@ test.describe('Login + PIN flow', () => {
     await expect(page.getByText('ID de utilizador ou palavra-passe incorretos.')).toBeVisible();
   });
 
+  test('does not offer a Face ID shortcut that bypasses authentication', async ({ page }) => {
+    await page.goto('/auth/login');
+    await expect(page).toHaveURL('/auth/login');
+
+    // The login form must only expose the real, password-checked submit button —
+    // no secondary control may navigate straight to /dashboard without auth.
+    await expect(page.getByText('Face ID')).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
+  });
+
   test('shows the same generic error for a known user ID with the wrong password', async ({ page }) => {
     // get_email_by_handle resolves fine, but the password is rejected by Supabase Auth
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';

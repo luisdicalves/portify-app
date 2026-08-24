@@ -32,7 +32,6 @@ export const en: typeof pt = {
   passwordPh: '••••••••',
   forgotPassword: 'Forgot your password?',
   signIn: 'Sign in',
-  faceId: 'Sign in with Face ID',
   noAccount: 'No account?',
   createAccount: 'Create account',
   rememberMe: 'Keep me signed in',

@@ -31,7 +31,6 @@ export const pt = {
   passwordPh: '••••••••',
   forgotPassword: 'Esqueceu-se da palavra-passe?',
   signIn: 'Entrar',
-  faceId: 'Entrar com Face ID',
   noAccount: 'Não tem conta?',
   createAccount: 'Criar conta',
   rememberMe: 'Manter sessão iniciada',

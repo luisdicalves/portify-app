@@ -353,11 +353,11 @@ export default function ProfilePage() {
       {/* Horizon sheet */}
       <Sheet open={horizonSheetOpen} onClose={() => setHorizonSheetOpen(false)} title={t.horizonLabel}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-          <button onClick={() => setHorizonYears(y => Math.max(1, y - 1))} style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', border: '1px solid var(--card-border)', background: 'var(--surface-low)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', fontFamily: 'inherit' }}>−</button>
+          <button onClick={() => setHorizonYears(y => Math.max(1, y - 1))} style={{ width: 44, height: 44, borderRadius: 'var(--radius-full)', border: '1px solid var(--card-border)', background: 'var(--surface-low)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', fontFamily: 'inherit' }}>−</button>
           <span style={{ fontSize: 26, fontWeight: 700, minWidth: 70, textAlign: 'center', letterSpacing: '-0.02em' }}>
             {horizonYears} <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--on-surface-variant)' }}>anos</span>
           </span>
-          <button onClick={() => setHorizonYears(y => Math.min(50, y + 1))} style={{ width: 40, height: 40, borderRadius: 'var(--radius-full)', border: '1px solid var(--card-border)', background: 'var(--surface-low)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', fontFamily: 'inherit' }}>+</button>
+          <button onClick={() => setHorizonYears(y => Math.min(50, y + 1))} style={{ width: 44, height: 44, borderRadius: 'var(--radius-full)', border: '1px solid var(--card-border)', background: 'var(--surface-low)', fontSize: 22, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', fontFamily: 'inherit' }}>+</button>
           <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
             {[5, 10, 15, 20, 30].map(y => (
               <button key={y} onClick={() => setHorizonYears(y)} style={{
