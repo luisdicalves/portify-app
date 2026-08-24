@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const WEEKDAYS_PT = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 const WEEKDAYS_EN = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -67,10 +67,23 @@ export default function DatePicker({
   const [viewMonth, setViewMonth] = useState(initial.getMonth());
   const [picked, setPicked] = useState(value);
   const [yearsView, setYearsView] = useState(false);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const monthYearBtnRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     setDigits(digitsFromIso(value, lang));
   }, [value, lang]);
+
+  // Sheet focus contract — PDS-496: open -> first focusable element,
+  // close -> focus returns to the control that opened it.
+  useEffect(() => {
+    if (open) {
+      previouslyFocused.current = document.activeElement as HTMLElement | null;
+      requestAnimationFrame(() => monthYearBtnRef.current?.focus());
+    } else {
+      previouslyFocused.current?.focus?.();
+    }
+  }, [open]);
 
   const weekdays = lang === 'pt' ? WEEKDAYS_PT : WEEKDAYS_EN;
   const months = lang === 'pt' ? MONTHS_PT : MONTHS_EN;
@@ -164,8 +177,9 @@ export default function DatePicker({
       {error && <div style={{ fontSize: 12, color: 'var(--loss)', marginTop: 6 }}>{error}</div>}
 
       {open && (
-        <div onClick={() => setOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 320, background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl)', padding: 20, boxShadow: 'var(--shadow)' }}>
+        <div onClick={() => setOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 100, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 430, background: 'var(--surface-lowest)', borderRadius: 'var(--radius-2xl) var(--radius-2xl) 0 0', padding: '10px 20px 20px', boxShadow: 'var(--shadow)' }}>
+            <div style={{ width: 38, height: 4, borderRadius: 'var(--radius-full)', background: 'var(--outline-variant)', margin: '0 auto 14px' }} />
             {/* Selected-date display */}
             <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 18 }}>
               <div style={{ minWidth: 0 }}>
@@ -179,14 +193,14 @@ export default function DatePicker({
 
             {/* Month / year navigation */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-              <button type="button" onClick={() => setYearsView(v => !v)} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--on-surface)', fontFamily: 'inherit', padding: '6px 4px' }}>
+              <button ref={monthYearBtnRef} type="button" onClick={() => setYearsView(v => !v)} style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 5, background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--on-surface)', fontFamily: 'inherit', padding: '6px 4px' }}>
                 <span style={{ fontSize: 17, fontWeight: 700 }}>{months[viewMonth]} {viewYear}</span>
                 <span className="material-symbols-outlined" style={{ fontSize: 20, color: 'var(--primary)', transition: 'transform .2s', transform: yearsView ? 'rotate(180deg)' : 'none' }}>expand_more</span>
               </button>
-              <button type="button" disabled={yearsView} onClick={() => shiftMonth(-1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: yearsView ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: yearsView ? 0.35 : 1 }}>
+              <button type="button" disabled={yearsView} onClick={() => shiftMonth(-1)} style={{ width: 44, height: 44, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: yearsView ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: yearsView ? 0.35 : 1 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_left</span>
               </button>
-              <button type="button" disabled={yearsView || viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(1)} style={{ width: 34, height: 34, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: (yearsView || viewIsAtOrAfterMaxMonth) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: (yearsView || viewIsAtOrAfterMaxMonth) ? 0.35 : 1 }}>
+              <button type="button" disabled={yearsView || viewIsAtOrAfterMaxMonth} onClick={() => shiftMonth(1)} style={{ width: 44, height: 44, border: 'none', background: 'var(--surface-high)', borderRadius: 'var(--radius-md)', cursor: (yearsView || viewIsAtOrAfterMaxMonth) ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface)', opacity: (yearsView || viewIsAtOrAfterMaxMonth) ? 0.35 : 1 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 20 }}>chevron_right</span>
               </button>
             </div>

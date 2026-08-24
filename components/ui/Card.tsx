@@ -16,10 +16,13 @@ export default function Card({
   return (
     <div
       onClick={onClick}
+      tabIndex={onClick ? 0 : undefined}
+      role={onClick ? 'button' : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
       style={{
         background: 'var(--surface-lowest)',
-        border: '1px solid var(--card-border)',
-        borderRadius: 'var(--radius-lg)',
+        border: elevated ? 'none' : '1px solid var(--card-border)',
+        borderRadius: 'var(--radius-panel)',
         padding,
         boxShadow: elevated ? 'var(--shadow)' : 'none',
         cursor: onClick ? 'pointer' : 'default',

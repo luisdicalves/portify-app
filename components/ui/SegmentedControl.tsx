@@ -13,7 +13,7 @@ export default function SegmentedControl<T extends string>({
   onChange: (id: T) => void;
 }) {
   return (
-    <div style={{ display: 'flex', background: 'var(--surface-container)', borderRadius: 'var(--radius-full)', padding: 4 }}>
+    <div style={{ display: 'flex', gap: 2, background: 'var(--surface-container)', borderRadius: 'var(--radius-button)', padding: 3 }}>
       {options.map(opt => {
         const active = opt.id === value;
         return (
@@ -24,8 +24,12 @@ export default function SegmentedControl<T extends string>({
             aria-pressed={active}
             style={{
               flex: 1,
-              padding: '8px 0',
-              borderRadius: 'var(--radius-full)',
+              minHeight: 38,
+              padding: '0 14px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 11,
               border: 'none',
               cursor: 'pointer',
               fontSize: 13,

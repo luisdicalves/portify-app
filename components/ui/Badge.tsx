@@ -10,12 +10,12 @@ type BadgeSize = 'sm' | 'md';
 const INTENT_STYLE: Record<BadgeIntent, { bg: string; color: string }> = {
   information: { bg: 'var(--information-container)', color: 'var(--information-strong)' },
   warning: { bg: 'var(--warning-container)', color: 'var(--warning-strong)' },
-  critical: { bg: 'var(--loss-container)', color: 'var(--loss)' },
+  critical: { bg: 'var(--critical-container)', color: 'var(--critical)' },
   neutral: { bg: 'var(--surface-high)', color: 'var(--on-surface-variant)' },
 };
 
 const SIZE_STYLE: Record<BadgeSize, { fontSize: number; padding: string }> = {
-  sm: { fontSize: 11, padding: '2px 8px' },
+  sm: { fontSize: 11, padding: '3px 10px' },
   md: { fontSize: 13, padding: '3px 9px' },
 };
 

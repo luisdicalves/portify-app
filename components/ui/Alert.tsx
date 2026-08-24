@@ -12,7 +12,7 @@ type AlertIntent = 'information' | 'warning' | 'critical' | 'neutral';
 const INTENT_STYLE: Record<AlertIntent, { bg: string; border: string; fg: string }> = {
   information: { bg: 'var(--information-container)', border: 'var(--information)', fg: 'var(--information-strong)' },
   warning: { bg: 'var(--warning-container)', border: 'var(--warning)', fg: 'var(--warning-strong)' },
-  critical: { bg: 'var(--loss-container)', border: 'var(--loss)', fg: 'var(--loss)' },
+  critical: { bg: 'var(--critical-container)', border: 'var(--critical)', fg: 'var(--critical)' },
   neutral: { bg: 'var(--surface-container)', border: 'var(--card-border)', fg: 'var(--on-surface-variant)' },
 };
 
@@ -39,7 +39,7 @@ export default function Alert({
       style={{
         display: 'flex', gap: 8, alignItems: 'flex-start',
         background: bg, border: `1px solid ${border}`,
-        borderRadius: 'var(--radius-md)', padding: '10px 14px',
+        borderRadius: 'var(--radius-lg)', padding: '10px 14px',
       }}
     >
       {icon && (
