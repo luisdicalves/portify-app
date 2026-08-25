@@ -55,6 +55,43 @@ test.describe('Dashboard totals', () => {
   });
 });
 
+test.describe('Dashboard chart accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ id: 'h1', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'AAPL', units: 10, avg_price: 100, currency: 'EUR' }]),
+      }),
+    );
+    await page.route('**/api/quote**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ price: 150, change: 5, changePercent: 3.45, companyName: 'Apple Inc.' }) }),
+    );
+    // Real history (>=2 points) so the chart branch renders instead of the empty state.
+    await page.route('**/api/history**', route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ points: [{ date: '2026-01-01', close: 140 }, { date: '2026-06-01', close: 150 }] }),
+      }),
+    );
+    await page.route('**/api/dividends**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ dividends: [] }) }),
+    );
+  });
+
+  test('renders an accessible data table alongside the chart', async ({ page }) => {
+    await loginAndReachDashboard(page);
+
+    const table = page.locator('table.sr-only');
+    await expect(page.getByText('Tabela de dados do gráfico')).toBeAttached();
+    await expect(table).toContainText('2026-01-01');
+    await expect(table).toContainText('2026-06-01');
+    await expect(page.locator('svg title')).toHaveText('Valor Total do Portfólio');
+  });
+});
+
 test.describe('Dashboard timeframe SegmentedControl', () => {
   test.beforeEach(async ({ page }) => {
     await mockSupabase(page);

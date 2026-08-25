@@ -268,3 +268,54 @@ test.describe('Portfolio history filters', () => {
     await expect(page.getByText('Nenhum movimento corresponde ao filtro.')).toBeVisible();
   });
 });
+
+test.describe('Asset detail chart accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+  });
+
+  test('renders an accessible data table with real dates when real history exists', async ({ page }) => {
+    await page.route('**/api/quote**', route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ price: 150, change: 5, changePercent: 3.45, open: 145, low: 140, high: 152, prevClose: 148, companyName: 'Apple Inc.' }),
+      }),
+    );
+    await page.route('**/api/history**', route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ points: [{ date: '2026-01-01', close: 140 }, { date: '2026-06-01', close: 150 }] }),
+      }),
+    );
+
+    await loginAndReachPortfolio(page);
+    await page.goto('/portfolio/AAPL', { waitUntil: 'domcontentloaded' });
+
+    await expect(page.locator('svg title')).toHaveText('AAPL');
+    const table = page.locator('table.sr-only');
+    await expect(page.getByText('Tabela de dados do gráfico')).toBeAttached();
+    await expect(table).toContainText('2026-01-01');
+    await expect(table).toContainText('2026-06-01');
+  });
+
+  test('falls back to labeled OHLC rows (not fabricated dates) when there is no real history', async ({ page }) => {
+    await page.route('**/api/quote**', route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ price: 150, change: 5, changePercent: 3.45, open: 145, low: 140, high: 152, prevClose: 148, companyName: 'Apple Inc.' }),
+      }),
+    );
+    await page.route('**/api/history**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ points: [] }) }),
+    );
+
+    await loginAndReachPortfolio(page);
+    await page.goto('/portfolio/AAPL', { waitUntil: 'domcontentloaded' });
+
+    const table = page.locator('table.sr-only');
+    await expect(table).toContainText('Abertura');
+    await expect(table).toContainText('Mín. dia');
+    await expect(table).toContainText('Máx. dia');
+    await expect(table).toContainText('Atual');
+  });
+});
