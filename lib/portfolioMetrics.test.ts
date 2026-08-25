@@ -3,6 +3,7 @@ import {
   calcTotalValue,
   calcTotalInvested,
   buildPortfolioSeries,
+  buildPortfolioDates,
   buildLinePath,
   calcWeightedAvgDaysHeld,
   calcAnnualizedReturn,
@@ -94,6 +95,24 @@ describe('buildPortfolioSeries', () => {
   it('returns null when the resulting series has fewer than 2 points', () => {
     const histories = [[{ date: '2024-01-01', close: 110 }], null];
     expect(buildPortfolioSeries(holdings, histories)).toBeNull();
+  });
+});
+
+describe('buildPortfolioDates', () => {
+  it('returns the dates of the longest history, same backbone as buildPortfolioSeries', () => {
+    const histories = [
+      [{ date: '2024-01-01', close: 110 }],
+      [{ date: '2024-01-01', close: 210 }, { date: '2024-01-02', close: 220 }, { date: '2024-01-03', close: 230 }],
+    ];
+    expect(buildPortfolioDates(histories)).toEqual(['2024-01-01', '2024-01-02', '2024-01-03']);
+  });
+
+  it('returns null when there is no history at all', () => {
+    expect(buildPortfolioDates([null, null])).toBeNull();
+  });
+
+  it('returns null when the resulting series has fewer than 2 points', () => {
+    expect(buildPortfolioDates([[{ date: '2024-01-01', close: 110 }], null])).toBeNull();
   });
 });
 

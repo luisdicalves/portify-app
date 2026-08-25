@@ -9,7 +9,7 @@ import SegmentedControl from '@/components/ui/SegmentedControl';
 import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
 import { getPlan } from '@/lib/db/plans';
-import { buildPortfolioSeries, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
+import { buildPortfolioSeries, buildPortfolioDates, buildLinePath, type Holding } from '@/lib/portfolioMetrics';
 import { buildPortfolioState } from '@/lib/portfolio/portfolioState';
 import { holdingsToPortfolioInput, quotesToLatestQuotes, logPortfolioStateWarnings, DEFAULT_CURRENCY } from '@/lib/portfolio/portfolioStateAdapters';
 import { useApp } from '@/lib/context';
@@ -34,6 +34,7 @@ export default function DashboardPage() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [chartValues, setChartValues] = useState<number[] | null>(null);
+  const [chartDates, setChartDates] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingChart, setLoadingChart] = useState(true);
   const [monthlyPlan, setMonthlyPlan] = useState<number | null>(null);
@@ -78,6 +79,7 @@ export default function DashboardPage() {
       const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
       const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
       setChartValues(buildPortfolioSeries(holdings, histories));
+      setChartDates(buildPortfolioDates(histories));
       setLoadingChart(false);
     })();
   }, [holdings, tf]);
@@ -169,16 +171,32 @@ export default function DashboardPage() {
             {loadingChart ? (
               <SkeletonChart height={88} />
             ) : chartValues && chartValues.length > 1 ? (
-              <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
-                <defs>
-                  <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={chartColor} stopOpacity="0.28" />
-                    <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <path d={area} fill="url(#pHomeG)" />
-                <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
-              </svg>
+              <>
+                <svg viewBox="0 0 320 96" style={{ width: '100%', height: 88, display: 'block' }}>
+                  <title>{t.totalValue}</title>
+                  <desc>{`${t.chartDescFrom} ${eur.format(chartValues[0])} € ${t.chartDescTo} ${eur.format(chartValues[chartValues.length - 1])} €`}</desc>
+                  <defs>
+                    <linearGradient id="pHomeG" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={chartColor} stopOpacity="0.28" />
+                      <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
+                    </linearGradient>
+                  </defs>
+                  {[24, 48, 72].map(y => (
+                    <line key={y} x1="0" y1={y} x2="320" y2={y} stroke="var(--chart-grid)" strokeWidth="1" />
+                  ))}
+                  <path d={area} fill="url(#pHomeG)" />
+                  <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
+                </svg>
+                <table className="sr-only">
+                  <caption>{t.chartTableCaption}</caption>
+                  <thead><tr><th>{t.chartDateColumn}</th><th>{t.chartValueColumn}</th></tr></thead>
+                  <tbody>
+                    {chartValues.map((v, i) => (
+                      <tr key={i}><td>{chartDates?.[i] ?? i}</td><td>{eur.format(v)} €</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </>
             ) : (
               <div style={{ height: 88, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--on-surface-variant)', fontSize: 13 }}>
                 {t.noHistoricalData}

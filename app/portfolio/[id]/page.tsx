@@ -106,24 +106,45 @@ export default function AssetDetailPage({ params }: { params: Promise<{ id: stri
         </div>
 
         {quote && (() => {
-          const gain = history && history.length > 1
-            ? history[history.length - 1].close >= history[0].close
+          const hasHistory = history && history.length > 1;
+          const gain = hasHistory
+            ? history![history!.length - 1].close >= history![0].close
             : quote.change >= 0;
-          const values = history && history.length > 1
-            ? history.map(p => p.close)
+          const values = hasHistory
+            ? history!.map(p => p.close)
             : [quote.open, quote.low, quote.high, quote.price];
+          const rowLabels = hasHistory
+            ? history!.map(p => p.date)
+            : [t.open, t.dayLow, t.dayHigh, t.chartCurrentLabel];
           const { line, area } = buildLinePath(values);
+          const color = gain ? 'var(--gain)' : 'var(--loss)';
           return (
-            <svg viewBox="0 0 320 110" style={{ width: '100%', height: 100, display: 'block' }}>
-              <defs>
-                <linearGradient id="pDetG" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={gain ? 'var(--gain)' : 'var(--loss)'} stopOpacity="0.26" />
-                  <stop offset="100%" stopColor={gain ? 'var(--gain)' : 'var(--loss)'} stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path d={area} fill="url(#pDetG)" />
-              <path d={line} fill="none" stroke={gain ? 'var(--gain)' : 'var(--loss)'} strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
+            <>
+              <svg viewBox="0 0 320 110" style={{ width: '100%', height: 100, display: 'block' }}>
+                <title>{ticker}</title>
+                <desc>{`${t.chartDescFrom} ${eur.format(values[0])} € ${t.chartDescTo} ${eur.format(values[values.length - 1])} €`}</desc>
+                <defs>
+                  <linearGradient id="pDetG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={color} stopOpacity="0.26" />
+                    <stop offset="100%" stopColor={color} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {[20, 45, 70, 95].map(y => (
+                  <line key={y} x1="0" y1={y} x2="320" y2={y} stroke="var(--chart-grid)" strokeWidth="1" />
+                ))}
+                <path d={area} fill="url(#pDetG)" />
+                <path d={line} fill="none" stroke={color} strokeWidth="2.5" strokeLinecap="round" />
+              </svg>
+              <table className="sr-only">
+                <caption>{t.chartTableCaption}</caption>
+                <thead><tr><th>{t.chartDateColumn}</th><th>{t.chartValueColumn}</th></tr></thead>
+                <tbody>
+                  {values.map((v, i) => (
+                    <tr key={i}><td>{rowLabels[i]}</td><td>{eur.format(v)} €</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           );
         })()}
 
