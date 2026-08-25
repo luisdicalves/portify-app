@@ -92,6 +92,60 @@ test.describe('Dashboard chart accessibility', () => {
   });
 });
 
+test.describe('Dashboard keyboard accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ id: 'h1', user_id: 'aaaaaaaa-0000-0000-0000-000000000001', ticker: 'AAPL', units: 10, avg_price: 100, currency: 'EUR' }]),
+      }),
+    );
+    await page.route('**/api/quote**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ price: 150, change: 5, changePercent: 3.45, companyName: 'Apple Inc.' }) }),
+    );
+    await page.route('**/api/history**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ points: [] }) }),
+    );
+    await page.route('**/api/dividends**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ dividends: [] }) }),
+    );
+  });
+
+  test('portfolio value card is keyboard-focusable and Enter activates it, same as a click', async ({ page }) => {
+    await loginAndReachDashboard(page);
+
+    const valueCard = page.getByText('Valor Total do Portfólio').locator('..');
+    await expect(valueCard).toHaveAttribute('role', 'button');
+    await expect(valueCard).toHaveAttribute('tabindex', '0');
+
+    await valueCard.focus();
+    await expect(valueCard).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL('/dashboard/net-worth');
+  });
+
+  test('bottom nav tap targets clear the safe-area inset instead of sitting flush at the true edge', async ({ page }) => {
+    await loginAndReachDashboard(page);
+
+    // No real notch in CI — inject a real inset value and measure the actual
+    // rendered layout, the same way the bug was found and the fix verified.
+    const gap = await page.evaluate(() => {
+      document.documentElement.style.setProperty('--safe-bottom', '40px');
+      const shellBottom = document.querySelector('.phone-shell')!.getBoundingClientRect().bottom;
+      const navButton = [...document.querySelectorAll('button')].find(b => b.textContent?.includes('Painel'))!;
+      const buttonBottom = navButton.getBoundingClientRect().bottom;
+      return Math.round(shellBottom - buttonBottom);
+    });
+
+    // Before the fix this was 0 (nav ignored the shell's safe-bottom padding
+    // entirely, being position:absolute). 12px base padding + 40px inset.
+    expect(gap).toBe(52);
+  });
+});
+
 test.describe('Dashboard timeframe SegmentedControl', () => {
   test.beforeEach(async ({ page }) => {
     await mockSupabase(page);

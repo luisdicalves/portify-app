@@ -21,11 +21,15 @@ export default function BottomNav() {
   // with the bottom edge, no active pill (already color-only here).
   return (
     <div style={{
+      // Absolutely positioned within .phone-shell, so it sits at the shell's
+      // true bottom edge and doesn't inherit the shell's own safe-bottom
+      // padding — added directly here instead (background stays flush behind
+      // the home indicator/gesture area; only the tap targets shift up).
       position: 'absolute', left: 0, right: 0, bottom: 0,
       display: 'flex', justifyContent: 'space-around', alignItems: 'center',
       background: 'var(--surface-lowest)',
       borderTop: '1px solid var(--hairline)',
-      padding: '10px 8px 12px', zIndex: 10,
+      padding: '10px 8px calc(12px + var(--safe-bottom))', zIndex: 10,
     }}>
       {TABS.map(tab => {
         const active = pathname === tab.path || pathname.startsWith(tab.path + '/');

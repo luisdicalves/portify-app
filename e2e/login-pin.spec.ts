@@ -65,6 +65,19 @@ test.describe('Login + PIN flow', () => {
     await expect(page.getByRole('button', { name: 'Entrar', exact: true })).toBeVisible();
   });
 
+  test('"Criar conta" is a real link, reachable and activatable by keyboard', async ({ page }) => {
+    await page.goto('/auth/login');
+
+    const createAccount = page.getByRole('link', { name: 'Criar conta' });
+    // A real <a href> — not an onClick-only element browsers exclude from the tab order.
+    await expect(createAccount).toHaveAttribute('href', '/auth/register');
+
+    await createAccount.focus();
+    await expect(createAccount).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL('/auth/register');
+  });
+
   test('shows the same generic error for a known user ID with the wrong password', async ({ page }) => {
     // get_email_by_handle resolves fine, but the password is rejected by Supabase Auth
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
