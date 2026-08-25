@@ -22,6 +22,17 @@ const TIMEFRAME_OUTPUTSIZE = [7, 30, 90, 180, 365, 500];
 const eur = new Intl.NumberFormat('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const eurCompact = new Intl.NumberFormat('pt-PT', { notation: 'compact', maximumFractionDigits: 1 });
 
+// Real keyboard access for a clickable wrapper div (role/tabIndex/Enter+Space) —
+// same pattern components/ui/Card.tsx already uses for its onClick prop.
+function clickableProps(onClick: () => void) {
+  return {
+    onClick,
+    role: 'button' as const,
+    tabIndex: 0,
+    onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
+  };
+}
+
 type UpcomingDividend = { ticker: string; expectedDate: string; netAmount: number; confidence: 'high' | 'low' };
 
 export default function DashboardPage() {
@@ -146,7 +157,7 @@ export default function DashboardPage() {
       <div style={{ flex: 1, overflow: 'auto', padding: '16px 16px 100px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
         {/* Portfolio value */}
-        <div onClick={() => router.push('/dashboard/net-worth')} style={{ cursor: 'pointer' }}>
+        <div {...clickableProps(() => router.push('/dashboard/net-worth'))} style={{ cursor: 'pointer' }}>
           <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--on-surface-variant)' }}>{t.totalValue}</div>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
             <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{loading ? '—' : `€ ${eur.format(totalValue)}`}</span>
@@ -167,7 +178,7 @@ export default function DashboardPage() {
               onChange={id => setTf(Number(id))}
             />
           </div>
-          <div onClick={() => router.push('/dashboard/performance')} style={{ cursor: 'pointer' }}>
+          <div {...clickableProps(() => router.push('/dashboard/performance'))} style={{ cursor: 'pointer' }}>
             {loadingChart ? (
               <SkeletonChart height={88} />
             ) : chartValues && chartValues.length > 1 ? (
@@ -233,7 +244,7 @@ export default function DashboardPage() {
           {!loading && holdings.length === 0 && <div style={{ fontSize: 13, color: 'var(--on-surface-variant)' }}>{t.noPositions}</div>}
 
           {!loading && topGainer && (
-            <div onClick={() => router.push(`/portfolio/${topGainer.ticker}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topGainer.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px', marginBottom: topLoser ? 9 : 0 }}>
+            <div {...clickableProps(() => router.push(`/portfolio/${topGainer.ticker}`))} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topGainer.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px', marginBottom: topLoser ? 9 : 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: topGainer.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>{topGainer.changePercent >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>
@@ -250,7 +261,7 @@ export default function DashboardPage() {
           )}
 
           {!loading && topLoser && (
-            <div onClick={() => router.push(`/portfolio/${topLoser.ticker}`)} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topLoser.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px' }}>
+            <div {...clickableProps(() => router.push(`/portfolio/${topLoser.ticker}`))} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: topLoser.changePercent >= 0 ? 'var(--gain-container)' : 'var(--loss-container)', borderRadius: 'var(--radius-md)', padding: '9px 11px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ width: 34, height: 34, borderRadius: 'var(--radius-full)', background: topLoser.changePercent >= 0 ? 'var(--gain)' : 'var(--loss)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <span className="material-symbols-outlined icf" style={{ fontSize: 18, color: 'var(--bg)' }}>{topLoser.changePercent >= 0 ? 'arrow_upward' : 'arrow_downward'}</span>

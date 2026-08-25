@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
 import { createClient } from '@/lib/supabase/client';
@@ -99,7 +100,7 @@ export default function LoginPage() {
 
       <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--on-surface-variant)', paddingTop: 16 }}>
         {t.noAccount}{' '}
-        <a onClick={() => router.push('/auth/register')} style={{ fontWeight: 700, color: 'var(--primary)', cursor: 'pointer' }}>{t.createAccount}</a>
+        <Link href="/auth/register" style={{ fontWeight: 700, color: 'var(--primary)' }}>{t.createAccount}</Link>
       </div>
     </div>
   );
