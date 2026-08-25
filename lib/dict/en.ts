@@ -291,6 +291,12 @@ export const en: typeof pt = {
   netWorthCardLabel: 'Net worth',
   totalReturn: 'Total return',
   todayHighlights: "Today's highlights",
+  chartTableCaption: 'Chart data table',
+  chartDateColumn: 'Date',
+  chartValueColumn: 'Value',
+  chartCurrentLabel: 'Current',
+  chartDescFrom: 'Trend from',
+  chartDescTo: 'to',
   // Performance page
   performanceAnnualizedLabel: 'Annualized',
   performanceXirrCaption: 'Estimate (XIRR) since the first recorded transaction.',

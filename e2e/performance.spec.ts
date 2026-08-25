@@ -65,6 +65,46 @@ test.describe('Performance page — XIRR', () => {
     await loginAndReachPerformance(page);
 
     await expect(page.getByText('Anualizado')).toBeVisible();
-    await expect(page.getByText('—')).toBeVisible();
+    // exact: true — a bare '—' otherwise substring-matches the page <title>
+    // ("Portify — Gestão de Portfólio"), which also contains an em dash.
+    await expect(page.getByText('—', { exact: true })).toBeVisible();
+  });
+});
+
+test.describe('Performance page — chart accessibility', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockSupabase(page);
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? 'http://supabase.test';
+    await page.route(`${supabaseUrl}/rest/v1/holdings**`, route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify([{ id: 'h1', user_id: USER_ID, ticker: 'AAPL', units: 10, avg_price: 100, currency: 'EUR' }]),
+      }),
+    );
+    await page.route('**/api/quote**', route =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ price: 150, change: 5, changePercent: 3.45, companyName: 'Apple Inc.' }) }),
+    );
+    // Real history (>=2 points) so the grid/axis/table chart branch renders.
+    await page.route('**/api/history**', route =>
+      route.fulfill({
+        status: 200, contentType: 'application/json',
+        body: JSON.stringify({ points: [{ date: '2026-01-01', close: 140 }, { date: '2026-03-01', close: 145 }, { date: '2026-06-01', close: 150 }] }),
+      }),
+    );
+  });
+
+  test('renders a real date axis and an accessible data table alongside the chart', async ({ page }) => {
+    await loginAndReachPerformance(page);
+
+    // Axis: 3 tick labels (start/mid/end), independent of locale date formatting.
+    await expect(page.locator('svg text')).toHaveCount(3);
+
+    // Accessible fallback: SVG title + a data table with the real (unformatted) dates.
+    await expect(page.locator('svg title')).toHaveText('Retorno Total');
+    const table = page.locator('table.sr-only');
+    await expect(page.getByText('Tabela de dados do gráfico')).toBeAttached();
+    await expect(table).toContainText('2026-01-01');
+    await expect(table).toContainText('2026-06-01');
   });
 });

@@ -42,6 +42,17 @@ export function buildPortfolioSeries(holdings: Holding[], histories: (HistoryPoi
   return values.length > 1 ? values : null;
 }
 
+// Dates aligned 1:1 with buildPortfolioSeries's returned values — mirrors
+// its exact backbone-selection so the two never drift apart.
+export function buildPortfolioDates(histories: (HistoryPoint[] | null)[]): string[] | null {
+  const backbone = histories
+    .filter((h): h is HistoryPoint[] => h !== null)
+    .sort((a, b) => b.length - a.length)[0];
+  if (!backbone) return null;
+  const dates = backbone.map(p => p.date);
+  return dates.length > 1 ? dates : null;
+}
+
 // Builds an SVG line/area path from a series of values, scaled to the viewBox.
 export function buildLinePath(values: number[], opts: { width?: number; height?: number; padding?: number } = {}) {
   const { width = 320, height = 110, padding = 8 } = opts;

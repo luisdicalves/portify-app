@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client';
 import { getHoldings } from '@/lib/db/holdings';
 import { getTransactions } from '@/lib/db/transactions';
 import {
-  calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildLinePath, type Holding,
+  calcTotalValue, calcTotalInvested, buildPortfolioSeries, buildPortfolioDates, buildLinePath, type Holding,
 } from '@/lib/portfolioMetrics';
 import { evaluatePerformance, type CashFlow, type ValuationPoint } from '@/lib/models/performanceEngine';
 import { fetchQuote, fetchHistory, type Quote, type HistoryPoint } from '@/lib/marketApi';
@@ -33,6 +33,7 @@ export default function PerformancePage() {
   const [externalFlows, setExternalFlows] = useState<CashFlow[]>([]);
   const [inceptionDate, setInceptionDate] = useState<string | null>(null);
   const [chartValues, setChartValues] = useState<number[] | null>(null);
+  const [chartDates, setChartDates] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function PerformancePage() {
       const outputsize = TIMEFRAME_OUTPUTSIZE[tf];
       const histories = await Promise.all(holdings.map(h => fetchHistory(h.ticker, outputsize)));
       setChartValues(buildPortfolioSeries(holdings, histories));
+      setChartDates(buildPortfolioDates(histories));
     })();
   }, [holdings, tf]);
 
@@ -149,16 +151,40 @@ export default function PerformancePage() {
             ))}
           </div>
           {chartValues && chartValues.length > 1 ? (
-            <svg viewBox="0 0 320 120" style={{ width: '100%', height: 110, display: 'block' }}>
-              <defs>
-                <linearGradient id="pPerfG" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={chartColor} stopOpacity="0.26" />
-                  <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path d={area} fill="url(#pPerfG)" />
-              <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
-            </svg>
+            <>
+              <svg viewBox="0 0 320 120" style={{ width: '100%', height: 110, display: 'block' }}>
+                <title>Retorno Total</title>
+                <desc>{`${t.chartDescFrom} ${eur.format(chartValues[0])} € ${t.chartDescTo} ${eur.format(chartValues[chartValues.length - 1])} €`}</desc>
+                <defs>
+                  <linearGradient id="pPerfG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartColor} stopOpacity="0.26" />
+                    <stop offset="100%" stopColor={chartColor} stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {[20, 45, 70, 95].map(y => (
+                  <line key={y} x1="0" y1={y} x2="320" y2={y} stroke="var(--chart-grid)" strokeWidth="1" />
+                ))}
+                <path d={area} fill="url(#pPerfG)" />
+                <path d={line} fill="none" stroke={chartColor} strokeWidth="2.5" strokeLinecap="round" />
+                {chartDates && chartDates.length > 1 && [0, Math.floor((chartDates.length - 1) / 2), chartDates.length - 1]
+                  .filter((v, i, a) => a.indexOf(v) === i)
+                  .map(i => {
+                    const x = (i / (chartDates.length - 1)) * 320;
+                    const anchor = i === 0 ? 'start' : i === chartDates.length - 1 ? 'end' : 'middle';
+                    const label = new Intl.DateTimeFormat(lang === 'pt' ? 'pt-PT' : 'en-GB', { day: '2-digit', month: 'short' }).format(new Date(`${chartDates[i]}T12:00:00Z`));
+                    return <text key={i} x={x} y={116} textAnchor={anchor} fill="var(--chart-axis)" fontSize="9">{label}</text>;
+                  })}
+              </svg>
+              <table className="sr-only">
+                <caption>{t.chartTableCaption}</caption>
+                <thead><tr><th>{t.chartDateColumn}</th><th>{t.chartValueColumn}</th></tr></thead>
+                <tbody>
+                  {chartValues.map((v, i) => (
+                    <tr key={i}><td>{chartDates?.[i] ?? i}</td><td>{eur.format(v)} €</td></tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
           ) : loading ? (
             <SkeletonChart height={110} />
           ) : (

@@ -297,6 +297,12 @@ export const pt = {
   netWorthCardLabel: 'Património líquido',
   totalReturn: 'Retorno total',
   todayHighlights: 'Destaques do dia',
+  chartTableCaption: 'Tabela de dados do gráfico',
+  chartDateColumn: 'Data',
+  chartValueColumn: 'Valor',
+  chartCurrentLabel: 'Atual',
+  chartDescFrom: 'Evolução de',
+  chartDescTo: 'até',
   // Performance page
   performanceAnnualizedLabel: 'Anualizado',
   performanceXirrCaption: 'Estimativa (XIRR) desde a primeira transação registada.',
