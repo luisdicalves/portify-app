@@ -38,22 +38,26 @@ body {
 
 /* ── Design Tokens ─────────────────────────── */
 :root {
-  /* Light theme */
-  --bg: #fff8f5;
-  --surface: #fff8f5;
+  /* Light theme — achromatic neutral scale, PDS-017/031/033 (retires the
+     former warm-cream canvas). Values match the approved 14-step candidate
+     in PORTIFY-DESIGN-SYSTEM-V1-CANDIDATE.md and reuse RUNTIME's own
+     canvas/border/muted anchors (DESIGN-SYSTEM/RUNTIME/portify-shared.css)
+     where the token is conceptually identical. */
+  --bg: #ffffff;
+  --surface: #ffffff;
   --surface-lowest: #ffffff;
-  --surface-low: #fcf2eb;
-  --surface-container: #f6ece6;
-  --surface-high: #f0e6e0;
-  --surface-highest: #eae1da;
+  --surface-low: #f7f7f7;
+  --surface-container: #f2f2f2;
+  --surface-high: #e6e6e6;
+  --surface-highest: #cccccc;
 
-  --inverse-surface: #342f2b;
-  --inverse-on-surface: #f9efe8;
+  --inverse-surface: #262626;
+  --inverse-on-surface: #f7f7f7;
 
-  --on-surface: #1f1b17;
-  --on-surface-variant: #434654;
-  --outline: #737685;
-  --outline-variant: #c3c6d6;
+  --on-surface: #000000;
+  --on-surface-variant: #666666;
+  --outline: #808080;
+  --outline-variant: #e6e6e6;
 
   --primary: #025963;
   --primary-strong: #025963;
@@ -92,10 +96,10 @@ body {
 
   --card-border: rgba(0, 0, 0, 0.07);
   --hairline: rgba(0, 0, 0, 0.08);
-  --nav-bg: rgba(255, 248, 245, 0.88);
+  --nav-bg: rgba(255, 255, 255, 0.88);
   --shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
-  --bezel: #d9cfc8;
-  --panel: #f6ece6;
+  --bezel: #cccccc;
+  --panel: #f2f2f2;
 
   /* Focus ring — value from the approved RUNTIME baseline (PDS-491..507,
      DESIGN-SYSTEM/RUNTIME/portify-shared.css --focus); closes the
@@ -131,21 +135,24 @@ body {
 }
 
 [data-theme='dark'] {
-  --bg: #11131a;
-  --surface: #11131a;
-  --surface-lowest: #1a1c24;
-  --surface-low: #191b23;
-  --surface-container: #1d1f27;
-  --surface-high: #282a31;
-  --surface-highest: #32343c;
+  /* Dark theme — achromatic neutral scale, PDS-017/032/033 (retires the
+     former blue-gray-biased canvas). Same source/rationale as the light
+     block above. */
+  --bg: #000000;
+  --surface: #000000;
+  --surface-lowest: #111111;
+  --surface-low: #1a1a1a;
+  --surface-container: #262626;
+  --surface-high: #333333;
+  --surface-highest: #4d4d4d;
 
-  --inverse-surface: #e1e2ec;
-  --inverse-on-surface: #2e3038;
+  --inverse-surface: #e6e6e6;
+  --inverse-on-surface: #262626;
 
-  --on-surface: #e1e2ec;
-  --on-surface-variant: #c3c6d6;
-  --outline: #8d90a0;
-  --outline-variant: #434654;
+  --on-surface: #ffffff;
+  --on-surface-variant: #a6a6a6;
+  --outline: #808080;
+  --outline-variant: #333333;
 
   --primary: #4e8b92;
   --primary-strong: #1b6a73;
@@ -176,10 +183,10 @@ body {
 
   --card-border: rgba(255, 255, 255, 0.09);
   --hairline: rgba(255, 255, 255, 0.09);
-  --nav-bg: rgba(17, 19, 26, 0.88);
+  --nav-bg: rgba(0, 0, 0, 0.88);
   --shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  --bezel: #2a2c34;
-  --panel: #15171f;
+  --bezel: #333333;
+  --panel: #1a1a1a;
 
   --focus: 0 0 0 3px rgba(78, 139, 146, 0.42);
 }
