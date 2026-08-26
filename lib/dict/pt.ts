@@ -74,6 +74,7 @@ export const pt = {
   navDash: 'Painel',
   navPort: 'Portfólio',
   navFor: 'Para Si',
+  navRadar: 'Radar',
   navProfile: 'Perfil',
   navTx: 'Movim.',
   // Dashboard
