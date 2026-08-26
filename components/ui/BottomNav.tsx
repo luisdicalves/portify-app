@@ -13,7 +13,7 @@ export default function BottomNav() {
   const TABS = [
     { path: '/dashboard', icon: 'dashboard',              label: t.navDash },
     { path: '/portfolio', icon: 'account_balance_wallet', label: t.navPort },
-    { path: '/for-you',   icon: 'auto_awesome',           label: t.navFor },
+    { path: '/for-you',   icon: 'explore',                label: t.navRadar },
     { path: '/profile',   icon: 'person',                 label: t.navProfile },
   ];
 

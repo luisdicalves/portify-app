@@ -68,6 +68,7 @@ export const en: typeof pt = {
   navDash: 'Dashboard',
   navPort: 'Portfolio',
   navFor: 'For You',
+  navRadar: 'Radar',
   navProfile: 'Profile',
   navTx: 'Activity',
   welcomeBack: 'Welcome back',
