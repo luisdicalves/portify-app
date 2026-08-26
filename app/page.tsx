@@ -19,7 +19,7 @@ export default function SplashPage() {
           .select('id')
           .eq('user_id', session.user.id)
           .maybeSingle();
-        router.replace(plan ? '/auth/pin' : '/auth/assets');
+        router.replace(plan ? '/auth/pin' : '/auth/experience');
       } else {
         setChecking(false);
       }
