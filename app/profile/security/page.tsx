@@ -3,16 +3,9 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/ui/BottomNav';
+import Switch from '@/components/ui/Switch';
 import { useApp } from '@/lib/context';
 import { useDict } from '@/lib/dict';
-
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
-  return (
-    <button onClick={onToggle} style={{ width: 44, height: 26, borderRadius: 13, border: 'none', cursor: 'pointer', background: on ? 'var(--primary)' : 'var(--surface-highest)', position: 'relative', transition: 'background 0.2s', padding: 0 }}>
-      <span style={{ display: 'block', width: 20, height: 20, borderRadius: '50%', background: '#fff', position: 'absolute', top: 3, left: on ? 21 : 3, transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-    </button>
-  );
-}
 
 export default function SecurityPage() {
   const router = useRouter();
@@ -34,13 +27,13 @@ export default function SecurityPage() {
             <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>face</span>{t.faceIdLabel}
             </span>
-            <Toggle on={faceId} onToggle={() => setFaceId(v => !v)} />
+            <Switch checked={faceId} onChange={() => setFaceId(v => !v)} ariaLabel={t.faceIdLabel} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '13px 14px' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15 }}>
               <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>verified_user</span>{t.twoFactorAuth}
             </span>
-            <Toggle on={twoFa} onToggle={() => setTwoFa(v => !v)} />
+            <Switch checked={twoFa} onChange={() => setTwoFa(v => !v)} ariaLabel={t.twoFactorAuth} />
           </div>
         </div>
 

@@ -337,7 +337,7 @@ export default function SettingsPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>dark_mode</span>
                 {t.darkTheme}
               </span>
-              <Switch checked={theme === 'dark'} onChange={toggleTheme} />
+              <Switch checked={theme === 'dark'} onChange={toggleTheme} ariaLabel={t.darkTheme} />
             </div>
             <SettingsRow
               icon="language"
@@ -405,21 +405,21 @@ export default function SettingsPage() {
                 <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>price_change</span>
                 {t.notifPriceAlerts}
               </span>
-              <Switch checked={priceAlerts} onChange={() => setPriceAlerts(v => !v)} />
+              <Switch checked={priceAlerts} onChange={() => setPriceAlerts(v => !v)} ariaLabel={t.notifPriceAlerts} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderBottom: '1px solid var(--hairline)' }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>newspaper</span>
                 {t.notifMarketNews}
               </span>
-              <Switch checked={marketNews} onChange={() => setMarketNews(v => !v)} />
+              <Switch checked={marketNews} onChange={() => setMarketNews(v => !v)} ariaLabel={t.notifMarketNews} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 14 }}>
               <span style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600 }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 21, color: 'var(--primary)' }}>calendar_view_week</span>
                 {t.notifWeeklySummary}
               </span>
-              <Switch checked={weeklySummary} onChange={() => setWeeklySummary(v => !v)} />
+              <Switch checked={weeklySummary} onChange={() => setWeeklySummary(v => !v)} ariaLabel={t.notifWeeklySummary} />
             </div>
           </Card>
         </div>
