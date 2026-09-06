@@ -52,6 +52,14 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      # Secretless — reads only the committed vendor/ snapshot, never
+      # PORTIFY-KNOWLEDGE directly. See scripts/check-design-tokens.mjs and
+      # the Tranche 1B design record for why this is deliberately NOT proof
+      # that Knowledge has published nothing newer (that's the privileged
+      # sync workflow's job, .github/workflows/sync-design-tokens.yml).
+      - name: Design tokens check (schema, provenance, contentHash, determinism, drift)
+        run: npm run check:design-tokens
+
       - name: Build
         run: npm run build
 
