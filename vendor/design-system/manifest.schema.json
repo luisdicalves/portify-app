@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portify.internal/schemas/manifest.schema.json",
+  "title": "Portify Canonical Artifact Manifest",
+  "description": "Provenance record for a generated canonical artifact (e.g. tokens.json). Schemas are owned by PORTIFY-KNOWLEDGE and are not embedded inline in the distributed artifact files themselves (SCHEMAS_EMBEDDED_IN_DISTRIBUTED_ARTIFACT: NO) — schemaVersion identifies which version of the separately-held schema an artifact was validated against.",
+  "type": "object",
+  "required": [
+    "artifactVersion",
+    "schemaVersion",
+    "knowledgeCommit",
+    "generatedAt",
+    "generatorVersion",
+    "contentHash",
+    "domainsIncluded",
+    "sourceFiles",
+    "sourceWorktreeClean"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "artifactVersion": {
+      "type": "string",
+      "description": "Semver of this artifact's own content shape.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "schemaVersion": {
+      "type": "string",
+      "description": "Semver of tokens.schema.json (and this manifest.schema.json) that the artifact was validated against.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "knowledgeCommit": {
+      "type": "string",
+      "description": "The PORTIFY-KNOWLEDGE commit SHA that last modified every file listed in sourceFiles — NOT necessarily the HEAD commit at generation time. This avoids a self-referential provenance claim (an artifact cannot honestly name the very commit that will contain it) and is deterministic: regenerating from the same source content always yields the same value, regardless of unrelated later commits.",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO 8601 UTC timestamp of this specific generation run. Deliberately excluded from contentHash's input — two generations from identical source content must produce an identical contentHash even though generatedAt differs.",
+      "format": "date-time"
+    },
+    "generatorVersion": {
+      "type": "string",
+      "description": "Semver of the generator script itself, so a script defect is distinguishable from a genuine content change.",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "contentHash": {
+      "type": "string",
+      "description": "sha256 of the exact bytes written to tokens.json, prefixed 'sha256:'. Self-verifying: anyone can independently run `shasum -a 256 tokens.json` and compare to this value without needing to trust or re-run the generator.",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "domainsIncluded": {
+      "type": "array",
+      "description": "Must exactly match tokens.json's own domainsIncluded field.",
+      "items": { "type": "string", "enum": ["color", "radius", "spacing", "typography", "brand"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "sourceFiles": {
+      "type": "array",
+      "description": "Repo-relative paths of every canonical file this generation run actually read. As of Tranche 1A.2 this is normally three files (one per domain's canonical authority: color, radius, spacing), not one — see the generator's own docstring for why a single mockup file is never treated as a runtime authority.",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "sourceWorktreeClean": {
+      "type": "boolean",
+      "description": "Must be true. Records that the generator explicitly checked `git status --porcelain` for every file in sourceFiles and found no uncommitted changes before generating — a positive, verified assertion, not merely the absence of a dirty-worktree field. The generator refuses to run (rather than emit this as false) if any source file is dirty."
+    }
+  }
+}

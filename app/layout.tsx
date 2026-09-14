@@ -1,6 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, Space_Mono } from 'next/font/google';
 import './globals.css';
+// Canonical PORTIFY-KNOWLEDGE design tokens, isolated --ds-* namespace.
+// Generated (scripts/generate-design-tokens.mjs) from vendor/design-system/ —
+// see that script for why nothing here bridges to the properties above.
+import './generated/design-tokens.css';
 import { AppProvider } from '@/lib/context';
 
 const spaceGrotesk = Space_Grotesk({

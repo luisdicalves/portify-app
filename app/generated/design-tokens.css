@@ -1,0 +1,91 @@
+/* GENERATED FILE — DO NOT EDIT BY HAND.
+ * Produced by scripts/generate-design-tokens.mjs from vendor/design-system/
+ * (a committed snapshot of PORTIFY-KNOWLEDGE's canonical token artifact —
+ * PORTIFY-KNOWLEDGE remains the sole canonical source of truth).
+ *
+ * Isolated --ds-* namespace only. No existing portify-app custom property
+ * is read, referenced, or overridden by this file — see the Tranche 1B
+ * design record for why automatic name-based bridging is forbidden.
+ *
+ * artifactVersion: 3.0.0
+ * schemaVersion:   3.0.0
+ * knowledgeCommit: bab521e22bd3d0385837c3209f9b32f862cd7d49
+ * contentHash:     sha256:809de2341610ccb07745b2b4c3d1bcbdd5b8310d5dc2820641b387fd318ce231
+ * domainsIncluded: color, radius, spacing
+ */
+
+:root {
+  --ds-color-action: #025963;
+  --ds-color-action-soft: #EEF5F5;
+  --ds-color-action-text: #ffffff;
+  --ds-color-border: #E6E6E6;
+  --ds-color-border-strong: #CCCCCC;
+  --ds-color-brand: #025963;
+  --ds-color-brand-fg: #025963;
+  --ds-color-canvas: #ffffff;
+  --ds-color-chart-axis: #666666;
+  --ds-color-chart-benchmark: #003D9B;
+  --ds-color-chart-cash: #8C6D1F;
+  --ds-color-chart-grid: #E6E6E6;
+  --ds-color-chart-primary: #025963;
+  --ds-color-critical: #BA1A1A;
+  --ds-color-critical-bg: #FFF0EF;
+  --ds-color-critical-border: #FFC6C0;
+  --ds-color-info: #003D9B;
+  --ds-color-info-bg: #EEF4FF;
+  --ds-color-info-border: #B8D0FF;
+  --ds-color-muted: #666666;
+  --ds-color-negative: #BA1A1A;
+  --ds-color-positive: #006E28;
+  --ds-color-surface: #ffffff;
+  --ds-color-surface-raised: #ffffff;
+  --ds-color-surface-subtle: #F7F7F7;
+  --ds-color-text: #000000;
+  --ds-color-warning: #6B4E00;
+  --ds-color-warning-bg: #FFF6D8;
+  --ds-color-warning-border: #E8D18A;
+  --ds-radius-btn: 14px;
+  --ds-radius-card: 18px;
+  --ds-space-10: 10px;
+  --ds-space-12: 12px;
+  --ds-space-14: 14px;
+  --ds-space-16: 16px;
+  --ds-space-18: 18px;
+  --ds-space-20: 20px;
+  --ds-space-24: 24px;
+  --ds-space-4: 4px;
+  --ds-space-6: 6px;
+  --ds-space-8: 8px;
+}
+
+[data-theme='dark'] {
+  --ds-color-action: #1B6A73;
+  --ds-color-action-soft: #132B2E;
+  --ds-color-action-text: #ffffff;
+  --ds-color-border: #333333;
+  --ds-color-border-strong: #4D4D4D;
+  --ds-color-brand: #025963;
+  --ds-color-brand-fg: #4E8B92;
+  --ds-color-canvas: #000000;
+  --ds-color-chart-axis: #A6A6A6;
+  --ds-color-chart-benchmark: #A9C7FF;
+  --ds-color-chart-cash: #D4B45F;
+  --ds-color-chart-grid: #333333;
+  --ds-color-chart-primary: #4E8B92;
+  --ds-color-critical: #FFB4AB;
+  --ds-color-critical-bg: #331B19;
+  --ds-color-critical-border: #7F4842;
+  --ds-color-info: #A9C7FF;
+  --ds-color-info-bg: #172033;
+  --ds-color-info-border: #516989;
+  --ds-color-muted: #A6A6A6;
+  --ds-color-negative: #FFB4AB;
+  --ds-color-positive: #53E16F;
+  --ds-color-surface: #111111;
+  --ds-color-surface-raised: #161616;
+  --ds-color-surface-subtle: #1A1A1A;
+  --ds-color-text: #ffffff;
+  --ds-color-warning: #F2D170;
+  --ds-color-warning-bg: #2D2714;
+  --ds-color-warning-border: #786B35;
+}

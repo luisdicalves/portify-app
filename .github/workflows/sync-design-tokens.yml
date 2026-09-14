@@ -1,0 +1,108 @@
+name: Sync Design Tokens (privileged)
+
+# Trusted, non-PR triggers only. Never pull_request / pull_request_target —
+# this workflow holds a credential for the private PORTIFY-KNOWLEDGE repo,
+# and that credential must never execute in a code path influenced by
+# externally-supplied PR content. See the Tranche 1B design record.
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: '0 6 * * 1' # weekly, Monday 06:00 UTC — adjust cadence as needed
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout portify-app
+        uses: actions/checkout@v4
+        with:
+          path: portify-app
+
+      # The ONLY step in this whole workflow that touches the Knowledge
+      # credential. KNOWLEDGE_REPO_TOKEN must be a fine-grained,
+      # read-only, single-repository (PORTIFY-KNOWLEDGE) PAT — never a
+      # broad personal token, never write access. checkout materializes
+      # the repo to a local path; nothing downstream ever sees the token
+      # itself (see scripts/sync-design-tokens.mjs's own docstring).
+      - name: Checkout PORTIFY-KNOWLEDGE (read-only)
+        uses: actions/checkout@v4
+        with:
+          repository: luisdicalves/PORTIFY-KNOWLEDGE
+          token: ${{ secrets.KNOWLEDGE_REPO_TOKEN }}
+          path: knowledge-checkout
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: portify-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: portify-app
+        run: npm ci
+
+      # Credential-free: this script never receives the token, only the
+      # path to the already-checked-out local directory above.
+      - name: Run sync
+        working-directory: portify-app
+        run: node scripts/sync-design-tokens.mjs --source ../knowledge-checkout
+
+      - name: Check whether anything material changed
+        id: diff
+        working-directory: portify-app
+        run: |
+          if git diff --quiet -- vendor/ app/generated/design-tokens.css; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No material change — distributionCommit-only churn is not a reason to update. Exiting cleanly."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Re-run the exact same secretless gate normal PR CI uses, against
+      # the freshly-synced snapshot, BEFORE ever proposing it for review.
+      - name: Validate freshly-synced snapshot
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: portify-app
+        run: npm run check:design-tokens
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: portify-app
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          BRANCH="sync/design-tokens-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "portify-design-tokens-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add vendor/ app/generated/design-tokens.css
+          git commit -m "chore(design-tokens): sync vendored PORTIFY-KNOWLEDGE artifact"
+          git push origin "$BRANCH"
+          NEW_KNOWLEDGE_COMMIT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('vendor/design-tokens.lock.json','utf8')).knowledgeCommit)")
+          NEW_DISTRIBUTION_COMMIT=$(node -e "console.log(JSON.parse(require('fs').readFileSync('vendor/design-tokens.lock.json','utf8')).distributionCommit)")
+          PR_BODY_FILE="$(mktemp)"
+          {
+            echo "Automated sync of the vendored PORTIFY-KNOWLEDGE design-token artifact."
+            echo ""
+            echo "distributionCommit: ${NEW_DISTRIBUTION_COMMIT}"
+            echo "knowledgeCommit:    ${NEW_KNOWLEDGE_COMMIT}"
+            echo ""
+            echo "The secretless \`check:design-tokens\` gate already passed against this exact snapshot as a pre-flight check before this PR was opened."
+            echo ""
+            echo "**Manual step required before merging:** this PR was opened using the default GITHUB_TOKEN, which GitHub does not permit to trigger other workflows — normal CI (pull_request-triggered) will NOT run automatically here. A maintainer must manually re-trigger it (e.g. push an empty commit, or close and reopen this PR) before the required status checks can pass and this can merge. No bot/App credential is configured for portify-app yet to remove this manual step — see the Tranche 1B design record."
+          } > "$PR_BODY_FILE"
+          gh pr create \
+            --title "chore(design-tokens): sync vendored PORTIFY-KNOWLEDGE artifact" \
+            --base main \
+            --head "$BRANCH" \
+            --body-file "$PR_BODY_FILE"
+
+      - name: No changes
+        if: steps.diff.outputs.changed == 'false'
+        run: echo "Nothing to sync."

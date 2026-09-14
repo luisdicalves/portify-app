@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm test",
     "check:schema": "node scripts/check-import-audit-schema.mjs",
-    "check:supabase-env": "node scripts/check-supabase-environment.mjs"
+    "check:supabase-env": "node scripts/check-supabase-environment.mjs",
+    "generate:design-tokens": "node scripts/generate-design-tokens.mjs",
+    "check:design-tokens": "node scripts/check-design-tokens.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
@@ -30,6 +32,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitejs/plugin-react": "^6.1.1",
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "eslint": "^8",
     "eslint-config-next": "^15.5.20",
     "happy-dom": "^20.11.12",

@@ -1,0 +1,10 @@
+{
+  "sourceRepository": "https://github.com/luisdicalves/PORTIFY-KNOWLEDGE",
+  "distributionCommit": "3a3910ded6293f7e3ed455fa8b33a0ad5ce06ada",
+  "artifactVersion": "3.0.0",
+  "schemaVersion": "3.0.0",
+  "generatorVersion": "3.0.0",
+  "knowledgeCommit": "bab521e22bd3d0385837c3209f9b32f862cd7d49",
+  "contentHash": "sha256:809de2341610ccb07745b2b4c3d1bcbdd5b8310d5dc2820641b387fd318ce231",
+  "domainsIncluded": ["color", "radius", "spacing"]
+}

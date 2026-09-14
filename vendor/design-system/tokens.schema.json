@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portify.internal/schemas/tokens.schema.json",
+  "title": "Portify Canonical Design Tokens",
+  "description": "Machine-readable canonical design tokens. Tranche 1A/1A.1/1A.2 scope: color, radius and spacing. COLOR is generated from 10-design/DESIGN-SYSTEM/RUNTIME/portify-shared.css (the file the closed neutral-palette decision, PDS-017/033, is actually bound to in live canon); RADIUS is generated from 10-design/DESIGN-SYSTEM/CANONICAL-RADIUS-DECISIONS.json (only the radius values that trace to a closed PDS decision); SPACING is generated from 10-design/DESIGN-SYSTEM/CANONICAL-SPACING-DECISIONS.json (Product Owner-approved Option 3B, 2026-09-02 — a closed 10-value primitive set, see the Tranche 1A.2 governance record §14). Neither the color nor the radius source has a primitive/alias layer, so this artifact has no top-level 'primitive' key — every semantic color value is already final.",
+  "type": "object",
+  "required": ["domainsIncluded", "semantic", "radius", "spacing"],
+  "additionalProperties": false,
+  "properties": {
+    "domainsIncluded": {
+      "type": "array",
+      "description": "Which token domains this specific artifact actually populates with real values. A domain absent here has no canonical values yet and must never be filled with fabricated or borrowed-from-a-non-canonical-source data.",
+      "items": { "type": "string", "enum": ["color", "radius", "spacing", "typography", "brand"] },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "semantic": {
+      "type": "object",
+      "description": "Theme-dependent semantic color tokens, fully resolved to concrete hex/rgba values (no var() references — this artifact is meant to be consumed directly, not re-resolved).",
+      "required": ["color"],
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "object",
+          "required": ["light", "dark"],
+          "additionalProperties": false,
+          "properties": {
+            "light": { "$ref": "#/$defs/colorValueMap" },
+            "dark": { "$ref": "#/$defs/colorValueMap" }
+          }
+        }
+      }
+    },
+    "radius": {
+      "type": "object",
+      "description": "Theme-independent corner-radius tokens. Only values that trace to an explicitly closed PDS decision — not a general-purpose scale.",
+      "additionalProperties": { "type": "string", "pattern": "^\\d+(px|%)$" }
+    },
+    "spacing": {
+      "type": "object",
+      "description": "Theme-independent spacing tokens. Product Owner-approved v1 (Option 3B, 2026-09-02): a closed 10-value primitive set plus an optional, currently-empty semantic-alias layer. 'primitive' values are restricted by enum to exactly the approved set — an unapproved value fails closed at validation, not just at generation time.",
+      "required": ["primitive", "semantic"],
+      "additionalProperties": false,
+      "properties": {
+        "primitive": {
+          "type": "object",
+          "description": "The approved v1 spacing primitives. Closed set — do not add a value here without another canonical Design System decision.",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["4px", "6px", "8px", "10px", "12px", "14px", "16px", "18px", "20px", "24px"]
+          }
+        },
+        "semantic": {
+          "type": "object",
+          "description": "Semantic spacing aliases. Empty in the v1 decision — no candidate currently meets ONLY_STABLE_CROSS_SYSTEM_MEANINGS. Present as an object (not absent) so a future decision can populate it without a breaking schema change.",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "colorValueMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^(#[0-9A-Fa-f]{6}|rgba\\(\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*[0-9.]+\\s*\\))$"
+      }
+    }
+  }
+}
