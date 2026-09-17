@@ -7,11 +7,11 @@
  * is read, referenced, or overridden by this file — see the Tranche 1B
  * design record for why automatic name-based bridging is forbidden.
  *
- * artifactVersion: 3.0.0
- * schemaVersion:   3.0.0
- * knowledgeCommit: bab521e22bd3d0385837c3209f9b32f862cd7d49
- * contentHash:     sha256:809de2341610ccb07745b2b4c3d1bcbdd5b8310d5dc2820641b387fd318ce231
- * domainsIncluded: color, radius, spacing
+ * artifactVersion: 3.1.0
+ * schemaVersion:   3.1.0
+ * knowledgeCommit: 41ca3843ccbc194ecd7290870cf9736da259935a
+ * contentHash:     sha256:c5be52d8c03e58f03ac600f230517174532e15a23f023eee80bc792f2104e9e2
+ * domainsIncluded: color, radius, spacing, typography
  */
 
 :root {
@@ -56,6 +56,118 @@
   --ds-space-4: 4px;
   --ds-space-6: 6px;
   --ds-space-8: 8px;
+  --ds-typography-family-primary: var(--font-sans);
+  --ds-typography-family-structured: var(--font-mono);
+  --ds-typography-style-body-lg-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-body-lg-font-size: 16px;
+  --ds-typography-style-body-lg-line-height: 24px;
+  --ds-typography-style-body-lg-font-weight: 500;
+  --ds-typography-style-body-lg-letter-spacing: 0em;
+  --ds-typography-style-body-md-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-body-md-font-size: 14px;
+  --ds-typography-style-body-md-line-height: 20px;
+  --ds-typography-style-body-md-font-weight: 500;
+  --ds-typography-style-body-md-letter-spacing: 0em;
+  --ds-typography-style-caption-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-caption-font-size: 12px;
+  --ds-typography-style-caption-line-height: 16px;
+  --ds-typography-style-caption-font-weight: 500;
+  --ds-typography-style-caption-letter-spacing: 0em;
+  --ds-typography-style-display-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-display-font-size: 28px;
+  --ds-typography-style-display-line-height: 34px;
+  --ds-typography-style-display-font-weight: 700;
+  --ds-typography-style-display-letter-spacing: 0em;
+  --ds-typography-style-heading-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-heading-font-size: 18px;
+  --ds-typography-style-heading-line-height: 24px;
+  --ds-typography-style-heading-font-weight: 700;
+  --ds-typography-style-heading-letter-spacing: 0em;
+  --ds-typography-style-label-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-label-font-size: 14px;
+  --ds-typography-style-label-line-height: 18px;
+  --ds-typography-style-label-font-weight: 500;
+  --ds-typography-style-label-letter-spacing: 0em;
+  --ds-typography-style-numeric-hero-font-family: var(--ds-typography-family-structured);
+  --ds-typography-style-numeric-hero-font-size: 32px;
+  --ds-typography-style-numeric-hero-line-height: 38px;
+  --ds-typography-style-numeric-hero-font-weight: 700;
+  --ds-typography-style-numeric-hero-letter-spacing: 0em;
+  --ds-typography-style-numeric-inline-font-family: var(--ds-typography-family-structured);
+  --ds-typography-style-numeric-inline-font-size: 16px;
+  --ds-typography-style-numeric-inline-line-height: 22px;
+  --ds-typography-style-numeric-inline-font-weight: 400;
+  --ds-typography-style-numeric-inline-letter-spacing: 0em;
+  --ds-typography-style-numeric-meta-font-family: var(--ds-typography-family-structured);
+  --ds-typography-style-numeric-meta-font-size: 14px;
+  --ds-typography-style-numeric-meta-line-height: 18px;
+  --ds-typography-style-numeric-meta-font-weight: 400;
+  --ds-typography-style-numeric-meta-letter-spacing: 0em;
+  --ds-typography-style-numeric-primary-font-family: var(--ds-typography-family-structured);
+  --ds-typography-style-numeric-primary-font-size: 24px;
+  --ds-typography-style-numeric-primary-line-height: 30px;
+  --ds-typography-style-numeric-primary-font-weight: 700;
+  --ds-typography-style-numeric-primary-letter-spacing: 0em;
+  --ds-typography-style-numeric-secondary-font-family: var(--ds-typography-family-structured);
+  --ds-typography-style-numeric-secondary-font-size: 18px;
+  --ds-typography-style-numeric-secondary-line-height: 24px;
+  --ds-typography-style-numeric-secondary-font-weight: 400;
+  --ds-typography-style-numeric-secondary-letter-spacing: 0em;
+  --ds-typography-style-title-lg-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-title-lg-font-size: 24px;
+  --ds-typography-style-title-lg-line-height: 30px;
+  --ds-typography-style-title-lg-font-weight: 700;
+  --ds-typography-style-title-lg-letter-spacing: 0em;
+  --ds-typography-style-title-md-font-family: var(--ds-typography-family-primary);
+  --ds-typography-style-title-md-font-size: 20px;
+  --ds-typography-style-title-md-line-height: 26px;
+  --ds-typography-style-title-md-font-weight: 700;
+  --ds-typography-style-title-md-letter-spacing: 0em;
+  --ds-typography-role-body-font-family: var(--ds-typography-style-body-lg-font-family);
+  --ds-typography-role-body-font-size: var(--ds-typography-style-body-lg-font-size);
+  --ds-typography-role-body-line-height: var(--ds-typography-style-body-lg-line-height);
+  --ds-typography-role-body-font-weight: var(--ds-typography-style-body-lg-font-weight);
+  --ds-typography-role-body-letter-spacing: var(--ds-typography-style-body-lg-letter-spacing);
+  --ds-typography-role-brand-display-font-family: var(--ds-typography-style-display-font-family);
+  --ds-typography-role-brand-display-font-size: var(--ds-typography-style-display-font-size);
+  --ds-typography-role-brand-display-line-height: var(--ds-typography-style-display-line-height);
+  --ds-typography-role-brand-display-font-weight: var(--ds-typography-style-display-font-weight);
+  --ds-typography-role-brand-display-letter-spacing: var(--ds-typography-style-display-letter-spacing);
+  --ds-typography-role-card-financial-value-font-family: var(--ds-typography-style-numeric-primary-font-family);
+  --ds-typography-role-card-financial-value-font-size: var(--ds-typography-style-numeric-primary-font-size);
+  --ds-typography-role-card-financial-value-line-height: var(--ds-typography-style-numeric-primary-line-height);
+  --ds-typography-role-card-financial-value-font-weight: var(--ds-typography-style-numeric-primary-font-weight);
+  --ds-typography-role-card-financial-value-letter-spacing: var(--ds-typography-style-numeric-primary-letter-spacing);
+  --ds-typography-role-financial-hero-font-family: var(--ds-typography-style-numeric-hero-font-family);
+  --ds-typography-role-financial-hero-font-size: var(--ds-typography-style-numeric-hero-font-size);
+  --ds-typography-role-financial-hero-line-height: var(--ds-typography-style-numeric-hero-line-height);
+  --ds-typography-role-financial-hero-font-weight: var(--ds-typography-style-numeric-hero-font-weight);
+  --ds-typography-role-financial-hero-letter-spacing: var(--ds-typography-style-numeric-hero-letter-spacing);
+  --ds-typography-role-label-font-family: var(--ds-typography-style-caption-font-family);
+  --ds-typography-role-label-font-size: var(--ds-typography-style-caption-font-size);
+  --ds-typography-role-label-line-height: var(--ds-typography-style-caption-line-height);
+  --ds-typography-role-label-font-weight: var(--ds-typography-style-caption-font-weight);
+  --ds-typography-role-label-letter-spacing: var(--ds-typography-style-caption-letter-spacing);
+  --ds-typography-role-metadata-font-family: var(--ds-typography-style-numeric-meta-font-family);
+  --ds-typography-role-metadata-font-size: var(--ds-typography-style-numeric-meta-font-size);
+  --ds-typography-role-metadata-line-height: var(--ds-typography-style-numeric-meta-line-height);
+  --ds-typography-role-metadata-font-weight: var(--ds-typography-style-numeric-meta-font-weight);
+  --ds-typography-role-metadata-letter-spacing: var(--ds-typography-style-numeric-meta-letter-spacing);
+  --ds-typography-role-page-title-font-family: var(--ds-typography-style-title-lg-font-family);
+  --ds-typography-role-page-title-font-size: var(--ds-typography-style-title-lg-font-size);
+  --ds-typography-role-page-title-line-height: var(--ds-typography-style-title-lg-line-height);
+  --ds-typography-role-page-title-font-weight: var(--ds-typography-style-title-lg-font-weight);
+  --ds-typography-role-page-title-letter-spacing: var(--ds-typography-style-title-lg-letter-spacing);
+  --ds-typography-role-secondary-body-font-family: var(--ds-typography-style-body-md-font-family);
+  --ds-typography-role-secondary-body-font-size: var(--ds-typography-style-body-md-font-size);
+  --ds-typography-role-secondary-body-line-height: var(--ds-typography-style-body-md-line-height);
+  --ds-typography-role-secondary-body-font-weight: var(--ds-typography-style-body-md-font-weight);
+  --ds-typography-role-secondary-body-letter-spacing: var(--ds-typography-style-body-md-letter-spacing);
+  --ds-typography-role-section-title-font-family: var(--ds-typography-style-heading-font-family);
+  --ds-typography-role-section-title-font-size: var(--ds-typography-style-heading-font-size);
+  --ds-typography-role-section-title-line-height: var(--ds-typography-style-heading-line-height);
+  --ds-typography-role-section-title-font-weight: var(--ds-typography-style-heading-font-weight);
+  --ds-typography-role-section-title-letter-spacing: var(--ds-typography-style-heading-letter-spacing);
 }
 
 [data-theme='dark'] {
