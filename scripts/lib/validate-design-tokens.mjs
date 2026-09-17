@@ -9,6 +9,7 @@
 import { createHash } from 'node:crypto';
 import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
+import { FAMILY_BINDINGS } from './typography-runtime.mjs';
 
 // Closed set, per the Product Owner-approved Option 3B decision
 // (PORTIFY-KNOWLEDGE 00-governance/TRANCHE-1A-2-SPACING-DECISION-PACKAGE-2026-09-01.md §14).
@@ -21,7 +22,14 @@ export const APPROVED_SPACING_VALUES = Object.freeze([
 // schemaVersion values this validator explicitly knows how to interpret.
 // A vendored artifact with any other value fails closed rather than being
 // silently (mis)interpreted under an assumed-compatible shape.
-export const SUPPORTED_SCHEMA_VERSIONS = Object.freeze(['3.0.0']);
+//
+// 3.1.0 added (Tranche 2B Stage 1): PORTIFY-KNOWLEDGE's Typography domain
+// (TYPO-001..012). 3.0.0 is intentionally still supported here — the
+// vendored snapshot remains 3.0.0 throughout Stage 1 (no sync performed
+// yet), so existing CI must keep validating it. Whether 3.0.0 support is
+// removed after Tranche 2B closes is a separate, later decision — not
+// pre-authorized by this change.
+export const SUPPORTED_SCHEMA_VERSIONS = Object.freeze(['3.0.0', '3.1.0']);
 
 const HEX40_RE = /^[0-9a-f]{40}$/;
 const CONTENT_HASH_RE = /^sha256:[0-9a-f]{64}$/;
@@ -218,6 +226,80 @@ export function validateSpacingExactSet(tokens, approved = APPROVED_SPACING_VALU
 }
 
 /**
+ * App-specific Typography consumer-compatibility — NOT a re-validation of
+ * PORTIFY-KNOWLEDGE's canonical shape or values. tokens.schema.json (AJV,
+ * above) already closes the family/style/role key sets, constrains value
+ * representations, and constrains family/role-slot references; contentHash
+ * (above) already proves the whole payload is unaltered. Duplicating the
+ * 13-slot/9-role value tables here would make this App a second canonical
+ * source, which it must never become (see PORTIFY-KNOWLEDGE's own
+ * AUTOMATIC_NAME_BASED_BRIDGING discipline).
+ *
+ * What only the App can know, and therefore must check itself:
+ *
+ *  (A) presence coherence — manifest.domainsIncluded and tokens.typography
+ *      must agree, and for schemaVersion '3.1.0' specifically (the version
+ *      that introduced Typography, per TYPO-012's approved SemVer policy)
+ *      Typography must actually be present. A legacy '3.0.0' snapshot
+ *      never requires it.
+ *  (B) canonical family identity still matches what this App's own
+ *      next/font/google loader actually binds (FAMILY_BINDINGS) — fails
+ *      closed if PORTIFY-KNOWLEDGE ever renamed a family without a
+ *      corresponding App-side loader update, rather than silently binding
+ *      a CSS variable to a font it no longer actually names.
+ *  (C) every style slot's family reference resolves to a known local
+ *      binding — referential integrity between the vendored data and this
+ *      App's own FAMILY_BINDINGS table, so CSS generation can never emit a
+ *      dangling reference.
+ */
+export function validateTypographyRuntimeCompatibility(manifest, tokens, familyBindings = FAMILY_BINDINGS) {
+  const errors = [];
+  const domainsIncluded = Array.isArray(manifest?.domainsIncluded) ? manifest.domainsIncluded : [];
+  const domainSaysTypography = domainsIncluded.includes('typography');
+  const tokensHasTypography = tokens?.typography !== undefined;
+
+  if (domainSaysTypography !== tokensHasTypography) {
+    errors.push(
+      `manifest.domainsIncluded ${domainSaysTypography ? 'includes' : 'omits'} 'typography' but tokens.typography is ${tokensHasTypography ? 'present' : 'absent'} — inconsistent artifact`,
+    );
+  }
+
+  if (manifest?.schemaVersion === '3.1.0' && !tokensHasTypography) {
+    errors.push(
+      "schemaVersion '3.1.0' requires tokens.typography to be present under this App's 3.1 consumption contract — no legacy fallback exists for this version",
+    );
+  }
+
+  if (!tokensHasTypography) {
+    // Nothing further to check for a legacy 3.0.0-shaped snapshot.
+    return { valid: errors.length === 0, errors };
+  }
+
+  const family = tokens.typography.family ?? {};
+  for (const [key, entry] of Object.entries(family)) {
+    const binding = familyBindings[key];
+    if (!binding) {
+      errors.push(`typography.family.${key} has no local runtime binding known to this App (FAMILY_BINDINGS) — cannot resolve to a CSS value`);
+      continue;
+    }
+    if (entry?.name !== binding.expectedCanonicalName) {
+      errors.push(
+        `typography.family.${key}.name is '${entry?.name}' but this App's local runtime binding (${binding.cssValue}) expects '${binding.expectedCanonicalName}' — refusing to bind a possibly-different font under the App's existing loader without an explicit App-side update`,
+      );
+    }
+  }
+
+  const style = tokens.typography.style ?? {};
+  for (const [slotKey, entry] of Object.entries(style)) {
+    if (entry?.family !== undefined && !familyBindings[entry.family]) {
+      errors.push(`typography.style.${slotKey}.family = '${entry.family}' does not resolve to a known local runtime binding`);
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+/**
  * Run the full offline validation pass against an already-loaded vendored
  * snapshot. Returns { valid: boolean, errors: string[] } — an aggregate of
  * every check, not short-circuited, so a caller sees every problem at once.
@@ -232,6 +314,7 @@ export function validateVendoredArtifact({ manifest, tokens, manifestSchema, tok
     ['supported schemaVersion', validateSupportedSchemaVersion(manifest)],
     ['Light/Dark parity', validateLightDarkParity(tokens)],
     ['spacing exact set', validateSpacingExactSet(tokens)],
+    ['typography runtime compatibility', validateTypographyRuntimeCompatibility(manifest, tokens)],
   ];
 
   const errors = [];
