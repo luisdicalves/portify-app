@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { generateCss } from './generate-design-tokens.mjs';
+import { makeLegacy30Fixture, makeTypography31Fixture } from './lib/design-tokens-fixtures.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..');
@@ -12,6 +13,11 @@ function readJson(path: string) {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
+// LIVE VENDOR FIXTURE — tracks whatever is actually currently vendored.
+// Appropriate ONLY for integration/drift tests. As of Tranche 2B Stage 2
+// this is 3.1.0-shaped (includes Typography) — do not assume any
+// particular shape here; tests relying on a specific historical shape use
+// the explicit synthetic fixtures below instead (design-tokens-fixtures.mjs).
 function loadFixture() {
   return {
     manifest: readJson(join(VENDOR_DIR, 'design-system', 'manifest.json')),
@@ -19,7 +25,45 @@ function loadFixture() {
   };
 }
 
-describe('generateCss', () => {
+function declaredVarNames(css: string) {
+  return [...css.matchAll(/^\s*(--[a-zA-Z0-9-]+):/gm)].map((m) => m[1]);
+}
+
+const APPROVED_EXTERNAL_VAR_REFS = new Set(['--font-sans', '--font-mono']);
+
+/** The full external-reference-namespace contract, as a standalone,
+ * independently-testable checker: every declared custom property must be
+ * --ds-* prefixed; every var() reference must be either --ds-* or exactly
+ * one of the two approved App-owned font bridges (not a broader --font-*
+ * pattern). Returns a list of violation descriptions (empty = compliant). */
+function findNamespaceViolations(css: string): string[] {
+  const violations: string[] = [];
+  for (const name of declaredVarNames(css)) {
+    if (!name.startsWith('--ds-')) violations.push(`declared property outside --ds-*: ${name}`);
+  }
+  const references = [...css.matchAll(/var\((--[a-zA-Z0-9-]+)\)/g)].map((m) => m[1]);
+  for (const ref of references) {
+    if (!ref.startsWith('--ds-') && !APPROVED_EXTERNAL_VAR_REFS.has(ref)) {
+      violations.push(`var() reference outside --ds-* and outside the approved font bridge set: ${ref}`);
+    }
+  }
+  return violations;
+}
+
+/** --ds-space-* entries found inside the :root block only — scoped
+ * strictly to spacing, so an unrelated domain's legitimate value (e.g.
+ * Typography's numericHero at 32px) can never affect this check. */
+function spacingVarEntries(css: string): Record<string, string> {
+  const rootMatch = css.match(/:root \{([\s\S]*?)\}/);
+  const rootBody = rootMatch ? rootMatch[1] : '';
+  const entries: Record<string, string> = {};
+  for (const m of rootBody.matchAll(/--ds-(space-\d+):\s*([^;]+);/g)) {
+    entries[m[1]] = m[2];
+  }
+  return entries;
+}
+
+describe('generateCss — live vendored snapshot (integration)', () => {
   it('is deterministic — two runs against the same input are byte-identical', () => {
     const fixture = loadFixture();
     const first = generateCss(fixture);
@@ -32,32 +76,6 @@ describe('generateCss', () => {
     const fresh = generateCss(fixture);
     const committed = readFileSync(join(REPO_ROOT, 'app', 'generated', 'design-tokens.css'), 'utf8');
     expect(fresh).toBe(committed);
-  });
-
-  it('uses only the isolated --ds- namespace, never portify-app\'s existing custom properties', () => {
-    const css = generateCss(loadFixture());
-    // Every custom property declared must start with --ds-
-    const declared = [...css.matchAll(/^\s*(--[a-zA-Z0-9-]+):/gm)].map((m) => m[1]);
-    expect(declared.length).toBeGreaterThan(0);
-    for (const name of declared) {
-      expect(name.startsWith('--ds-')).toBe(true);
-    }
-    // Must never reference an existing App token by name (no var(--on-surface) etc.)
-    // for the color/radius/spacing domains this current 3.0.0 fixture actually
-    // exercises. The two Typography family-binding exceptions (--font-sans,
-    // --font-mono — an explicit, App-owned, Tranche 2B-approved binding, not
-    // automatic name-based bridging) are asserted narrowly in the Typography
-    // describe block below, against a fixture that actually carries them.
-    expect(css).not.toMatch(/var\(--(?!ds-)/);
-  });
-
-  it('emits exactly the approved ten spacing primitives, verbatim canonical names', () => {
-    const css = generateCss(loadFixture());
-    for (const px of [4, 6, 8, 10, 12, 14, 16, 18, 20, 24]) {
-      expect(css).toContain(`--ds-space-${px}: ${px}px;`);
-    }
-    expect(css).not.toContain('--ds-space-2:');
-    expect(css).not.toContain('32px');
   });
 
   it('emits both radius keys with their canonical values', () => {
@@ -77,91 +95,95 @@ describe('generateCss', () => {
     expect(rootColorKeys.sort()).toEqual(darkColorKeys.sort());
     expect(rootColorKeys.length).toBeGreaterThan(0);
   });
+
+  it('produces exactly 153 distinct variables: 41 existing (color/radius/spacing) + 112 Typography, now that live vendor is 3.1.0', () => {
+    const css = generateCss(loadFixture());
+    const names = new Set(declaredVarNames(css));
+    const typographyNames = [...names].filter((n) => n.startsWith('--ds-typography-'));
+    expect(names.size).toBe(153);
+    expect(typographyNames.length).toBe(112);
+    expect(names.size - typographyNames.length).toBe(41);
+  });
 });
 
-// Controlled 3.1.0 Typography fixture — see scripts/lib/validate-design-tokens.test.ts
-// for the rationale: mirrors real canonical values for realism, exists to
-// exercise generator BEHAVIOR (naming, aliasing, counts, theme placement),
-// never restated as a second canonical value table.
-function typography31Fixture() {
-  return {
-    family: { primary: { name: 'Space Grotesk' }, structured: { name: 'Space Mono' } },
-    style: {
-      display: { family: 'primary', fontSize: '28px', lineHeight: '34px', fontWeight: 700, letterSpacing: '0em' },
-      titleLg: { family: 'primary', fontSize: '24px', lineHeight: '30px', fontWeight: 700, letterSpacing: '0em' },
-      titleMd: { family: 'primary', fontSize: '20px', lineHeight: '26px', fontWeight: 700, letterSpacing: '0em' },
-      heading: { family: 'primary', fontSize: '18px', lineHeight: '24px', fontWeight: 700, letterSpacing: '0em' },
-      bodyLg: { family: 'primary', fontSize: '16px', lineHeight: '24px', fontWeight: 500, letterSpacing: '0em' },
-      bodyMd: { family: 'primary', fontSize: '14px', lineHeight: '20px', fontWeight: 500, letterSpacing: '0em' },
-      label: { family: 'primary', fontSize: '14px', lineHeight: '18px', fontWeight: 500, letterSpacing: '0em' },
-      caption: { family: 'primary', fontSize: '12px', lineHeight: '16px', fontWeight: 500, letterSpacing: '0em' },
-      numericHero: { family: 'structured', fontSize: '32px', lineHeight: '38px', fontWeight: 700, letterSpacing: '0em' },
-      numericPrimary: { family: 'structured', fontSize: '24px', lineHeight: '30px', fontWeight: 700, letterSpacing: '0em' },
-      numericSecondary: { family: 'structured', fontSize: '18px', lineHeight: '24px', fontWeight: 400, letterSpacing: '0em' },
-      numericInline: { family: 'structured', fontSize: '16px', lineHeight: '22px', fontWeight: 400, letterSpacing: '0em' },
-      numericMeta: { family: 'structured', fontSize: '14px', lineHeight: '18px', fontWeight: 400, letterSpacing: '0em' },
-    },
-    role: {
-      brandDisplay: 'display',
-      financialHero: 'numericHero',
-      pageTitle: 'titleLg',
-      sectionTitle: 'heading',
-      cardFinancialValue: 'numericPrimary',
-      body: 'bodyLg',
-      secondaryBody: 'bodyMd',
-      label: 'caption',
-      metadata: 'numericMeta',
-    },
-  };
-}
+describe('generateCss — external reference namespace contract', () => {
+  it('the live vendored snapshot violates neither the declared-property nor the var()-reference namespace rule', () => {
+    const css = generateCss(loadFixture());
+    expect(findNamespaceViolations(css)).toEqual([]);
+  });
 
-function load31Fixture() {
-  const base = loadFixture();
-  const typography = typography31Fixture();
-  const tokens = { ...base.tokens, domainsIncluded: [...base.tokens.domainsIncluded, 'typography'], typography };
-  const manifest = { ...base.manifest, schemaVersion: '3.1.0', artifactVersion: '3.1.0', generatorVersion: '3.1.0', domainsIncluded: tokens.domainsIncluded };
-  return { manifest, tokens };
-}
+  it('detects a declared custom property outside --ds-*', () => {
+    const bad = ":root {\n  --not-ds-prefixed: 1px;\n}\n";
+    expect(findNamespaceViolations(bad)).toEqual(['declared property outside --ds-*: --not-ds-prefixed']);
+  });
 
-function declaredVarNames(css: string) {
-  return [...css.matchAll(/^\s*(--[a-zA-Z0-9-]+):/gm)].map((m) => m[1]);
-}
+  it('detects a var() reference outside --ds-* and outside the approved font bridge set', () => {
+    const bad = ":root {\n  --ds-example: var(--not-approved);\n}\n";
+    expect(findNamespaceViolations(bad)).toEqual([
+      'var() reference outside --ds-* and outside the approved font bridge set: --not-approved',
+    ]);
+  });
 
-describe('generateCss — Stage 1 critical requirement: unchanged for a 3.0.0-shaped snapshot', () => {
+  it('allows exactly the two approved font bridges and rejects any other --font-* reference (not a broad pattern allowance)', () => {
+    expect(findNamespaceViolations(":root {\n  --ds-x: var(--font-sans);\n}\n")).toEqual([]);
+    expect(findNamespaceViolations(":root {\n  --ds-x: var(--font-mono);\n}\n")).toEqual([]);
+    expect(findNamespaceViolations(":root {\n  --ds-x: var(--font-serif);\n}\n")).toEqual([
+      'var() reference outside --ds-* and outside the approved font bridge set: --font-serif',
+    ]);
+  });
+});
+
+describe('generateCss — spacing invariant (scoped to --ds-space-*, immune to other domains\' legitimate values)', () => {
+  it('emits exactly the approved ten spacing primitives, verbatim canonical names and values, and nothing else', () => {
+    const css = generateCss(loadFixture());
+    const entries = spacingVarEntries(css);
+    const expected: Record<string, string> = {};
+    for (const px of [4, 6, 8, 10, 12, 14, 16, 18, 20, 24]) expected[`space-${px}`] = `${px}px`;
+    expect(entries).toEqual(expected);
+  });
+
+  it('Typography\'s legitimate 32px (numericHero fontSize) does not corrupt the spacing check', () => {
+    const css = generateCss(loadFixture());
+    expect(css).toContain('32px'); // present somewhere (Typography) —
+    const entries = spacingVarEntries(css);
+    expect(Object.values(entries)).not.toContain('32px'); // but never under --ds-space-*
+  });
+});
+
+describe('generateCss — Typography-absent (explicit synthetic 3.0-shaped fixture, not live-vendor-dependent)', () => {
   it('produces zero Typography output when tokens.typography is absent', () => {
-    const { manifest, tokens } = loadFixture();
+    const { manifest, tokens } = makeLegacy30Fixture();
     expect(tokens.typography).toBeUndefined();
     const css = generateCss({ manifest, tokens });
     expect(css).not.toContain('ds-typography');
   });
 });
 
-describe('generateCss — Typography (3.1.0 fixture)', () => {
+describe('generateCss — Typography (explicit synthetic 3.1.0 fixture, not live-vendor-dependent)', () => {
   it('is deterministic with Typography present', () => {
-    const fixture = load31Fixture();
+    const fixture = makeTypography31Fixture();
     expect(generateCss(fixture)).toBe(generateCss(fixture));
   });
 
   it('emits exactly 2 family variables, bound via this App\'s own next/font CSS variables (the one approved namespace exception)', () => {
-    const css = generateCss(load31Fixture());
+    const css = generateCss(makeTypography31Fixture());
     expect(css).toContain('--ds-typography-family-primary: var(--font-sans);');
     expect(css).toContain('--ds-typography-family-structured: var(--font-mono);');
   });
 
   it('emits five variables for every one of the 13 style slots, values read from the fixture (never embedded in the generator)', () => {
-    const css = generateCss(load31Fixture());
+    const css = generateCss(makeTypography31Fixture());
     expect(css).toContain('--ds-typography-style-display-font-family: var(--ds-typography-family-primary);');
     expect(css).toContain('--ds-typography-style-display-font-size: 28px;');
     expect(css).toContain('--ds-typography-style-display-line-height: 34px;');
     expect(css).toContain('--ds-typography-style-display-font-weight: 700;');
     expect(css).toContain('--ds-typography-style-display-letter-spacing: 0em;');
-    // structured-family slot
     expect(css).toContain('--ds-typography-style-numeric-primary-font-family: var(--ds-typography-family-structured);');
     expect(css).toContain('--ds-typography-style-numeric-primary-font-size: 24px;');
   });
 
   it('emits five alias variables for every one of the 9 roles, as var() references — never copied literal values', () => {
-    const css = generateCss(load31Fixture());
+    const css = generateCss(makeTypography31Fixture());
     expect(css).toContain('--ds-typography-role-brand-display-font-size: var(--ds-typography-style-display-font-size);');
     expect(css).toContain('--ds-typography-role-brand-display-line-height: var(--ds-typography-style-display-line-height);');
     expect(css).toContain('--ds-typography-role-brand-display-font-weight: var(--ds-typography-style-display-font-weight);');
@@ -170,7 +192,6 @@ describe('generateCss — Typography (3.1.0 fixture)', () => {
     expect(css).toContain(
       '--ds-typography-role-card-financial-value-font-size: var(--ds-typography-style-numeric-primary-font-size);',
     );
-    // No role line may contain a literal px/em/integer value directly — every role value is a var() reference.
     const roleLines = css.split('\n').filter((l) => l.includes('ds-typography-role-'));
     expect(roleLines.length).toBeGreaterThan(0);
     for (const line of roleLines) {
@@ -178,39 +199,22 @@ describe('generateCss — Typography (3.1.0 fixture)', () => {
     }
   });
 
-  it('produces exactly 112 Typography variables (2 family + 13*5 style + 9*5 role) for a complete fixture', () => {
-    const css = generateCss(load31Fixture());
+  it('produces exactly 112 Typography variables (2 family + 13*5 style + 9*5 role)', () => {
+    const css = generateCss(makeTypography31Fixture());
     const names = new Set(declaredVarNames(css));
     const typographyNames = [...names].filter((n) => n.startsWith('--ds-typography-'));
     expect(typographyNames.length).toBe(112);
   });
 
-  it('produces exactly 153 distinct variables total once Typography is added to the current 41 (color/radius/spacing)', () => {
-    const css = generateCss(load31Fixture());
-    const names = new Set(declaredVarNames(css));
-    expect(names.size).toBe(153);
-  });
-
   it('does not duplicate Typography variables under [data-theme=\'dark\'] (TYPO-009: static, theme-independent in v1)', () => {
-    const css = generateCss(load31Fixture());
+    const css = generateCss(makeTypography31Fixture());
     const darkMatch = css.match(/\[data-theme='dark'\] \{([\s\S]*?)\}/);
     expect(darkMatch).not.toBeNull();
     expect(darkMatch![1]).not.toContain('ds-typography');
   });
 
-  it('every declared variable is either --ds- prefixed, and every var() reference is --ds- prefixed except the two approved family bindings', () => {
-    const css = generateCss(load31Fixture());
-    for (const name of declaredVarNames(css)) {
-      expect(name.startsWith('--ds-')).toBe(true);
-    }
-    const references = [...css.matchAll(/var\((--[a-zA-Z0-9-]+)\)/g)].map((m) => m[1]);
-    for (const ref of references) {
-      expect(ref.startsWith('--ds-') || ref === '--font-sans' || ref === '--font-mono').toBe(true);
-    }
-  });
-
   it('camelCase style/role keys transform to kebab-case exactly, mechanically — no manual per-key table', () => {
-    const css = generateCss(load31Fixture());
+    const css = generateCss(makeTypography31Fixture());
     expect(css).toContain('--ds-typography-style-title-lg-font-size:');
     expect(css).toContain('--ds-typography-style-numeric-secondary-font-size:');
     expect(css).toContain('--ds-typography-role-section-title-font-size:');
