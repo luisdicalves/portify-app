@@ -139,13 +139,68 @@ export function varCompliance(raw) {
   };
 }
 
-/** Values that are structurally inert regardless of property. */
-export function isInertValue(raw) {
-  if (typeof raw !== 'string') return false;
-  const v = raw.trim().toLowerCase();
-  if (ALLOWED_KEYWORDS.has(v)) return true;
-  if (v === '0' || v === '0px' || v === '100%') return true;
-  return false;
+/** HARDSTYLE-014: cascade keywords are neutral on every ENFORCED_V1 property. */
+const CASCADE_KEYWORDS = new Set(['inherit', 'initial', 'unset', 'revert', 'revert-layer']);
+
+/** Margins are the only v1 spacing properties for which `auto` is valid CSS. */
+const AUTO_VALID_SPACING = new Set(['margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft']);
+
+/** Any unit-bearing (or unitless) zero: 0, -0, 0.0, 0px, 0rem, 0em, 0%, ... */
+const ZERO_RE = /^[+-]?(0+(\.0*)?|\.0+)([a-z]+|%)?$/;
+
+function isZeroToken(t) {
+  return ZERO_RE.test(t);
+}
+
+/**
+ * Measurement-only neutrality for properties OUTSIDE the ENFORCED_V1
+ * taxonomy (geometry, elevation, interaction, colour-carrying shorthands).
+ * HARDSTYLE-014 does not govern these; this is the unchanged Tranche A
+ * behaviour, kept so REVIEW/BLOCKED measurement does not move for reasons
+ * no decision covers.
+ */
+const MEASUREMENT_NEUTRAL = new Set([
+  'transparent', 'currentcolor', 'inherit', 'initial', 'unset', 'revert',
+  'none', 'auto', 'normal',
+]);
+function isMeasurementNeutral(v) {
+  return MEASUREMENT_NEUTRAL.has(v) || v === '0' || v === '0px' || v === '100%';
+}
+
+/**
+ * HARDSTYLE-014 — neutral, cascade and non-magnitude values.
+ *
+ * Property-aware on purpose: there is no generic "keyword = allowed" rule.
+ *   typography : only cascade keywords are neutral. `normal`, `bold`,
+ *                `small`, `large`... remain TEXT_TYPOGRAPHY_LITERAL.
+ *   spacing    : cascade keywords; any zero; `auto` on margins; and a
+ *                composite made ONLY of those (`0 auto`). One non-zero
+ *                component (`0 auto 16px`) makes the whole value a literal.
+ *   radius     : cascade keywords; any zero, including composites of zeros.
+ * String and numeric zero are treated identically.
+ */
+export function isNeutralValue(property, raw) {
+  const prop = toCamelCase(property);
+  const enforcedProp = TYPOGRAPHY_PROPS.has(prop) || SPACING_PROPS.has(prop) || RADIUS_PROPS.has(prop);
+
+  if (typeof raw === 'number') {
+    // Outside ENFORCED_V1 no number was ever neutral (Tranche A behaviour),
+    // so `top: 0` / `zIndex: 0` keep being measured as REVIEW geometry.
+    if (!enforcedProp) return false;
+    return raw === 0 && (SPACING_PROPS.has(prop) || RADIUS_PROPS.has(prop));
+  }
+  const v = String(raw).trim().toLowerCase();
+  if (!v) return false;
+  if (!enforcedProp) return isMeasurementNeutral(v);
+
+  if (CASCADE_KEYWORDS.has(v)) return true;
+  if (TYPOGRAPHY_PROPS.has(prop)) return false;
+
+  const parts = v.split(/\s+/);
+  if (SPACING_PROPS.has(prop)) {
+    return parts.every((t) => isZeroToken(t) || (t === 'auto' && AUTO_VALID_SPACING.has(prop)));
+  }
+  return parts.every(isZeroToken); // radius
 }
 
 /**
@@ -175,14 +230,12 @@ export function normalizeValue(raw) {
 export function classify({ property, value, isMaterialSymbolContext = false }) {
   const prop = toCamelCase(property);
 
-  // Property-level BLOCKED categories are resolved BEFORE value-driven colour
-  // detection, deliberately. HARDSTYLE-012 states shadow/elevation and
-  // interaction "MUST NOT be enforced as violations until a canonical target
-  // exists"; a `boxShadow: '0 1px 2px #0000001a'` would otherwise be enforced
-  // through the colour rule, re-enforcing a category the contract excludes.
-  // The embedded literal is still recorded (see `embeddedColorLiteral`) so it
-  // stays measurable, and the ambiguity is raised for Tranche B rather than
-  // resolved by inventing a new enforcement rule.
+  // HARDSTYLE-013: a property whose whole policy is non-enforceable wins over
+  // value-driven colour detection, so `boxShadow: '0 1px 2px #0000001a'` is
+  // never promoted to ENFORCED_V1. The embedded literal stays visible as the
+  // `embeddedColorLiteral` diagnostic. This is not a generic colour
+  // exemption: a composite such as `border` is not wholly non-enforceable,
+  // so its colour is still caught below.
   if (ELEVATION_PROPS.has(prop)) return RULES.ELEVATION_LITERAL;
   if (INTERACTION_PROPS.has(prop)) return RULES.INTERACTION_LITERAL;
 
@@ -196,7 +249,12 @@ export function classify({ property, value, isMaterialSymbolContext = false }) {
     return RULES.TEXT_TYPOGRAPHY_LITERAL;
   }
   if (SPACING_PROPS.has(prop)) return RULES.SPACING_LITERAL;
-  if (RADIUS_PROPS.has(prop)) return RULES.BORDER_RADIUS_LITERAL;
+  if (RADIUS_PROPS.has(prop)) {
+    // HARDSTYLE-015: any percentage radius is element-relative geometry with
+    // no canonical target -> REVIEW_REQUIRED, never BORDER_RADIUS_LITERAL.
+    if (typeof value === 'string' && value.includes('%')) return RULES.GEOMETRY_LITERAL;
+    return RULES.BORDER_RADIUS_LITERAL;
+  }
   if (GEOMETRY_PROPS.has(prop)) return RULES.GEOMETRY_LITERAL;
   return null;
 }

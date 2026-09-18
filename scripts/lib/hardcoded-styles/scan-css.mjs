@@ -6,7 +6,7 @@
 // in any ordinary declaration in that same file is still a finding.
 
 import postcss from 'postcss';
-import { classify, normalizeValue, isVarReference, isInertValue, varCompliance } from './taxonomy.mjs';
+import { classify, normalizeValue, isVarReference, isNeutralValue, varCompliance } from './taxonomy.mjs';
 import { ScanIntegrityError } from './integrity.mjs';
 
 export const CONTEXT_KIND = Object.freeze({
@@ -93,7 +93,7 @@ export function scanCssSource(cssText, repoRelativePath) {
       });
       return;
     }
-    if (isInertValue(raw)) return;
+    if (isNeutralValue(decl.prop, raw)) return;
 
     const rule = classify({ property: decl.prop, value: raw, isMaterialSymbolContext: isMaterialSymbolRule(decl) });
     if (!rule) return;
