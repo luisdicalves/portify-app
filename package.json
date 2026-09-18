@@ -16,7 +16,8 @@
     "check:supabase-env": "node scripts/check-supabase-environment.mjs",
     "generate:design-tokens": "node scripts/generate-design-tokens.mjs",
     "check:design-tokens": "node scripts/check-design-tokens.mjs",
-    "audit:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs"
+    "audit:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs",
+    "baseline:hardcoded-styles": "node scripts/generate-hardcoded-styles-baseline.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "0.10.3",
