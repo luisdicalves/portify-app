@@ -437,7 +437,9 @@ describe('scan integrity', () => {
     const here = new URL('.', import.meta.url).pathname;
     const sources = [
       'check-hardcoded-styles.mjs',
+      'generate-hardcoded-styles-baseline.mjs',
       'hardcoded-styles.test.ts',
+      'hardcoded-styles-baseline.test.ts',
       ...readdirSync(join(here, 'lib/hardcoded-styles')).map((f) => `lib/hardcoded-styles/${f}`),
     ].filter((f) => /\.(mjs|ts)$/.test(f));
     for (const f of sources) {
