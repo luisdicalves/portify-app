@@ -17,6 +17,7 @@
     "generate:design-tokens": "node scripts/generate-design-tokens.mjs",
     "check:design-tokens": "node scripts/check-design-tokens.mjs",
     "audit:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs",
+    "check:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs --ratchet",
     "baseline:hardcoded-styles": "node scripts/generate-hardcoded-styles-baseline.mjs"
   },
   "dependencies": {
