@@ -12,9 +12,10 @@ import { join, relative, sep } from 'node:path';
 import { scanTsxSource } from './scan-tsx.mjs';
 import { scanCssSource } from './scan-css.mjs';
 import { buildTokenIndex, matchToken } from './tokens.mjs';
-import { FINDING_IDENTITY_VERSION, STATUS, statusForRule, containsColorLiteral, RULES } from './taxonomy.mjs';
+import { FINDING_IDENTITY_VERSION, STATUS, statusForRule, containsColorLiteral } from './taxonomy.mjs';
+import { assertCompleteRead, ScanIntegrityError } from './integrity.mjs';
 
-export { FINDING_IDENTITY_VERSION, STATUS };
+export { FINDING_IDENTITY_VERSION, STATUS, ScanIntegrityError };
 
 /** Authored UI source roots. New files are picked up automatically. */
 export const SCAN_ROOTS = Object.freeze(['app', 'components', 'lib']);
@@ -105,7 +106,9 @@ export function scanRepository(repoRoot, { roots = SCAN_ROOTS } = {}) {
 
   const raw = [];
   for (const rel of files) {
-    const text = readFileSync(join(repoRoot, rel), 'utf8');
+    const abs = join(repoRoot, rel);
+    const text = readFileSync(abs, 'utf8');
+    assertCompleteRead(abs, rel, text);
     raw.push(...scanSource(text, rel));
   }
 
@@ -118,9 +121,10 @@ export function scanRepository(repoRoot, { roots = SCAN_ROOTS } = {}) {
     findings.push({
       ...f,
       status,
-      // A blocked elevation/interaction value may still embed a raw colour.
-      // Recorded so it stays measurable without being enforced — the open
-      // policy question is raised for Tranche B, not resolved here.
+      // HARDSTYLE-013: a colour embedded in a property whose whole policy is
+      // non-enforceable (here: BLOCKED elevation/interaction) is never
+      // promoted to ENFORCED_V1. It stays visible as this diagnostic only,
+      // and is excluded from the baseline by status.
       embeddedColorLiteral: blocked && containsColorLiteral(f.normalizedValue),
       signature: stableSignature(f),
       tokenMatch: matchToken(tokenIndex, f.normalizedValue),
@@ -177,10 +181,14 @@ export function scanRepository(repoRoot, { roots = SCAN_ROOTS } = {}) {
       antiHardcodedCompliantReferences: antiHardcodedCompliant,
       canonicalDsReferences,
       legacyTokenDefinitions,
+      // Token matches are NOT mutually exclusive: one literal can equal both
+      // a canonical token value and a legacy variable value. Each count is
+      // therefore independent; only NO_TOKEN_MATCH and the others partition.
       tokenMatches: {
-        CANONICAL_TOKEN_MATCH: enforced.filter((f) => f.tokenMatch.kind === 'CANONICAL_TOKEN_MATCH').length,
-        LEGACY_TOKEN_MATCH: enforced.filter((f) => f.tokenMatch.kind === 'LEGACY_TOKEN_MATCH').length,
-        NO_TOKEN_MATCH: enforced.filter((f) => f.tokenMatch.kind === 'NO_TOKEN_MATCH').length,
+        CANONICAL_MATCH_COUNT: enforced.filter((f) => f.tokenMatch.canonical).length,
+        LEGACY_MATCH_COUNT: enforced.filter((f) => f.tokenMatch.legacy).length,
+        BOTH_CANONICAL_AND_LEGACY_MATCH_COUNT: enforced.filter((f) => f.tokenMatch.canonical && f.tokenMatch.legacy).length,
+        NO_TOKEN_MATCH_COUNT: enforced.filter((f) => !f.tokenMatch.canonical && !f.tokenMatch.legacy).length,
       },
     },
   };
