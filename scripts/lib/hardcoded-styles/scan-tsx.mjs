@@ -7,7 +7,7 @@
 // attribute rather than guessed from a value.
 
 import ts from 'typescript';
-import { classify, normalizeValue, isVarReference, isInertValue, varCompliance, RULES } from './taxonomy.mjs';
+import { classify, normalizeValue, isVarReference, isNeutralValue, varCompliance, RULES } from './taxonomy.mjs';
 import { ScanIntegrityError } from './integrity.mjs';
 
 export const CONTEXT_KIND = Object.freeze({
@@ -148,7 +148,7 @@ export function scanTsxSource(sourceText, repoRelativePath) {
             });
             continue;
           }
-          if (isInertValue(raw)) continue;
+          if (isNeutralValue(name, raw)) continue;
 
           const rule = classify({ property: name, value: raw, isMaterialSymbolContext: isIcon });
           if (!rule) continue;

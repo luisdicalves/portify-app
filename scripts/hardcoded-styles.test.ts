@@ -448,6 +448,85 @@ describe('scan integrity', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// HARDSTYLE-014 — neutral, cascade and non-magnitude values
+// HARDSTYLE-015 — percentage border radius
+// ---------------------------------------------------------------------------
+
+describe('HARDSTYLE-014 / HARDSTYLE-015 value policy', () => {
+  const one = (style: string) => tsx(component(`<div style={{ ${style} }} />`));
+  const enforced = (style: string) => one(style).filter((f) => statusForRule(f.rule) === STATUS.ENFORCED_V1);
+
+  describe('spacing: zero, auto and composites', () => {
+    it.each(['padding: 0', "padding: '0'", "padding: '0px'", "padding: '0rem'", "margin: '0 auto'", "marginLeft: 'auto'"])(
+      '%s is not a violation', (s) => { expect(one(s)).toHaveLength(0); },
+    );
+
+    it('treats string and numeric zero identically', () => {
+      expect(one('padding: 0')).toEqual(one("padding: '0'"));
+    });
+
+    it("keeps '0 auto 16px' as one SPACING_LITERAL with the whole value as identity", () => {
+      const f = enforced("margin: '0 auto 16px'");
+      expect(rulesOf(f)).toEqual([RULES.SPACING_LITERAL]);
+      expect(f[0].normalizedValue).toBe('0 auto 16px');
+    });
+
+    it('does not extend auto to properties where it is not valid CSS', () => {
+      expect(rulesOf(enforced("padding: 'auto'"))).toEqual([RULES.SPACING_LITERAL]);
+    });
+  });
+
+  describe('radius: zero, percentage and numeric', () => {
+    it.each(['borderRadius: 0', "borderRadius: '0px'"])('%s is not a violation', (s) => {
+      expect(one(s)).toHaveLength(0);
+    });
+
+    it.each(["borderRadius: '50%'", "borderRadius: '25%'"])('%s is REVIEW_REQUIRED, never ENFORCED_V1', (s) => {
+      const f = one(s);
+      expect(f).toHaveLength(1);
+      expect(statusForRule(f[0].rule)).toBe(STATUS.REVIEW_REQUIRED);
+    });
+
+    it('keeps a numeric non-zero radius enforced (borderRadius: 99)', () => {
+      expect(rulesOf(enforced('borderRadius: 99'))).toEqual([RULES.BORDER_RADIUS_LITERAL]);
+    });
+  });
+
+  describe('typography: cascade only, no generic keyword exemption', () => {
+    it("fontFamily: 'inherit' is not a violation", () => { expect(one("fontFamily: 'inherit'")).toHaveLength(0); });
+
+    it.each(["fontWeight: 'normal'", "lineHeight: 'normal'", "letterSpacing: 'normal'", "fontWeight: 'bold'"])(
+      '%s is a TEXT_TYPOGRAPHY_LITERAL', (s) => { expect(rulesOf(enforced(s))).toEqual([RULES.TEXT_TYPOGRAPHY_LITERAL]); },
+    );
+
+    it('does not borrow the spacing zero exemption', () => {
+      expect(rulesOf(enforced("letterSpacing: '0'"))).toEqual([RULES.TEXT_TYPOGRAPHY_LITERAL]);
+    });
+  });
+
+  it.each(['inherit', 'initial', 'unset', 'revert', 'revert-layer'])(
+    'cascade keyword %s is neutral on every enforced property', (kw) => {
+      for (const p of ['fontSize', 'padding', 'gap', 'borderRadius']) expect(one(`${p}: '${kw}'`)).toHaveLength(0);
+    },
+  );
+
+  it('applies identically in CSS', () => {
+    const found = css(`.a { padding: 0; margin: 0 auto; border-radius: 50%; font-family: inherit; font-weight: normal; margin-bottom: 0 auto 16px; }`)
+      .filter((f: any) => f.rule !== null);
+    const byProp = Object.fromEntries(found.map((f: any) => [f.property, [f.rule, statusForRule(f.rule)]]));
+    expect(byProp).toEqual({
+      'border-radius': [RULES.GEOMETRY_LITERAL, STATUS.REVIEW_REQUIRED],
+      'font-weight': [RULES.TEXT_TYPOGRAPHY_LITERAL, STATUS.ENFORCED_V1],
+      'margin-bottom': [RULES.SPACING_LITERAL, STATUS.ENFORCED_V1],
+    });
+  });
+
+  it('leaves non-enforced measurement unchanged (numeric zero geometry is still REVIEW)', () => {
+    expect(statusForRule(one('top: 0')[0].rule)).toBe(STATUS.REVIEW_REQUIRED);
+  });
+});
+
 describe('token-match reporting (independent, not mutually exclusive)', () => {
   it('lets one finding count toward both canonical and legacy matches', () => {
     const r = scanTree({
