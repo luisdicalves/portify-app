@@ -43,6 +43,22 @@ jobs:
 
       - run: npm ci
 
+      # HARDSTYLE-006 ratchet. Secretless: reads only this checkout plus the
+      # committed hardcoded-styles.baseline.json at the base revision (PR base
+      # / push "before"), fetched here at depth 1. Never regenerates the
+      # baseline. Fails on new or increased ENFORCED_V1 debt, and on any
+      # growth of the baseline itself relative to the base revision; an
+      # unavailable base revision fails closed.
+      - name: Fetch baseline base revision
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: git fetch --no-tags --depth=1 origin "$BASE_SHA"
+
+      - name: Hardcoded style ratchet (new debt, multiplicity, baseline growth)
+        env:
+          HARDSTYLE_BASELINE_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: npm run check:hardcoded-styles -- --require-baseline-base
+
       - name: Type check
         run: npx tsc --noEmit -p .
 
