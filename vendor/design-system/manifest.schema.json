@@ -50,14 +50,25 @@
     "domainsIncluded": {
       "type": "array",
       "description": "Must exactly match tokens.json's own domainsIncluded field.",
-      "items": { "type": "string", "enum": ["color", "radius", "spacing", "typography", "brand"] },
+      "items": {
+        "type": "string",
+        "enum": [
+          "color",
+          "radius",
+          "spacing",
+          "typography",
+          "brand"
+        ]
+      },
       "minItems": 1,
       "uniqueItems": true
     },
     "sourceFiles": {
       "type": "array",
       "description": "Repo-relative paths of every canonical file this generation run actually read. As of Tranche 1A.2 this is normally three files (one per domain's canonical authority: color, radius, spacing), not one — see the generator's own docstring for why a single mockup file is never treated as a runtime authority.",
-      "items": { "type": "string" },
+      "items": {
+        "type": "string"
+      },
       "minItems": 1
     },
     "sourceWorktreeClean": {

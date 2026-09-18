@@ -19,6 +19,12 @@ import {
   SUPPORTED_SCHEMA_VERSIONS,
 } from './validate-design-tokens.mjs';
 import { FAMILY_BINDINGS, camelToKebab } from './typography-runtime.mjs';
+import {
+  makeLegacy30Fixture,
+  makeTypography31Fixture,
+  HASH_KNOWN_ANSWER_INPUT,
+  HASH_KNOWN_ANSWER_EXPECTED,
+} from './design-tokens-fixtures.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const VENDOR_DIR = join(__dirname, '..', '..', 'vendor');
@@ -46,10 +52,10 @@ describe('the current committed vendored artifact', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('reproduces the known-good contentHash exactly (known-answer test)', () => {
-    const { tokens } = loadFixture();
+  it('the live vendored artifact\'s real hash matches its own manifest (live-vendor-coupled, expected to track re-syncs)', () => {
+    const { tokens, manifest } = loadFixture();
     const hash = computeContentHash(tokens);
-    expect(hash).toBe('sha256:809de2341610ccb07745b2b4c3d1bcbdd5b8310d5dc2820641b387fd318ce231');
+    expect(hash).toBe(manifest.contentHash);
   });
 
   it('produces bytes byte-identical to the vendored tokens.json file', () => {
@@ -57,6 +63,22 @@ describe('the current committed vendored artifact', () => {
     const canonicalBytes = Buffer.from(JSON.stringify(deepSortKeys(tokens), null, 2) + '\n', 'utf8');
     const committedBytes = readFileSync(join(VENDOR_DIR, 'design-system', 'tokens.json'));
     expect(Buffer.compare(canonicalBytes, committedBytes)).toBe(0);
+  });
+});
+
+describe('computeContentHash', () => {
+  it('reproduces a fixed algorithm known-answer vector, deliberately unrelated to any artifact release version', () => {
+    const hash = computeContentHash(HASH_KNOWN_ANSWER_INPUT);
+    expect(hash).toBe(HASH_KNOWN_ANSWER_EXPECTED);
+  });
+
+  it('is insensitive to input key order (proves the deep-sort step actually runs)', () => {
+    const reordered = {
+      middle: [3, 1, 2],
+      zebra: 1,
+      alpha: { nested: { alpha: 2, zulu: 3 } },
+    };
+    expect(computeContentHash(reordered)).toBe(HASH_KNOWN_ANSWER_EXPECTED);
   });
 });
 
@@ -227,61 +249,6 @@ describe('validateSpacingExactSet', () => {
   });
 });
 
-// Controlled 3.1.0 Typography fixture — mirrors the real canonical values
-// for realism (per Tranche 2B instruction), but exists purely to exercise
-// generator/consumer BEHAVIOR (presence coherence, family-identity
-// fail-closed, referential resolvability). It is not a second canonical
-// value table: no test below asserts the individual fontSize/lineHeight/
-// fontWeight/letterSpacing values are "the" approved ones — that is
-// tokens.schema.json's (AJV) and contentHash's job, already proven
-// end-to-end during the Tranche 2B preflight against the real 3.1.0
-// artifact, not restated here.
-function typography31Fixture() {
-  return {
-    family: { primary: { name: 'Space Grotesk' }, structured: { name: 'Space Mono' } },
-    style: {
-      display: { family: 'primary', fontSize: '28px', lineHeight: '34px', fontWeight: 700, letterSpacing: '0em' },
-      titleLg: { family: 'primary', fontSize: '24px', lineHeight: '30px', fontWeight: 700, letterSpacing: '0em' },
-      titleMd: { family: 'primary', fontSize: '20px', lineHeight: '26px', fontWeight: 700, letterSpacing: '0em' },
-      heading: { family: 'primary', fontSize: '18px', lineHeight: '24px', fontWeight: 700, letterSpacing: '0em' },
-      bodyLg: { family: 'primary', fontSize: '16px', lineHeight: '24px', fontWeight: 500, letterSpacing: '0em' },
-      bodyMd: { family: 'primary', fontSize: '14px', lineHeight: '20px', fontWeight: 500, letterSpacing: '0em' },
-      label: { family: 'primary', fontSize: '14px', lineHeight: '18px', fontWeight: 500, letterSpacing: '0em' },
-      caption: { family: 'primary', fontSize: '12px', lineHeight: '16px', fontWeight: 500, letterSpacing: '0em' },
-      numericHero: { family: 'structured', fontSize: '32px', lineHeight: '38px', fontWeight: 700, letterSpacing: '0em' },
-      numericPrimary: { family: 'structured', fontSize: '24px', lineHeight: '30px', fontWeight: 700, letterSpacing: '0em' },
-      numericSecondary: { family: 'structured', fontSize: '18px', lineHeight: '24px', fontWeight: 400, letterSpacing: '0em' },
-      numericInline: { family: 'structured', fontSize: '16px', lineHeight: '22px', fontWeight: 400, letterSpacing: '0em' },
-      numericMeta: { family: 'structured', fontSize: '14px', lineHeight: '18px', fontWeight: 400, letterSpacing: '0em' },
-    },
-    role: {
-      brandDisplay: 'display',
-      financialHero: 'numericHero',
-      pageTitle: 'titleLg',
-      sectionTitle: 'heading',
-      cardFinancialValue: 'numericPrimary',
-      body: 'bodyLg',
-      secondaryBody: 'bodyMd',
-      label: 'caption',
-      metadata: 'numericMeta',
-    },
-  };
-}
-
-function load31Fixture() {
-  const base = loadFixture();
-  const typography = typography31Fixture();
-  const tokens = { ...base.tokens, domainsIncluded: [...base.tokens.domainsIncluded, 'typography'], typography };
-  const manifest = {
-    ...base.manifest,
-    schemaVersion: '3.1.0',
-    artifactVersion: '3.1.0',
-    generatorVersion: '3.1.0',
-    domainsIncluded: tokens.domainsIncluded,
-  };
-  return { ...base, tokens, manifest };
-}
-
 describe('SUPPORTED_SCHEMA_VERSIONS (Tranche 2B Stage 1)', () => {
   it('supports both 3.0.0 and 3.1.0', () => {
     expect(SUPPORTED_SCHEMA_VERSIONS).toContain('3.0.0');
@@ -309,31 +276,32 @@ describe('camelToKebab', () => {
 });
 
 describe('validateTypographyRuntimeCompatibility', () => {
-  it('does not require typography for a legacy 3.0.0 snapshot', () => {
-    const { manifest, tokens } = loadFixture();
+  it('does not require typography for a legacy 3.0.0 snapshot (explicit synthetic fixture, not live-vendor-dependent)', () => {
+    const { manifest, tokens } = makeLegacy30Fixture();
     expect(tokens.typography).toBeUndefined();
     const result = validateTypographyRuntimeCompatibility(manifest, tokens);
     expect(result.valid).toBe(true);
   });
 
   it('requires typography to be present for schemaVersion 3.1.0', () => {
-    const { manifest } = loadFixture();
-    const broken31Manifest = { ...manifest, schemaVersion: '3.1.0', domainsIncluded: manifest.domainsIncluded };
-    const tokensWithoutTypography = loadFixture().tokens;
-    const result = validateTypographyRuntimeCompatibility(broken31Manifest, tokensWithoutTypography);
+    const { manifest, tokens } = makeTypography31Fixture();
+    const tokensWithoutTypography = { ...tokens, domainsIncluded: ['color', 'radius', 'spacing'] };
+    delete (tokensWithoutTypography as { typography?: unknown }).typography;
+    const manifestWithoutTypography = { ...manifest, domainsIncluded: tokensWithoutTypography.domainsIncluded };
+    const result = validateTypographyRuntimeCompatibility(manifestWithoutTypography, tokensWithoutTypography);
     expect(result.valid).toBe(false);
-    expect(result.errors.some((e: string) => e.includes("requires tokens.typography"))).toBe(true);
+    expect(result.errors.some((e: string) => e.includes('requires tokens.typography'))).toBe(true);
   });
 
   it('accepts a valid 3.1.0 fixture with correct family identities', () => {
-    const { manifest, tokens } = load31Fixture();
+    const { manifest, tokens } = makeTypography31Fixture();
     const result = validateTypographyRuntimeCompatibility(manifest, tokens);
     expect(result.valid).toBe(true);
     expect(result.errors).toEqual([]);
   });
 
   it('fails closed when domainsIncluded and tokens.typography disagree', () => {
-    const { manifest, tokens } = load31Fixture();
+    const { manifest, tokens } = makeTypography31Fixture();
     const inconsistentManifest = { ...manifest, domainsIncluded: ['color', 'radius', 'spacing'] };
     const result = validateTypographyRuntimeCompatibility(inconsistentManifest, tokens);
     expect(result.valid).toBe(false);
@@ -341,7 +309,7 @@ describe('validateTypographyRuntimeCompatibility', () => {
   });
 
   it('fails closed when family.primary.name no longer matches this App\'s Space Grotesk loader binding', () => {
-    const { manifest, tokens } = load31Fixture();
+    const { manifest, tokens } = makeTypography31Fixture();
     const renamed = structuredClone(tokens);
     renamed.typography.family.primary.name = 'Some Other Font';
     const result = validateTypographyRuntimeCompatibility(manifest, renamed);
@@ -350,7 +318,7 @@ describe('validateTypographyRuntimeCompatibility', () => {
   });
 
   it('fails closed when family.structured.name no longer matches this App\'s Space Mono loader binding', () => {
-    const { manifest, tokens } = load31Fixture();
+    const { manifest, tokens } = makeTypography31Fixture();
     const renamed = structuredClone(tokens);
     renamed.typography.family.structured.name = 'Some Other Mono Font';
     const result = validateTypographyRuntimeCompatibility(manifest, renamed);
@@ -359,7 +327,7 @@ describe('validateTypographyRuntimeCompatibility', () => {
   });
 
   it('fails closed when a style slot references a family key with no local runtime binding', () => {
-    const { manifest, tokens } = load31Fixture();
+    const { manifest, tokens } = makeTypography31Fixture();
     const broken = structuredClone(tokens);
     broken.typography.style.display.family = 'unbound-family-key';
     const result = validateTypographyRuntimeCompatibility(manifest, broken);

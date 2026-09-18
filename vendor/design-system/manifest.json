@@ -1,19 +1,21 @@
 {
-  "artifactVersion": "3.0.0",
-  "contentHash": "sha256:809de2341610ccb07745b2b4c3d1bcbdd5b8310d5dc2820641b387fd318ce231",
+  "artifactVersion": "3.1.0",
+  "contentHash": "sha256:c5be52d8c03e58f03ac600f230517174532e15a23f023eee80bc792f2104e9e2",
   "domainsIncluded": [
     "color",
     "radius",
-    "spacing"
+    "spacing",
+    "typography"
   ],
-  "generatedAt": "2026-09-01T23:10:45Z",
-  "generatorVersion": "3.0.0",
-  "knowledgeCommit": "bab521e22bd3d0385837c3209f9b32f862cd7d49",
-  "schemaVersion": "3.0.0",
+  "generatedAt": "2026-09-15T21:46:55Z",
+  "generatorVersion": "3.1.0",
+  "knowledgeCommit": "41ca3843ccbc194ecd7290870cf9736da259935a",
+  "schemaVersion": "3.1.0",
   "sourceFiles": [
     "10-design/DESIGN-SYSTEM/RUNTIME/portify-shared.css",
     "10-design/DESIGN-SYSTEM/CANONICAL-RADIUS-DECISIONS.json",
-    "10-design/DESIGN-SYSTEM/CANONICAL-SPACING-DECISIONS.json"
+    "10-design/DESIGN-SYSTEM/CANONICAL-SPACING-DECISIONS.json",
+    "10-design/DESIGN-SYSTEM/CANONICAL-TYPOGRAPHY-DECISIONS.json"
   ],
   "sourceWorktreeClean": true
 }

@@ -2,31 +2,54 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://portify.internal/schemas/tokens.schema.json",
   "title": "Portify Canonical Design Tokens",
-  "description": "Machine-readable canonical design tokens. Tranche 1A/1A.1/1A.2 scope: color, radius and spacing. COLOR is generated from 10-design/DESIGN-SYSTEM/RUNTIME/portify-shared.css (the file the closed neutral-palette decision, PDS-017/033, is actually bound to in live canon); RADIUS is generated from 10-design/DESIGN-SYSTEM/CANONICAL-RADIUS-DECISIONS.json (only the radius values that trace to a closed PDS decision); SPACING is generated from 10-design/DESIGN-SYSTEM/CANONICAL-SPACING-DECISIONS.json (Product Owner-approved Option 3B, 2026-09-02 — a closed 10-value primitive set, see the Tranche 1A.2 governance record §14). Neither the color nor the radius source has a primitive/alias layer, so this artifact has no top-level 'primitive' key — every semantic color value is already final.",
+  "description": "Machine-readable canonical design tokens. Tranche 1A/1A.1/1A.2 scope: color, radius and spacing. COLOR is generated from 10-design/DESIGN-SYSTEM/RUNTIME/portify-shared.css (the file the closed neutral-palette decision, PDS-017/033, is actually bound to in live canon); RADIUS is generated from 10-design/DESIGN-SYSTEM/CANONICAL-RADIUS-DECISIONS.json (only the radius values that trace to a closed PDS decision); SPACING is generated from 10-design/DESIGN-SYSTEM/CANONICAL-SPACING-DECISIONS.json (Product Owner-approved Option 3B, 2026-09-02 — a closed 10-value primitive set, see the Tranche 1A.2 governance record §14). Neither the color nor the radius source has a primitive/alias layer, so this artifact has no top-level 'primitive' key — every semantic color value is already final. Tranche 2A.1 adds an OPTIONAL 'typography' domain, generated from 10-design/DESIGN-SYSTEM/CANONICAL-TYPOGRAPHY-DECISIONS.json (Product Owner-approved TYPO-001..012, 2026-09-15 — see 03-decisions/UX/TYPOGRAPHY-V1-DECISIONS.md). 'typography' is deliberately NOT in the top-level 'required' list — a pre-2A.1 artifact without it remains valid against this schema (additive, non-breaking); once present, its own required/additionalProperties:false sub-shape makes the full family/style/role contract mandatory, never partial.",
   "type": "object",
-  "required": ["domainsIncluded", "semantic", "radius", "spacing"],
+  "required": [
+    "domainsIncluded",
+    "semantic",
+    "radius",
+    "spacing"
+  ],
   "additionalProperties": false,
   "properties": {
     "domainsIncluded": {
       "type": "array",
       "description": "Which token domains this specific artifact actually populates with real values. A domain absent here has no canonical values yet and must never be filled with fabricated or borrowed-from-a-non-canonical-source data.",
-      "items": { "type": "string", "enum": ["color", "radius", "spacing", "typography", "brand"] },
+      "items": {
+        "type": "string",
+        "enum": [
+          "color",
+          "radius",
+          "spacing",
+          "typography",
+          "brand"
+        ]
+      },
       "minItems": 1,
       "uniqueItems": true
     },
     "semantic": {
       "type": "object",
       "description": "Theme-dependent semantic color tokens, fully resolved to concrete hex/rgba values (no var() references — this artifact is meant to be consumed directly, not re-resolved).",
-      "required": ["color"],
+      "required": [
+        "color"
+      ],
       "additionalProperties": false,
       "properties": {
         "color": {
           "type": "object",
-          "required": ["light", "dark"],
+          "required": [
+            "light",
+            "dark"
+          ],
           "additionalProperties": false,
           "properties": {
-            "light": { "$ref": "#/$defs/colorValueMap" },
-            "dark": { "$ref": "#/$defs/colorValueMap" }
+            "light": {
+              "$ref": "#/$defs/colorValueMap"
+            },
+            "dark": {
+              "$ref": "#/$defs/colorValueMap"
+            }
           }
         }
       }
@@ -34,12 +57,18 @@
     "radius": {
       "type": "object",
       "description": "Theme-independent corner-radius tokens. Only values that trace to an explicitly closed PDS decision — not a general-purpose scale.",
-      "additionalProperties": { "type": "string", "pattern": "^\\d+(px|%)$" }
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^\\d+(px|%)$"
+      }
     },
     "spacing": {
       "type": "object",
       "description": "Theme-independent spacing tokens. Product Owner-approved v1 (Option 3B, 2026-09-02): a closed 10-value primitive set plus an optional, currently-empty semantic-alias layer. 'primitive' values are restricted by enum to exactly the approved set — an unapproved value fails closed at validation, not just at generation time.",
-      "required": ["primitive", "semantic"],
+      "required": [
+        "primitive",
+        "semantic"
+      ],
       "additionalProperties": false,
       "properties": {
         "primitive": {
@@ -47,13 +76,161 @@
           "description": "The approved v1 spacing primitives. Closed set — do not add a value here without another canonical Design System decision.",
           "additionalProperties": {
             "type": "string",
-            "enum": ["4px", "6px", "8px", "10px", "12px", "14px", "16px", "18px", "20px", "24px"]
+            "enum": [
+              "4px",
+              "6px",
+              "8px",
+              "10px",
+              "12px",
+              "14px",
+              "16px",
+              "18px",
+              "20px",
+              "24px"
+            ]
           }
         },
         "semantic": {
           "type": "object",
           "description": "Semantic spacing aliases. Empty in the v1 decision — no candidate currently meets ONLY_STABLE_CROSS_SYSTEM_MEANINGS. Present as an object (not absent) so a future decision can populate it without a breaking schema change.",
-          "additionalProperties": { "type": "string" }
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "description": "OPTIONAL. Typography v1 (TYPO-001..012, Product Owner-approved 2026-09-15). Two-layer model: 'family' (which font), 'style' (the PDS-061/062 real-font-validated render contract per slot), 'role' (BTM-014's semantic roles mapped onto style slots, per TYPO-001). Absent entirely in a pre-2A.1 artifact; once present, every sub-key below is mandatory — this schema validates contract SHAPE and representation only, never duplicating canonical VALUES already owned by CANONICAL-TYPOGRAPHY-DECISIONS.json.",
+      "required": [
+        "family",
+        "style",
+        "role"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "object",
+          "description": "The two approved Typography v1 families (TYPO-003). Closed set — do not add a key here without another canonical Typography decision.",
+          "required": [
+            "primary",
+            "structured"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "primary": {
+              "$ref": "#/$defs/typographyFamily"
+            },
+            "structured": {
+              "$ref": "#/$defs/typographyFamily"
+            }
+          }
+        },
+        "style": {
+          "type": "object",
+          "description": "The 13 approved Typography v1 style slots (TYPO-002/004/005/006/007), each a PDS-061/062-derived render contract. Closed set.",
+          "required": [
+            "display",
+            "titleLg",
+            "titleMd",
+            "heading",
+            "bodyLg",
+            "bodyMd",
+            "label",
+            "caption",
+            "numericHero",
+            "numericPrimary",
+            "numericSecondary",
+            "numericInline",
+            "numericMeta"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "display": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "titleLg": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "titleMd": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "heading": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "bodyLg": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "bodyMd": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "label": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "caption": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "numericHero": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "numericPrimary": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "numericSecondary": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "numericInline": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            },
+            "numericMeta": {
+              "$ref": "#/$defs/typographyStyleSlot"
+            }
+          }
+        },
+        "role": {
+          "type": "object",
+          "description": "The 9 approved BTM-014 semantic roles (TYPO-001), each mapped to one of the 13 style slots above. titleMd, label (style-slot), numericSecondary and numericInline are valid style slots deliberately absent here — not every slot has a semantic-role mapping in v1. Closed set.",
+          "required": [
+            "brandDisplay",
+            "financialHero",
+            "pageTitle",
+            "sectionTitle",
+            "cardFinancialValue",
+            "body",
+            "secondaryBody",
+            "label",
+            "metadata"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "brandDisplay": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "financialHero": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "pageTitle": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "sectionTitle": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "cardFinancialValue": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "body": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "secondaryBody": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "label": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            },
+            "metadata": {
+              "$ref": "#/$defs/typographyStyleSlotRef"
+            }
+          }
         }
       }
     }
@@ -65,6 +242,85 @@
         "type": "string",
         "pattern": "^(#[0-9A-Fa-f]{6}|rgba\\(\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*\\d+\\s*,\\s*[0-9.]+\\s*\\))$"
       }
+    },
+    "typographyFamily": {
+      "type": "object",
+      "description": "A single family entry — the literal font-family name only. No fallback stack (that stays consumer/runtime-owned, TYPO-003).",
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "typographyStyleSlot": {
+      "type": "object",
+      "description": "One style slot's render contract. Representation only (TYPO-010): fontSize/lineHeight as px-strings, letterSpacing as an em-string, fontWeight as a numeric CSS weight. Exact v1 values are owned by CANONICAL-TYPOGRAPHY-DECISIONS.json, not restated here as schema const.",
+      "required": [
+        "family",
+        "fontSize",
+        "lineHeight",
+        "fontWeight",
+        "letterSpacing"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "type": "string",
+          "enum": [
+            "primary",
+            "structured"
+          ]
+        },
+        "fontSize": {
+          "type": "string",
+          "pattern": "^\\d+px$"
+        },
+        "lineHeight": {
+          "type": "string",
+          "pattern": "^\\d+px$"
+        },
+        "fontWeight": {
+          "type": "integer",
+          "enum": [
+            100,
+            200,
+            300,
+            400,
+            500,
+            600,
+            700,
+            800,
+            900
+          ]
+        },
+        "letterSpacing": {
+          "type": "string",
+          "pattern": "^-?\\d+(\\.\\d+)?em$"
+        }
+      }
+    },
+    "typographyStyleSlotRef": {
+      "type": "string",
+      "description": "A semantic role's value must reference one of the 13 approved style slots by name — referential integrity, not a duplicated value.",
+      "enum": [
+        "display",
+        "titleLg",
+        "titleMd",
+        "heading",
+        "bodyLg",
+        "bodyMd",
+        "label",
+        "caption",
+        "numericHero",
+        "numericPrimary",
+        "numericSecondary",
+        "numericInline",
+        "numericMeta"
+      ]
     }
   }
 }
