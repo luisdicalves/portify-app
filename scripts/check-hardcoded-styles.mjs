@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-// Hardcoded-style audit — Tranche A, REPORT ONLY.
+// Hardcoded-style audit — REPORT ONLY.
 //
-// This command NEVER fails because the App contains existing debt: no
-// approved baseline exists yet (HARDSTYLE-005/006 land in Tranche B, CI
-// enforcement in Tranche C). It exits non-zero only if the scan itself
-// cannot be completed.
+// This command NEVER fails because the App contains existing debt. It exits
+// non-zero only if the scan itself cannot be completed or trusted — including
+// a ScanIntegrityError for a file that could not be fully read or parsed,
+// which must never be reported as clean. Baseline generation is a separate
+// command (baseline:hardcoded-styles); CI enforcement is not wired here.
 //
 //   npm run audit:hardcoded-styles
 //   npm run audit:hardcoded-styles -- --format json
@@ -40,14 +41,15 @@ function renderText(result, opts) {
   L.push(`REVIEW_REQUIRED ............ ${c.reviewRequired}   (geometry + dynamic expressions; not enforced in v1)`);
   L.push(`MEASURE_ONLY ............... ${c.measureOnly}`);
   L.push(`BLOCKED_BY_MISSING_CANONICAL_TOKEN ... ${c.blockedByMissingCanonicalToken}   (elevation, interaction)`);
-  L.push(`  of which embed a raw colour literal .. ${c.blockedButEmbeddingColorLiteral}   (measured, NOT enforced — open question for Tranche B)`);
+  L.push(`  of which embed a raw colour literal .. ${c.blockedButEmbeddingColorLiteral}   (diagnostic only — never enforced, HARDSTYLE-013)`);
   L.push('');
   L.push('Compliance context — deliberately NOT merged (HARDSTYLE-002):');
   L.push(`  var() references that are anti-hardcoded compliant ... ${c.antiHardcodedCompliantReferences}`);
   L.push(`  of which canonical --ds-* references ................. ${c.canonicalDsReferences}`);
   L.push(`  legacy token definitions exempt per HARDSTYLE-003 .... ${c.legacyTokenDefinitions}`);
   L.push('');
-  L.push('Token diagnostics for ENFORCED_V1 literals (diagnostic only — a match is still a finding):');
+  L.push('Token diagnostics for ENFORCED_V1 literals (diagnostic only — a match is still a finding;');
+  L.push('counts are independent, not mutually exclusive — one literal may match both):');
   for (const [k, n] of Object.entries(c.tokenMatches)) L.push(`  ${k.padEnd(24)} ${n}`);
   L.push('');
 
@@ -55,15 +57,16 @@ function renderText(result, opts) {
   if (opts.rule) sample = sample.filter((f) => f.rule === opts.rule);
   L.push(`Sample findings (${Math.min(opts.limit, sample.length)} of ${sample.length}):`);
   for (const f of sample.slice(0, opts.limit)) {
-    const t = f.tokenMatch.kind === 'NO_TOKEN_MATCH'
-      ? 'no token match'
-      : `${f.tokenMatch.kind}: ${f.tokenMatch.canonical ?? f.tokenMatch.legacy}`;
+    const parts = [];
+    if (f.tokenMatch.canonical) parts.push(`canonical ${f.tokenMatch.canonical}`);
+    if (f.tokenMatch.legacy) parts.push(`legacy ${f.tokenMatch.legacy}`);
+    const t = parts.length ? parts.join(' + ') : 'no token match';
     L.push(`  ${f.rule}`);
     L.push(`    ${f.repoRelativePath}:${f.line}:${f.column}  <${f.namedScope}>`);
     L.push(`    ${f.property}: ${f.normalizedValue}   [${t}]`);
   }
   L.push('');
-  L.push('No baseline exists yet; existing debt does not fail this command.');
+  L.push('Report only: existing debt does not fail this command.');
   return L.join('\n');
 }
 
@@ -73,7 +76,9 @@ function main() {
   try {
     result = scanRepository(REPO_ROOT);
   } catch (err) {
-    console.error('ERROR: hardcoded-style scan failed to complete.');
+    console.error(err && err.name === 'ScanIntegrityError'
+      ? 'ERROR: hardcoded-style scan is not trustworthy — a file could not be fully read or parsed.'
+      : 'ERROR: hardcoded-style scan failed to complete.');
     console.error(err && err.stack ? err.stack : String(err));
     process.exitCode = 1;
     return;

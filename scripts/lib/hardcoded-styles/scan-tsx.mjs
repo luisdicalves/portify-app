@@ -7,7 +7,8 @@
 // attribute rather than guessed from a value.
 
 import ts from 'typescript';
-import { classify, normalizeValue, isVarReference, isInertValue, varCompliance, containsColorLiteral, RULES } from './taxonomy.mjs';
+import { classify, normalizeValue, isVarReference, isInertValue, varCompliance, RULES } from './taxonomy.mjs';
+import { ScanIntegrityError } from './integrity.mjs';
 
 export const CONTEXT_KIND = Object.freeze({
   JSX_STYLE_ATTRIBUTE: 'jsx-style-attribute',
@@ -56,14 +57,20 @@ function isMaterialSymbolElement(openingElement) {
     if (attr.name.getText() !== 'className') continue;
     const init = attr.initializer;
     if (!init) continue;
-    let text = null;
-    if (ts.isStringLiteral(init)) text = init.text;
+    // Only the *authored static text* of the className counts as structural
+    // proof. For a template literal that is its head plus the literal part of
+    // each span — `material-symbols-outlined${active ? ' icf' : ''}` proves
+    // icon context through its static head, never through the substitution.
+    const staticParts = [];
+    if (ts.isStringLiteral(init)) staticParts.push(init.text);
     else if (ts.isJsxExpression(init) && init.expression) {
-      if (ts.isStringLiteral(init.expression) || ts.isNoSubstitutionTemplateLiteral(init.expression)) {
-        text = init.expression.text;
+      const e = init.expression;
+      if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e)) staticParts.push(e.text);
+      else if (ts.isTemplateExpression(e)) {
+        staticParts.push(e.head.text, ...e.templateSpans.map((s) => s.literal.text));
       }
     }
-    if (text && /\bmaterial-symbols/.test(text)) return true;
+    if (staticParts.some((t) => /(^|\s)material-symbols-[a-z]+/.test(t))) return true;
   }
   return false;
 }
@@ -90,6 +97,17 @@ function literalOf(node) {
  */
 export function scanTsxSource(sourceText, repoRelativePath) {
   const sf = ts.createSourceFile(repoRelativePath, sourceText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+
+  // A file the scanner cannot parse must never be reported as clean: an
+  // unparseable (e.g. truncated or placeholder) file yields zero findings,
+  // which a ratchet would misread as debt reduction.
+  const syntaxErrors = sf.parseDiagnostics ?? [];
+  if (syntaxErrors.length > 0) {
+    const d = syntaxErrors[0];
+    const msg = ts.flattenDiagnosticMessageText(d.messageText, ' ');
+    throw new ScanIntegrityError(repoRelativePath, `TypeScript parse error: ${msg}`);
+  }
+
   const findings = [];
 
   const visit = (node) => {

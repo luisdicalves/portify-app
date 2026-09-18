@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { scanSource, stableSignature, discoverFiles, EXCLUDED_PATHS, STATUS } from './lib/hardcoded-styles/index.mjs';
-import { RULES, statusForRule, varCompliance, normalizeValue } from './lib/hardcoded-styles/taxonomy.mjs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readdirSync, readFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  scanSource, scanRepository, stableSignature, discoverFiles, EXCLUDED_PATHS, STATUS, ScanIntegrityError,
+} from './lib/hardcoded-styles/index.mjs';
+import { RULES, statusForRule, varCompliance, normalizeValue, classify, containsColorLiteral } from './lib/hardcoded-styles/taxonomy.mjs';
+import { assertCompleteRead } from './lib/hardcoded-styles/integrity.mjs';
 
 /** Scan a synthetic TSX source and keep only real (rule-bearing) findings. */
 function tsx(src: string, path = 'app/sample/page.tsx'): any[] {
@@ -315,5 +321,144 @@ describe('scan exclusions', () => {
   it('does not scan this scanner\'s own test file', () => {
     const files = discoverFiles(new URL('..', import.meta.url).pathname) as string[];
     expect(files.some((f: string) => f.endsWith('.test.ts') || f.endsWith('.test.tsx'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tranche B calibration
+// ---------------------------------------------------------------------------
+
+/** Builds a throwaway repo tree and scans it — never touches the real App. */
+function scanTree(files: Record<string, string>): any {
+  const root = mkdtempSync(join(tmpdir(), 'hardstyle-'));
+  try {
+    for (const [rel, text] of Object.entries(files)) {
+      const abs = join(root, rel);
+      mkdirSync(join(abs, '..'), { recursive: true });
+      writeFileSync(abs, text);
+    }
+    return scanRepository(root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+describe('Material Symbols context — calibration (HARDSTYLE-004)', () => {
+  it('recognises icon context from the static head of a template-literal className', () => {
+    const jsx = component("<span className={`material-symbols-outlined${active ? ' icf' : ''}`} style={{ fontSize: 20 }}>x</span>");
+    expect(tsx(jsx)).toHaveLength(0);
+  });
+
+  it('never infers icon context from a template substitution', () => {
+    const jsx = component("<span className={`chip ${'material-symbols-outlined'}`} style={{ fontSize: 20 }}>x</span>");
+    expect(rulesOf(tsx(jsx))).toEqual([RULES.TEXT_TYPOGRAPHY_LITERAL]);
+  });
+
+  it('exempts fontSize/fontFamily in a CSS rule whose selector subject is the icon class', () => {
+    const found = css('.material-symbols-outlined { font-family: x; font-size: 24px; }\n.nav span.material-symbols-outlined { font-size: 24px; }')
+      .filter((f: any) => f.rule !== null);
+    expect(found).toHaveLength(0);
+  });
+
+  it('keeps other properties of a CSS icon rule enforceable', () => {
+    const found = css('.material-symbols-outlined { line-height: 1; color: #fff; }').filter((f: any) => f.rule !== null);
+    expect(rulesOf(found).sort()).toEqual([RULES.RAW_VISUAL_COLOR_LITERAL, RULES.TEXT_TYPOGRAPHY_LITERAL]);
+  });
+
+  it('does not treat an icon class that is only an ancestor as icon context', () => {
+    const found = css('.material-symbols-outlined .label { font-size: 14px; }').filter((f: any) => f.rule !== null);
+    expect(rulesOf(found)).toEqual([RULES.TEXT_TYPOGRAPHY_LITERAL]);
+  });
+});
+
+describe('HARDSTYLE-013 — precedence of non-enforceable property categories', () => {
+  it('never promotes a colour embedded in boxShadow to ENFORCED_V1', () => {
+    const rule = classify({ property: 'boxShadow', value: '0 1px 2px #0000001a' });
+    expect(rule).toBe(RULES.ELEVATION_LITERAL);
+    expect(statusForRule(rule!)).toBe(STATUS.BLOCKED_BY_MISSING_CANONICAL_TOKEN);
+  });
+
+  it('never promotes a colour embedded in an interaction property to ENFORCED_V1', () => {
+    expect(statusForRule(classify({ property: 'outline', value: '2px solid #ff0000' })!))
+      .toBe(STATUS.BLOCKED_BY_MISSING_CANONICAL_TOKEN);
+  });
+
+  it('keeps the embedded literal visible as a diagnostic and out of ENFORCED_V1', () => {
+    const r = scanTree({ 'app/a/page.tsx': component(`<div style={{ boxShadow: '0 1px 2px rgba(0,0,0,.3)' }} />`) });
+    const f = r.findings.find((x: any) => x.property === 'boxShadow');
+    expect(f.embeddedColorLiteral).toBe(true);
+    expect(f.status).toBe(STATUS.BLOCKED_BY_MISSING_CANONICAL_TOKEN);
+    expect(r.counts.enforcedV1).toBe(0);
+    expect(r.counts.blockedButEmbeddingColorLiteral).toBe(1);
+  });
+
+  it('is not a generic colour exemption: a plain colour stays ENFORCED_V1', () => {
+    const rule = classify({ property: 'color', value: '#000000' });
+    expect(rule).toBe(RULES.RAW_VISUAL_COLOR_LITERAL);
+    expect(statusForRule(rule!)).toBe(STATUS.ENFORCED_V1);
+  });
+
+  it('does not extend to a composite border shorthand, whose colour is independently enforceable', () => {
+    expect(containsColorLiteral('1px solid #1f1f24')).toBe(true);
+    expect(classify({ property: 'border', value: '1px solid #1f1f24' })).toBe(RULES.RAW_VISUAL_COLOR_LITERAL);
+  });
+});
+
+describe('scan integrity', () => {
+  it('rejects a read that is shorter than the file on disk', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hardstyle-'));
+    try {
+      const abs = join(root, 'page.tsx');
+      writeFileSync(abs, 'export const x = 1;\n');
+      expect(() => assertCompleteRead(abs, 'page.tsx', '')).toThrow(ScanIntegrityError);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('rejects placeholder content made of NUL bytes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hardstyle-'));
+    try {
+      const abs = join(root, 'page.tsx');
+      const zeros = String.fromCharCode(0).repeat(64);
+      writeFileSync(abs, zeros);
+      expect(() => assertCompleteRead(abs, 'page.tsx', zeros)).toThrow(/NUL bytes/);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  it('fails the whole scan instead of reporting an unparseable TSX file as clean', () => {
+    expect(() => scanTree({ 'app/a/page.tsx': 'export default function A() { return <div style={{ fontSize: 20 }} ' }))
+      .toThrow(ScanIntegrityError);
+  });
+
+  it('fails the whole scan instead of reporting an unparseable CSS file as clean', () => {
+    expect(() => scanTree({ 'app/a.css': '.a { color: #fff; ' })).toThrow(ScanIntegrityError);
+  });
+
+  it('keeps the scanner\'s own sources free of raw NUL bytes (git would treat them as binary)', () => {
+    const here = new URL('.', import.meta.url).pathname;
+    const sources = [
+      'check-hardcoded-styles.mjs',
+      'hardcoded-styles.test.ts',
+      ...readdirSync(join(here, 'lib/hardcoded-styles')).map((f) => `lib/hardcoded-styles/${f}`),
+    ].filter((f) => /\.(mjs|ts)$/.test(f));
+    for (const f of sources) {
+      expect(readFileSync(join(here, f)).includes(0), f).toBe(false);
+    }
+  });
+});
+
+describe('token-match reporting (independent, not mutually exclusive)', () => {
+  it('lets one finding count toward both canonical and legacy matches', () => {
+    const r = scanTree({
+      'vendor/design-system/tokens.json': JSON.stringify({ semantic: { color: { light: { ink: '#123456' } } } }),
+      'app/globals.css': ':root { --ink: #123456; }\n',
+      'app/a/page.tsx': component(`<div style={{ color: '#123456' }} />`),
+    });
+    const tm = r.counts.tokenMatches;
+    expect(tm.CANONICAL_MATCH_COUNT).toBe(1);
+    expect(tm.LEGACY_MATCH_COUNT).toBe(1);
+    expect(tm.BOTH_CANONICAL_AND_LEGACY_MATCH_COUNT).toBe(1);
+    expect(tm.NO_TOKEN_MATCH_COUNT).toBe(0);
+    // ...and the token match never changes the verdict (HARDSTYLE-009).
+    expect(r.counts.enforcedV1).toBe(1);
   });
 });

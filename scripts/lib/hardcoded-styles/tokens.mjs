@@ -59,14 +59,15 @@ export function buildTokenIndex(repoRoot, {
 }
 
 /**
- * Diagnostic only. Returns which known token a literal happens to equal.
- * `NO_TOKEN_MATCH` is a perfectly normal outcome and carries no verdict.
+ * Diagnostic only. Returns which known token(s) a literal happens to equal.
+ * Matching neither is a perfectly normal outcome and carries no verdict.
  */
 export function matchToken(index, normalizedValue) {
+  // Independent fields, deliberately: a literal may equal a canonical token
+  // value AND a legacy variable value at once. There is no single "kind",
+  // because collapsing the two would present overlapping matches as
+  // mutually exclusive categories.
   const canonical = index.canonical.get(normalizedValue) ?? null;
   const legacy = index.legacy.get(normalizedValue) ?? null;
-  let kind = 'NO_TOKEN_MATCH';
-  if (canonical) kind = 'CANONICAL_TOKEN_MATCH';
-  else if (legacy) kind = 'LEGACY_TOKEN_MATCH';
-  return { kind, canonical, legacy };
+  return { canonical, legacy };
 }
