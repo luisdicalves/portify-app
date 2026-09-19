@@ -76,6 +76,14 @@ jobs:
       - name: Design tokens check (schema, provenance, contentHash, determinism, drift)
         run: npm run check:design-tokens
 
+      # Secretless, like the token check above: reads only the committed
+      # vendor/brand/ snapshot, vendor/brand.lock.json, brand-consumption.json
+      # and the bound runtime targets — never PORTIFY-KNOWLEDGE. Upstream
+      # freshness is the privileged sync workflow's job (Brand Consumer
+      # Contract v1, DS-RUNTIME-002 T1 / APP_BRAND_VERSION_CHECK).
+      - name: Brand assets check (snapshot, contentHash, lock, bindings)
+        run: npm run check:brand-assets
+
       - name: Build
         run: npm run build
 
