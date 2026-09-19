@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portify.internal/schemas/brand-registry.schema.json",
+  "title": "Portify Brand Asset Registry",
+  "description": "Machine-readable structural contract for the Brand Asset Registry (BRAND-REG-001..009, 03-decisions/UX/BRAND-ASSET-REGISTRY-V1-DECISIONS.md). This schema is evaluated by the repository's existing dependency-free schema_validate.py, which supports only a documented JSON Schema subset (type, required, additionalProperties, properties, items, pattern, enum, minItems, uniqueItems, format, $ref, $defs) and fails closed on anything else -- so this schema deliberately does not use allOf/if-then/minimum/minLength. Conditional requirements (a PNG entry needs dimensions, an SVG entry needs viewBox, external-pinned provenance needs externalRef, derived provenance needs derivedFrom) and all referential/semantic integrity (assetId/sourcePath uniqueness, file existence, hash verification, derivedFrom resolution, distributable-set derivation) are enforced by validate_brand_registry.py's own logic layered on top of this schema, not by the schema itself -- deliberately, per BRAND-REG-005/009, so ordinary additive registry content never requires a schema change. This schema does not encode which specific assetId/role/variant values exist or any current asset hash.",
+  "type": "object",
+  "required": ["registryVersion", "schemaVersion", "contentHash", "assets"],
+  "additionalProperties": false,
+  "properties": {
+    "registryVersion": { "$ref": "#/$defs/semver" },
+    "schemaVersion": { "$ref": "#/$defs/semver" },
+    "contentHash": { "$ref": "#/$defs/contentHash" },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/assetEntry" }
+    }
+  },
+  "$defs": {
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "contentHash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "assetId": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+    },
+    "nonEmptyString": {
+      "type": "string",
+      "pattern": "^.+$"
+    },
+    "mediaType": {
+      "type": "string",
+      "enum": ["image/svg+xml", "image/png"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["APPROVED", "CANDIDATE", "SUPERSEDED"]
+    },
+    "provenanceType": {
+      "type": "string",
+      "enum": ["repository", "external-pinned", "derived"]
+    },
+    "dimensions": {
+      "type": "object",
+      "required": ["width", "height"],
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" }
+      }
+    },
+    "externalRef": {
+      "type": "object",
+      "required": ["description", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "description": { "$ref": "#/$defs/nonEmptyString" },
+        "sha256": { "$ref": "#/$defs/contentHash" }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["type", "decisionRef"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "$ref": "#/$defs/provenanceType" },
+        "decisionRef": { "$ref": "#/$defs/nonEmptyString" },
+        "externalRef": { "$ref": "#/$defs/externalRef" },
+        "derivedFrom": { "$ref": "#/$defs/assetId" }
+      }
+    },
+    "assetEntry": {
+      "type": "object",
+      "required": ["assetId", "role", "sourcePath", "mediaType", "sha256", "status", "provenance"],
+      "additionalProperties": false,
+      "properties": {
+        "assetId": { "$ref": "#/$defs/assetId" },
+        "role": { "$ref": "#/$defs/nonEmptyString" },
+        "variant": { "$ref": "#/$defs/nonEmptyString" },
+        "sourcePath": { "$ref": "#/$defs/nonEmptyString" },
+        "mediaType": { "$ref": "#/$defs/mediaType" },
+        "sha256": { "$ref": "#/$defs/contentHash" },
+        "status": { "$ref": "#/$defs/status" },
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "dimensions": { "$ref": "#/$defs/dimensions" },
+        "viewBox": { "$ref": "#/$defs/nonEmptyString" }
+      }
+    }
+  }
+}

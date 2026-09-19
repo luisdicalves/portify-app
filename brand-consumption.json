@@ -1,0 +1,15 @@
+{
+  "consumer": "portify-app",
+  "bindings": [
+    {
+      "target": "app/icon.png",
+      "assetId": "app-icon-on-green-png-512",
+      "usage": "platform-app-icon"
+    },
+    {
+      "target": "app/apple-icon.png",
+      "assetId": "app-icon-on-green-png-180",
+      "usage": "apple-touch-icon"
+    }
+  ]
+}
