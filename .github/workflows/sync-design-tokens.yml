@@ -106,3 +106,102 @@ jobs:
       - name: No changes
         if: steps.diff.outputs.changed == 'false'
         run: echo "Nothing to sync."
+
+  # Brand Consumer Contract v1 (DS-RUNTIME-002): the same privileged pattern
+  # as the token job above, for the independently-versioned Brand snapshot
+  # (BRAND-REG-001/008). A separate job so Brand and token changes never mix
+  # in one PR, and so this checkout can carry full history without touching
+  # the token job: sourceCommit is the last Knowledge commit that changed a
+  # snapshot file, which needs history to resolve (scripts/sync-brand-assets.mjs).
+  sync-brand:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout portify-app
+        uses: actions/checkout@v4
+        with:
+          path: portify-app
+
+      # Same read-only, single-repository KNOWLEDGE_REPO_TOKEN as the token
+      # job; full history (fetch-depth: 0) for the stable sourceCommit.
+      - name: Checkout PORTIFY-KNOWLEDGE (read-only, full history)
+        uses: actions/checkout@v4
+        with:
+          repository: luisdicalves/PORTIFY-KNOWLEDGE
+          token: ${{ secrets.KNOWLEDGE_REPO_TOKEN }}
+          path: knowledge-checkout
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: portify-app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: portify-app
+        run: npm ci
+
+      # Credential-free: reads only the local checkout. Writes nothing unless
+      # the Brand snapshot bytes changed; never edits brand-consumption.json.
+      - name: Run Brand sync
+        working-directory: portify-app
+        run: node scripts/sync-brand-assets.mjs --source ../knowledge-checkout
+
+      - name: Check whether anything material changed
+        id: diff
+        working-directory: portify-app
+        run: |
+          TARGETS=$(node -e "console.log(JSON.parse(require('fs').readFileSync('brand-consumption.json','utf8')).bindings.map(b=>b.target).join(' '))")
+          if git diff --quiet -- vendor/brand vendor/brand.lock.json $TARGETS && [ -z "$(git status --porcelain -- vendor/brand)" ]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No material Brand change — Knowledge HEAD moving is not a reason to update."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The same secretless gate normal CI runs, before proposing anything.
+      - name: Validate freshly-synced Brand snapshot
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: portify-app
+        run: npm run check:brand-assets
+
+      - name: Open pull request
+        if: steps.diff.outputs.changed == 'true'
+        working-directory: portify-app
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TARGETS: ${{ steps.diff.outputs.targets }}
+        run: |
+          set -euo pipefail
+          BRANCH="sync/brand-assets-$(date -u +%Y%m%d-%H%M%S)"
+          git config user.name "portify-brand-sync"
+          git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A vendor/brand vendor/brand.lock.json $TARGETS
+          git commit -m "chore(brand): sync vendored PORTIFY-KNOWLEDGE Brand snapshot"
+          git push origin "$BRANCH"
+          LOCK=vendor/brand.lock.json
+          field() { node -e "console.log(JSON.parse(require('fs').readFileSync('$LOCK','utf8')).$1)"; }
+          PR_BODY_FILE="$(mktemp)"
+          {
+            echo "Automated sync of the vendored PORTIFY-KNOWLEDGE Brand snapshot (Brand Consumer Contract v1)."
+            echo ""
+            echo "registryVersion: $(field registryVersion)"
+            echo "contentHash:     $(field contentHash)"
+            echo "sourceCommit:    $(field sourceCommit)"
+            echo ""
+            echo "Bound runtime targets were refreshed only for existing bindings; brand-consumption.json is unchanged (binding changes are placement and need a reviewed PR)."
+            echo "The secretless \`check:brand-assets\` gate already passed against this exact snapshot."
+            echo ""
+            echo "**Manual step required before merging:** this PR was opened with the default GITHUB_TOKEN, which does not trigger other workflows — re-trigger normal CI (e.g. close and reopen this PR) so the required status checks run."
+          } > "$PR_BODY_FILE"
+          gh pr create \
+            --title "chore(brand): sync vendored PORTIFY-KNOWLEDGE Brand snapshot" \
+            --base main \
+            --head "$BRANCH" \
+            --body-file "$PR_BODY_FILE"
+
+      - name: No changes
+        if: steps.diff.outputs.changed == 'false'
+        run: echo "Nothing to sync."

@@ -16,6 +16,7 @@
     "check:supabase-env": "node scripts/check-supabase-environment.mjs",
     "generate:design-tokens": "node scripts/generate-design-tokens.mjs",
     "check:design-tokens": "node scripts/check-design-tokens.mjs",
+    "check:brand-assets": "node scripts/check-brand-assets.mjs",
     "audit:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs",
     "check:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs --ratchet",
     "baseline:hardcoded-styles": "node scripts/generate-hardcoded-styles-baseline.mjs"
