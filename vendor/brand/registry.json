@@ -1,0 +1,601 @@
+{
+  "assets": [
+    {
+      "assetId": "app-icon-on-black-png-1024",
+      "dimensions": {
+        "height": 1024,
+        "width": 1024
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:ecd65d87af981022a1ed1475f15124ed2d26876ce4631a1ed509c040d540916e",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-1024.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-128",
+      "dimensions": {
+        "height": 128,
+        "width": 128
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:5f71d9e4691bbf11d058abeb5794337235948e3bc2cb31450ee451127147f0b9",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-128.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-16",
+      "dimensions": {
+        "height": 16,
+        "width": 16
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:978645e918b31a818d83713221759786cc283bf8187eadd095545a2e6cfbcd01",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-16.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-180",
+      "dimensions": {
+        "height": 180,
+        "width": 180
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:205ef3098602d4f95b4760754921354d5d943c7d6cc23821b5336d263bd3454b",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-180.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-192",
+      "dimensions": {
+        "height": 192,
+        "width": 192
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:a4294e4e525631a1dc947a48dda258a1f741c294f2682efee35bbbd3d7a29ad3",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-192.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-256",
+      "dimensions": {
+        "height": 256,
+        "width": 256
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:33f071ab38bce1685d85525a77f4278509bbaadf96e64ecb786e3f5915afddb4",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-256.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-32",
+      "dimensions": {
+        "height": 32,
+        "width": 32
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:87cf845a7c2db1d0fb750ebb7d1ec8475d3177a3e2fe9774ae86a03daf2aa5cd",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-32.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-48",
+      "dimensions": {
+        "height": 48,
+        "width": 48
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:3dafbcc755e6f85f80670884fd3364ef496df110e4a6a5856bc8450a61c7df0e",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-48.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-512",
+      "dimensions": {
+        "height": 512,
+        "width": 512
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:5a32bd8f75156f805bbcc370fed7b178619f181ebb2f98b64d271d04d3d76549",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-512.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-png-64",
+      "dimensions": {
+        "height": 64,
+        "width": 64
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-black-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:5827af61dce1ee4ef0dbc35ad8d8918032ef9c84f8cf8a68c7cec25f4af50b94",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-black/portify-icon-on-black-64.png",
+      "status": "APPROVED",
+      "variant": "on-black"
+    },
+    {
+      "assetId": "app-icon-on-black-svg",
+      "mediaType": "image/svg+xml",
+      "provenance": {
+        "decisionRef": "BTM-002",
+        "externalRef": {
+          "description": "app_icon-03.svg, pre-normalization source SVG, BRAND-FOUNDATIONS-V1.md evidence table",
+          "sha256": "sha256:ed3d1080824e44a05d94ec2482862996f337f5ee58b148a96588d1b3401c98fb"
+        },
+        "type": "external-pinned"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:ed3d1080824e44a05d94ec2482862996f337f5ee58b148a96588d1b3401c98fb",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/svg/portify-icon-on-black.svg",
+      "status": "APPROVED",
+      "variant": "on-black",
+      "viewBox": "0 0 1024 1024"
+    },
+    {
+      "assetId": "app-icon-on-green-png-1024",
+      "dimensions": {
+        "height": 1024,
+        "width": 1024
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:294574c898a848dbfcfcf2360cb904c6e4950ab53fbeffbfd7e320c3b7fe617d",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-1024.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-128",
+      "dimensions": {
+        "height": 128,
+        "width": 128
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:f56fe98c8ff1ce78d3e276b66f94247c1822555a09c1fe9feaa53f878674adb7",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-128.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-16",
+      "dimensions": {
+        "height": 16,
+        "width": 16
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:7ff15c8e6af91d3ecc17c7e51eae8fd4eea25f89aac75bbcf7c7fd9dc546ba58",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-16.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-180",
+      "dimensions": {
+        "height": 180,
+        "width": 180
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:e84922dafec373bbd9e5a192db57a81b43069e0f95db432ebfc31ddd5420b7b9",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-180.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-192",
+      "dimensions": {
+        "height": 192,
+        "width": 192
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:286e552c12e891f671a722b558adeedf0dfb56548f710cb9e165dc227d10de8d",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-192.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-256",
+      "dimensions": {
+        "height": 256,
+        "width": 256
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:9a296544ccf00561d36b8f1393e22df6d840aa4e622b7351f95ab4411e3fed1f",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-256.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-32",
+      "dimensions": {
+        "height": 32,
+        "width": 32
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:79c62410280c867c806d7e0100e7a41bf0b87ff856828efcd8ff4d789cc326d5",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-32.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-48",
+      "dimensions": {
+        "height": 48,
+        "width": 48
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:667c0b773d599a12762f8a4853b5fda7ffd6460680da8254809542828cc95a63",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-48.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-512",
+      "dimensions": {
+        "height": 512,
+        "width": 512
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:5921a2231afc654fdeb1a19d6ad3bbf8ec43612f692e9e20371cd22ecc47d4e7",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-512.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-png-64",
+      "dimensions": {
+        "height": 64,
+        "width": 64
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-green-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:eeef920092ecb600d85aeb86aeebd74bf155a564a8dd74ab167244cd7fd625dd",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/on-green/portify-icon-on-green-64.png",
+      "status": "APPROVED",
+      "variant": "on-green"
+    },
+    {
+      "assetId": "app-icon-on-green-svg",
+      "mediaType": "image/svg+xml",
+      "provenance": {
+        "decisionRef": "BTM-002",
+        "externalRef": {
+          "description": "app_icon-01.svg, pre-normalization source SVG, BRAND-FOUNDATIONS-V1.md evidence table",
+          "sha256": "sha256:29fd9dc0f7324867c79167b03fff5e8aa74a426df60abec7a92f34907f5b204e"
+        },
+        "type": "external-pinned"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:128bcb9374a191bd4864fd3ebd25556221984f5462a988869a81bcb6c7c5727d",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/svg/portify-icon-on-green.svg",
+      "status": "APPROVED",
+      "variant": "on-green",
+      "viewBox": "0 0 1024 1024"
+    },
+    {
+      "assetId": "app-icon-on-white-png-1024",
+      "dimensions": {
+        "height": 1024,
+        "width": 1024
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:f8626a4eb78a7d735210a9725b07a0173ed9eb8ccdf85260d5331c7f29221d07",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-1024.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-128",
+      "dimensions": {
+        "height": 128,
+        "width": 128
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:e7638090dfab88944fa432c227e5ad73f9426fb63f83675a97df600a2c1ee9d1",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-128.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-16",
+      "dimensions": {
+        "height": 16,
+        "width": 16
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:38fc28168dd75da55a0a23c9a188743f7b71114ffea9cfc79d1ed4252df02e15",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-16.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-180",
+      "dimensions": {
+        "height": 180,
+        "width": 180
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:decb32c190f9fbc0fad1255039707ab0bef0541c661882fa455dd36ec2c00192",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-180.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-192",
+      "dimensions": {
+        "height": 192,
+        "width": 192
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:8f7c85b0fb3ccd6f2c7b42f47ad9f3613b685ab2f9be4e630d0072fc4766af3d",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-192.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-256",
+      "dimensions": {
+        "height": 256,
+        "width": 256
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:a63d851484f5940791b55ab714fe8575ccf4a7ee5764d2551a69eba1ec91dc6a",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-256.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-32",
+      "dimensions": {
+        "height": 32,
+        "width": 32
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:2eba7eb2cf0ba19b65e6f441cd7a580e4ecd2709aa4720f61426a468be181c50",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-32.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-48",
+      "dimensions": {
+        "height": 48,
+        "width": 48
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:88ffd2e97e9f64244d9a6362e58c7bec173e083e1c099414f176d52d94117620",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-48.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-512",
+      "dimensions": {
+        "height": 512,
+        "width": 512
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:7172ec63da852443c52605157b343e4251ac45c466cce8cceca3e25cbdc2b1ab",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-512.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-png-64",
+      "dimensions": {
+        "height": 64,
+        "width": 64
+      },
+      "mediaType": "image/png",
+      "provenance": {
+        "decisionRef": "BTM-029",
+        "derivedFrom": "app-icon-on-white-svg",
+        "type": "derived"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:343143ef3a58a158a962997afe4d30cdfde16b3c83fd62708f310345fc18f68d",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/png/mark-green/portify-mark-green-64.png",
+      "status": "APPROVED",
+      "variant": "on-white"
+    },
+    {
+      "assetId": "app-icon-on-white-svg",
+      "mediaType": "image/svg+xml",
+      "provenance": {
+        "decisionRef": "BTM-002",
+        "externalRef": {
+          "description": "app_icon-02.svg, pre-normalization source SVG, BRAND-FOUNDATIONS-V1.md evidence table",
+          "sha256": "sha256:6e51b505be8e9fcf95327f6917d8256a1984788297feb4fc29facc22e6d1027c"
+        },
+        "type": "external-pinned"
+      },
+      "role": "appIcon",
+      "sha256": "sha256:f3f3d2041a7d0d0fa5c5beb47814ab1ccd0bff3f4dea5d90d8e96d1140a66b41",
+      "sourcePath": "10-design/DESIGN-SYSTEM/BRAND-ASSETS/svg/portify-mark-green.svg",
+      "status": "APPROVED",
+      "variant": "on-white",
+      "viewBox": "0 0 1024 1024"
+    }
+  ],
+  "contentHash": "sha256:01a3e9ef9684e782dcb43e2f0ec9f37f27f4ebe84981db17b9566f0a746fb6f8",
+  "registryVersion": "1.0.0",
+  "schemaVersion": "1.0.0"
+}

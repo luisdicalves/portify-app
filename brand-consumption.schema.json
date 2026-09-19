@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://portify.app/schemas/brand-consumption.schema.json",
+  "title": "portify-app Brand consumption bindings",
+  "description": "Consumer-owned runtime bindings from repository targets to canonical Brand Registry assetIds (Brand Consumer Contract v1, PORTIFY-KNOWLEDGE 11-engineering/CLAUDE-ARCHITECTURE/INTERFACES/BRAND-CONSUMER-CONTRACT-V1.md). Changed only by reviewed source changes; the privileged Brand sync never edits this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "consumer",
+    "bindings"
+  ],
+  "properties": {
+    "consumer": {
+      "const": "portify-app"
+    },
+    "bindings": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "target",
+          "assetId",
+          "usage"
+        ],
+        "properties": {
+          "target": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._/-]*\\.(png|svg)$",
+            "description": "Repository-relative runtime file whose bytes must equal the bound asset."
+          },
+          "assetId": {
+            "type": "string",
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$"
+          },
+          "usage": {
+            "enum": [
+              "platform-app-icon",
+              "apple-touch-icon"
+            ],
+            "description": "Platform icon metadata only. In-product brand placement (brandMark, splash, login, header, wordmark) is not an allowed usage (appIcon is not authorized as brandMark)."
+          }
+        }
+      }
+    }
+  }
+}
