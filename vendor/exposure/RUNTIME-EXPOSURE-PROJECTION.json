@@ -1,0 +1,48 @@
+{
+  "contractId": "RUNTIME-EXPOSURE-PROJECTION-V1",
+  "contractVersion": "1.0.0",
+  "scopeId": "EXS-001",
+  "subjectCount": 4,
+  "subjects": [
+    {
+      "binding": {
+        "effectiveFromAppSha": "5d3fa4318be5d69239016ef124a1f99ff9e7b3ea",
+        "screenId": "SCR-020"
+      },
+      "decisionId": "EXD-001",
+      "intendedExposure": "OFFERED",
+      "runtimeRoute": "/dashboard",
+      "screenId": "SCR-020"
+    },
+    {
+      "binding": {
+        "effectiveFromAppSha": "5d3fa4318be5d69239016ef124a1f99ff9e7b3ea",
+        "screenId": "SCR-040"
+      },
+      "decisionId": "EXD-002",
+      "intendedExposure": "OFFERED",
+      "runtimeRoute": "/portfolio",
+      "screenId": "SCR-040"
+    },
+    {
+      "binding": {
+        "effectiveFromAppSha": "5d3fa4318be5d69239016ef124a1f99ff9e7b3ea",
+        "screenId": "SCR-140"
+      },
+      "decisionId": "EXD-003",
+      "intendedExposure": "OFFERED",
+      "runtimeRoute": "/profile",
+      "screenId": "SCR-140"
+    },
+    {
+      "binding": {
+        "effectiveFromAppSha": "5d3fa4318be5d69239016ef124a1f99ff9e7b3ea",
+        "screenId": "SCR-160"
+      },
+      "decisionId": "EXD-004",
+      "intendedExposure": "OFFERED",
+      "runtimeRoute": "/profile/security",
+      "screenId": "SCR-160"
+    }
+  ]
+}

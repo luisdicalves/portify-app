@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run check:exposure && next build",
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
@@ -16,6 +16,7 @@
     "check:supabase-env": "node scripts/check-supabase-environment.mjs",
     "generate:design-tokens": "node scripts/generate-design-tokens.mjs",
     "check:design-tokens": "node scripts/check-design-tokens.mjs",
+    "check:exposure": "node scripts/check-exposure-projection.mjs",
     "check:brand-assets": "node scripts/check-brand-assets.mjs",
     "audit:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs",
     "check:hardcoded-styles": "node scripts/check-hardcoded-styles.mjs --ratchet",
