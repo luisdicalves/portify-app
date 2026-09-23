@@ -84,6 +84,15 @@ jobs:
       - name: Brand assets check (snapshot, contentHash, lock, bindings)
         run: npm run check:brand-assets
 
+      # Secretless, self-contained: validates the vendored EXS-001 Runtime
+      # Exposure Projection and vendor/exposure.lock.json against this App's
+      # own routes. Never reads PORTIFY-KNOWLEDGE. Redundant with the gate
+      # inside `npm run build` below, and deliberately so — the build gate is
+      # what protects the deployable production build; this step just fails
+      # faster and names the reason (ORG-019 / PRT-CAP-APP-C1).
+      - name: Exposure projection check (contract, lock, hash, route compatibility)
+        run: npm run check:exposure
+
       - name: Build
         run: npm run build
 
